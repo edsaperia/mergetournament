@@ -1,0 +1,53 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { and, eq } from "drizzle-orm";
+import { getDb } from "../../../db";
+import { textVersions } from "../../../db/schema";
+import { currentParticipant, tournamentBySlug } from "../../../server/session";
+import { DraftEditor } from "./draft-editor";
+
+export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
+  const { slug } = await props.params;
+  const tournament = await tournamentBySlug(slug);
+  if (!tournament) notFound();
+
+  const me = await currentParticipant(slug);
+  if (!me) {
+    return (
+      <main className="mx-auto max-w-xl flex-1 px-6 py-16">
+        <h1 className="text-2xl font-bold">{tournament.name}</h1>
+        <p className="mt-4 text-neutral-600 dark:text-neutral-300">
+          To edit your draft, sign in with the personal link from your
+          invitation email.
+        </p>
+      </main>
+    );
+  }
+
+  const db = await getDb();
+  const [draft] = await db
+    .select()
+    .from(textVersions)
+    .where(and(eq(textVersions.authorId, me.id), eq(textVersions.kind, "draft")));
+
+  return (
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-8">
+      <div className="mb-4 flex items-baseline justify-between">
+        <h1 className="text-xl font-bold">
+          <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
+          {" — your draft"}
+        </h1>
+        {tournament.submissionDeadline && (
+          <span className="text-sm text-neutral-500">
+            due {tournament.submissionDeadline.toLocaleString()}
+          </span>
+        )}
+      </div>
+      {tournament.phase === "submission" ? (
+        <DraftEditor slug={slug} initialBody={draft?.bodyMd ?? tournament.defaultSubmission} />
+      ) : (
+        <p className="text-neutral-600 dark:text-neutral-300">Submissions are closed.</p>
+      )}
+    </main>
+  );
+}
