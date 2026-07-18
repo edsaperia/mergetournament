@@ -23,7 +23,7 @@ Magic-link auth; no passwords, no signup:
 - Admin seeds participants (name + email). Each receives a unique signed URL; visiting it sets a session cookie. Admin can re-issue links.
 - The admin may **invite and remove participants freely at any time until the tournament is published**; after publication the roster is frozen.
 - All chat and comments are attributed by name — nothing is anonymous.
-- Observer view is mergetournament.org/\<slug\>, read only.
+- Observer view is mergetournament.org/\<slug\>, read only. For **participants-only** tournaments it requires an authenticated session; otherwise it is world-readable.
 
 ## 4. Lifecycle
 
@@ -32,6 +32,7 @@ Magic-link auth; no passwords, no signup:
 Create a tournament with:
 
 - **name** and **URL slug** (the tournament lives at mergetournament.org/\<slug\>; the instance supports multiple tournaments distinguished by slug);
+- **visibility**: **public** (default — anyone with the URL can observe) or **participants-only** (the observer view and all texts/chats require an authenticated participant session). Editable at any time, including after the finish;
 - **round duration** and **break duration**, each configurable per tournament. Editable until bracket is published.
 - **submission close datetime**; optional — if not set, admin closes manually.
 - **tournament start datetime**; optional — if not set, admin starts manually.
@@ -79,7 +80,7 @@ Triggered when the admin presses **Publish Bracket**:
 - Merges that are locked with bearer selected are fully resolved.
 - Any merge with its **text locked but bearer selection incomplete**: the system coin-flips (with animation) between the two bearers to choose which will advance.
 - Any merge **not locked in and both bearers active**: the system coin-flips (with animation) between the two input texts; the winning input advances intact, borne by its incoming bearer. The unfinished working text is archived out of the bracket.
-- Not locked, **one** bearer active: the active bearer advances with the merge text, or with their input if the merge text is blank.
+- Not locked, **one** bearer active: during the 60-second window the active bearer chooses whether to advance **the working text** or **their own input**; if they make no choice (or the working text is blank), their own input advances intact.
 - Not locked, **neither** bearer active: the merge is archived entirely and nothing advances — the slot is empty.
 
 **Byes and Walkovers.** A merge with exactly one input (its other feeder slot empty) is a walkover; a merge with no inputs propagates emptiness. A text is idle in a round if it holds a bye slot or arrives by walkover. At the end of a round, if two or more texts are idle in the next round, the system pairs them into ad-hoc merges (posted to chat and the bracket); any odd remainder stands over as usual. An ad-hoc merge behaves identically to a scheduled one — workspace, chat, lock-in, backstop. Its result takes the bracket position of one of its two inputs, chosen randomly; the vacated position propagates as empty downstream. A single idle text simply stands over as a bye: shown as such in the bracket, readable and chattable during the round it sits out. If the final has no inputs, the tournament concludes with no canonical text.
@@ -125,7 +126,8 @@ Slot(id, tournament_id, round_no, position, kind: MERGE|BYE)
 Merge(id, slot_id, text_a_id, text_b_id, bearer_a_id, bearer_b_id,
       ydoc_ref, state: PENDING|OPEN|LOCKED|RESOLVED,
       locked_at?, result_text_id?, advancing_bearer_id?,
-      resolution: AGREED|BEARER_FLIP|BACKSTOP_FLIP, flip_seed?)
+      resolution: AGREED|BEARER_FLIP|BACKSTOP_FLIP|ACTIVE_ADVANCE|ABANDONED|WALKOVER,
+      flip_seed?)
 
 Round(id, tournament_id, number, scheduled_start, actual_start?, actual_close?, state)
 
