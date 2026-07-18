@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Merge Tournament
 
-## Getting Started
+**A fair method for combining many draft documents into one by knockout tournament of pairwise negotiations.**
 
-First, run the development server:
+A merge tournament takes a set of draft documents — position papers, proposed constitutions, competing specifications — and produces a single canonical text. Drafts are seeded into a knockout bracket at random. In each round, pairs of texts meet: their two bearers negotiate a merged text in a shared editor, against a fixed deadline. Both must consent to the result. If the clock expires first, a coin flip selects one of the two input texts to advance intact. Rounds halve the field until one text remains.
+
+This repository contains the software that runs the event: submission, seeding, scheduling, the collaborative merge workspaces, the coin flips, and the archive. Open source and self-hostable, with magic-link authentication and no accounts.
+
+Built for constitutional conventions — but the structure is general: standards bodies reconciling competing proposals, activist groups synthesising position papers, communities drafting charters or codes of conduct.
+
+## Status
+
+Early development. The full specification lives in [`docs/SPEC.md`](docs/SPEC.md); the theory and pitch in [`docs/COPY.md`](docs/COPY.md).
+
+## Stack
+
+- Next.js (App Router) + TypeScript, Tailwind
+- Drizzle ORM + Postgres
+- Yjs via Hocuspocus for the collaborative merge editor (Tiptap bindings)
+- SSE for bracket/clock/flip/chat/comment events
+- Resend for magic links and notifications
+
+## Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## License
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To be decided.
