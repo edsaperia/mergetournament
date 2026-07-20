@@ -8,4 +8,4 @@ sudo -u mt npm run build
 set -a; source /etc/mergetournament.env; set +a
 sudo -u mt --preserve-env=DATABASE_URL npx drizzle-kit migrate
 systemctl restart mergetournament
-echo "Deployed $(git rev-parse --short HEAD)"
+echo "Deployed $(sudo -u mt git rev-parse --short HEAD)"
