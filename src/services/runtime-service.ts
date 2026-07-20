@@ -39,7 +39,7 @@ import { commitmentOf, deriveSeed, makeMasterSecret } from "../lib/commit";
 import { mulberry32 } from "../lib/rng";
 import { effectiveNow, scheduledStarts } from "../lib/schedule";
 import { countWords } from "../lib/text";
-import { Emailer } from "../lib/email";
+import type { Email, Emailer } from "../lib/email";
 import type { Db } from "./tournament-service";
 
 /** The are-you-still-here window after a round's clock expires (SPEC §4). */
@@ -108,58 +108,61 @@ export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, 
     roundDurationS: t.roundDurationS,
     breakDurationS: t.breakDurationS,
   });
-  for (let r = 1; r <= bracket.rounds.length; r++) {
-    await db.insert(rounds).values({ tournamentId, number: r, scheduledStartS: starts[r - 1] });
-  }
 
-  const slotIds = new Map<string, string>(); // "round:position" -> slot id
-  for (const roundSlots of bracket.rounds) {
-    for (const s of roundSlots) {
-      const [row] = await db
-        .insert(slots)
-        .values({ tournamentId, roundNo: s.round, position: s.index, kind: s.kind })
-        .returning();
-      slotIds.set(`${s.round}:${s.index}`, row.id);
-    }
-  }
+  // All-or-nothing: a crash mid-publish must not leave a half-built bracket.
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(rounds)
+      .values(starts.map((startS, i) => ({ tournamentId, number: i + 1, scheduledStartS: startS })));
 
-  // Round 1: merges get their input texts and bearers; byes pass through now.
-  for (const s of bracket.rounds[0]) {
-    const slotId = slotIds.get(`1:${s.index}`)!;
-    if (s.kind === "bye") {
-      const d = seeded[s.feeders[0]];
-      await db
-        .update(slots)
-        .set({ outState: "filled", outTextId: d.id, outBearerId: d.authorId })
-        .where(eq(slots.id, slotId));
-      continue;
-    }
-    const [fa, fb] = s.feeders as [number, number];
-    const a = seeded[fa];
-    const b = seeded[fb];
-    const [m] = await db
-      .insert(merges)
-      .values({ slotId, textAId: a.id, textBId: b.id, bearerAId: a.authorId, bearerBId: b.authorId })
+    const slotRows = await tx
+      .insert(slots)
+      .values(
+        bracket.rounds.flatMap((roundSlots) =>
+          roundSlots.map((s) => ({ tournamentId, roundNo: s.round, position: s.index, kind: s.kind }))
+        )
+      )
       .returning();
-    await db.insert(chatRooms).values({ tournamentId, kind: "merge", subjectId: m.id });
-  }
+    const slotIds = new Map(slotRows.map((row) => [`${row.roundNo}:${row.position}`, row.id]));
 
-  await db
-    .update(tournaments)
-    .set({ phase: "convening", seed, masterSecret })
-    .where(eq(tournaments.id, tournamentId));
-  await audit(db, tournamentId, "bracket_published", {
-    n,
-    seed,
-    placement: seeded.map((d) => d.id),
-    seedCommitment: commitment,
+    // Round 1: merges get their input texts and bearers; byes pass through now.
+    for (const s of bracket.rounds[0]) {
+      const slotId = slotIds.get(`1:${s.index}`)!;
+      if (s.kind === "bye") {
+        const d = seeded[s.feeders[0]];
+        await tx
+          .update(slots)
+          .set({ outState: "filled", outTextId: d.id, outBearerId: d.authorId })
+          .where(eq(slots.id, slotId));
+        continue;
+      }
+      const [fa, fb] = s.feeders as [number, number];
+      const a = seeded[fa];
+      const b = seeded[fb];
+      const [m] = await tx
+        .insert(merges)
+        .values({ slotId, textAId: a.id, textBId: b.id, bearerAId: a.authorId, bearerBId: b.authorId })
+        .returning();
+      await tx.insert(chatRooms).values({ tournamentId, kind: "merge", subjectId: m.id });
+    }
+
+    await tx
+      .update(tournaments)
+      .set({ phase: "convening", seed, masterSecret })
+      .where(eq(tournaments.id, tournamentId));
+    await audit(tx, tournamentId, "bracket_published", {
+      n,
+      seed,
+      placement: seeded.map((d) => d.id),
+      seedCommitment: commitment,
+    });
+    await postSystem(
+      tx,
+      tournamentId,
+      `The bracket is published: ${n} drafts, ${bracket.rounds.length} rounds. ` +
+        `Randomness commitment: ${commitment} (the seed behind every coin flip is fixed now and revealed at the end).`
+    );
   });
-  await postSystem(
-    db,
-    tournamentId,
-    `The bracket is published: ${n} drafts, ${bracket.rounds.length} rounds. ` +
-      `Randomness commitment: ${commitment} (the seed behind every coin flip is fixed now and revealed at the end).`
-  );
 
   const roster = await db.select().from(participants).where(eq(participants.tournamentId, tournamentId));
   for (const p of roster) {
@@ -179,10 +182,12 @@ export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, 
 export async function beginTournament(db: Db, tournamentId: string, now: Date) {
   const t = await requireTournament(db, tournamentId);
   if (t.phase !== "convening") throw new Error("begin is only available while convening");
-  await db.update(tournaments).set({ phase: "running", begunAt: now }).where(eq(tournaments.id, tournamentId));
-  await openRound(db, tournamentId, 1, 0);
-  await audit(db, tournamentId, "begin", { at: now.toISOString() });
-  await postSystem(db, tournamentId, "Begin! Round 1 is open.");
+  await db.transaction(async (tx) => {
+    await tx.update(tournaments).set({ phase: "running", begunAt: now }).where(eq(tournaments.id, tournamentId));
+    await openRound(tx, tournamentId, 1, 0);
+    await audit(tx, tournamentId, "begin", { at: now.toISOString() });
+    await postSystem(tx, tournamentId, "Begin! Round 1 is open.");
+  });
 }
 
 export async function pauseTournament(db: Db, tournamentId: string, now: Date) {
@@ -282,23 +287,25 @@ export async function mergeAction(
   if (round.state !== "open") throw new Error("this round is not open");
 
   const session = applyAction(rowToSession(m), { ...action, side } as MergeAction);
-  await db
-    .update(merges)
-    .set({
-      workingText: session.workingText,
-      proposedBy: session.proposedBy,
-      bearerPrefA: session.bearerPref.A,
-      bearerPrefB: session.bearerPref.B,
-      activeA: session.active.A,
-      activeB: session.active.B,
-      state: session.lock === "locked" ? "locked" : "open",
-      lockedAt: session.lock === "locked" ? now : null,
-    })
-    .where(eq(merges.id, mergeId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(merges)
+      .set({
+        workingText: session.workingText,
+        proposedBy: session.proposedBy,
+        bearerPrefA: session.bearerPref.A,
+        bearerPrefB: session.bearerPref.B,
+        activeA: session.active.A,
+        activeB: session.active.B,
+        state: session.lock === "locked" ? "locked" : "open",
+        lockedAt: session.lock === "locked" ? now : null,
+      })
+      .where(eq(merges.id, mergeId));
 
-  if (session.lock === "locked") {
-    await finalizeMerge(db, t, { ...m, ...sessionColumns(session), state: "locked" }, session);
-  }
+    if (session.lock === "locked") {
+      await finalizeMerge(tx, t, { ...m, ...sessionColumns(session), state: "locked" }, session);
+    }
+  });
 }
 
 function sessionColumns(s: MergeSession) {
@@ -429,99 +436,108 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
   const t = await requireTournament(db, tournamentId);
   if (t.phase !== "running" || t.pausedAt) return false;
   const te = effectiveT(t, now);
-  let changed = false;
 
-  const allRounds = await db
-    .select()
-    .from(rounds)
-    .where(eq(rounds.tournamentId, tournamentId))
-    .orderBy(asc(rounds.number));
-  const bracket = await bracketFor(db, tournamentId);
+  // One transaction for the whole advance: a crash loses the tick, never half
+  // a transition. Emails go out only after the commit.
+  const outbox: Email[] = [];
+  const changed = await db.transaction(async (tx) => {
+    let changed = false;
 
-  for (let guard = 0; guard < 200; guard++) {
-    const current = allRounds.find((r) => r.state !== "closed");
-    if (!current) return changed;
-
-    if (current.state === "scheduled") {
-      const prev = allRounds[current.number - 2];
-      const earliest = current.number === 1 ? 0 : (prev.actualCloseS ?? 0) + t.breakDurationS;
-      if (te < earliest) return changed;
-      // The full-schedule guarantee: a round only starts before its printed
-      // time when every bearer it requires has confirmed readiness during
-      // the break (agreed with Ed: nobody gets ambushed by an early start).
-      const guaranteed = Math.max(earliest, current.scheduledStartS);
-      let openAt: number;
-      if (te >= guaranteed) {
-        openAt = guaranteed;
-      } else if (await allBearersReady(db, tournamentId, current.number)) {
-        openAt = Math.max(earliest, Math.round(te));
-      } else {
-        return changed;
-      }
-      await openRound(db, tournamentId, current.number, openAt);
-      current.state = "open";
-      current.actualStartS = openAt;
-      changed = true;
-      continue;
-    }
-
-    // current.state === "open" | "closing"
-    const roundSlots = await db
+    const allRounds = await tx
       .select()
-      .from(slots)
-      .where(and(eq(slots.tournamentId, tournamentId), eq(slots.roundNo, current.number)))
-      .orderBy(asc(slots.position));
-    const slotIds = roundSlots.map((s) => s.id);
-    const roundMerges = slotIds.length
-      ? await db.select().from(merges).where(inArray(merges.slotId, slotIds))
-      : [];
-    const unresolved = roundMerges.filter((m) => m.state !== "resolved");
-    const expiry = (current.actualStartS ?? 0) + t.roundDurationS;
-    const graceEnd = expiry + GRACE_S;
+      .from(rounds)
+      .where(eq(rounds.tournamentId, tournamentId))
+      .orderBy(asc(rounds.number));
+    const bracket = await bracketFor(tx, tournamentId);
 
-    if (unresolved.length > 0) {
-      if (current.state === "open") {
-        if (te < expiry) return changed;
-        // Clock expired with merges unresolved: freeze editing and open the
-        // are-you-still-here window (SPEC §4).
-        await db.update(rounds).set({ state: "closing" }).where(eq(rounds.id, current.id));
-        current.state = "closing";
+    for (let guard = 0; guard < 200; guard++) {
+      const current = allRounds.find((r) => r.state !== "closed");
+      if (!current) return changed;
+
+      if (current.state === "scheduled") {
+        const prev = allRounds[current.number - 2];
+        const earliest = current.number === 1 ? 0 : (prev.actualCloseS ?? 0) + t.breakDurationS;
+        if (te < earliest) return changed;
+        // The full-schedule guarantee: a round only starts before its printed
+        // time when every bearer it requires has confirmed readiness during
+        // the break (agreed with Ed: nobody gets ambushed by an early start).
+        const guaranteed = Math.max(earliest, current.scheduledStartS);
+        let openAt: number;
+        if (te >= guaranteed) {
+          openAt = guaranteed;
+        } else if (await allBearersReady(tx, tournamentId, current.number)) {
+          openAt = Math.max(earliest, Math.round(te));
+        } else {
+          return changed;
+        }
+        await openRound(tx, tournamentId, current.number, openAt);
+        current.state = "open";
+        current.actualStartS = openAt;
         changed = true;
-        await audit(db, tournamentId, "backstop_window_opened", { round: current.number, atS: expiry });
-        await postSystem(
-          db,
-          tournamentId,
-          `Round ${current.number}: time is up. Unresolved merges have ${GRACE_S} seconds — are you still here?`
-        );
         continue;
       }
-      // current.state === "closing"
-      if (te < graceEnd) return changed;
-      // Window over: the backstop resolves everything still open.
-      for (const m of unresolved) {
-        await finalizeMerge(db, t, m, rowToSession(m));
-      }
-    }
-    // Integer column: effective time is fractional, schedule points are whole seconds.
-    const closeAt =
-      unresolved.length > 0 ? graceEnd : Math.max(Math.round(te), current.actualStartS ?? 0);
-    await db
-      .update(rounds)
-      .set({ state: "closed", actualCloseS: closeAt })
-      .where(eq(rounds.id, current.id));
-    current.state = "closed";
-    current.actualCloseS = closeAt;
-    changed = true;
-    await audit(db, tournamentId, "round_closed", { round: current.number, atS: closeAt });
-    await postSystem(db, tournamentId, `Round ${current.number} has closed.`);
 
-    if (current.number === allRounds.length) {
-      await completeTournament(db, emailer, baseUrl, t);
-      return true;
+      // current.state === "open" | "closing"
+      const roundSlots = await tx
+        .select()
+        .from(slots)
+        .where(and(eq(slots.tournamentId, tournamentId), eq(slots.roundNo, current.number)))
+        .orderBy(asc(slots.position));
+      const slotIds = roundSlots.map((s) => s.id);
+      const roundMerges = slotIds.length
+        ? await tx.select().from(merges).where(inArray(merges.slotId, slotIds))
+        : [];
+      const unresolved = roundMerges.filter((m) => m.state !== "resolved");
+      const expiry = (current.actualStartS ?? 0) + t.roundDurationS;
+      const graceEnd = expiry + GRACE_S;
+
+      if (unresolved.length > 0) {
+        if (current.state === "open") {
+          if (te < expiry) return changed;
+          // Clock expired with merges unresolved: freeze editing and open the
+          // are-you-still-here window (SPEC §4).
+          await tx.update(rounds).set({ state: "closing" }).where(eq(rounds.id, current.id));
+          current.state = "closing";
+          changed = true;
+          await audit(tx, tournamentId, "backstop_window_opened", { round: current.number, atS: expiry });
+          await postSystem(
+            tx,
+            tournamentId,
+            `Round ${current.number}: time is up. Unresolved merges have ${GRACE_S} seconds — are you still here?`
+          );
+          continue;
+        }
+        // current.state === "closing"
+        if (te < graceEnd) return changed;
+        // Window over: the backstop resolves everything still open.
+        for (const m of unresolved) {
+          await finalizeMerge(tx, t, m, rowToSession(m));
+        }
+      }
+      // Integer column: effective time is fractional, schedule points are whole seconds.
+      const closeAt =
+        unresolved.length > 0 ? graceEnd : Math.max(Math.round(te), current.actualStartS ?? 0);
+      await tx
+        .update(rounds)
+        .set({ state: "closed", actualCloseS: closeAt })
+        .where(eq(rounds.id, current.id));
+      current.state = "closed";
+      current.actualCloseS = closeAt;
+      changed = true;
+      await audit(tx, tournamentId, "round_closed", { round: current.number, atS: closeAt });
+      await postSystem(tx, tournamentId, `Round ${current.number} has closed.`);
+
+      if (current.number === allRounds.length) {
+        await completeTournament(tx, baseUrl, t, outbox);
+        return true;
+      }
+      await populateRound(tx, t, bracket, current.number + 1);
     }
-    await populateRound(db, t, bracket, current.number + 1);
-  }
-  throw new Error("tick failed to converge");
+    throw new Error("tick failed to converge");
+  });
+
+  for (const email of outbox) await emailer.send(email);
+  return changed;
 }
 
 /** True when every pending merge of the round has both bearers confirmed ready. */
@@ -619,7 +635,7 @@ async function populateRound(db: Db, t: Tournament, bracket: Bracket, roundNo: n
   });
 }
 
-async function completeTournament(db: Db, emailer: Emailer, baseUrl: string, t: Tournament): Promise<void> {
+async function completeTournament(db: Db, baseUrl: string, t: Tournament, outbox: Email[]): Promise<void> {
   await db.update(tournaments).set({ phase: "complete" }).where(eq(tournaments.id, t.id));
   const finalRoundNo = (await db.select().from(rounds).where(eq(rounds.tournamentId, t.id))).length;
   const [finalSlot] = await db
@@ -650,7 +666,7 @@ async function completeTournament(db: Db, emailer: Emailer, baseUrl: string, t: 
   );
   const roster = await db.select().from(participants).where(eq(participants.tournamentId, t.id));
   for (const p of roster) {
-    await emailer.send({
+    outbox.push({
       to: p.email,
       subject: `${t.name}: the tournament is complete`,
       text: canonical

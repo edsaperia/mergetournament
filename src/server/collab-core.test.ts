@@ -71,7 +71,6 @@ describe("collab write gates", () => {
     await until(() => a.text.toString().includes("And B agrees."));
 
     // The store hook (debounced 50ms) persists into working_text.
-    await until(async () => true);
     await settle(300);
     const [row] = await db.select().from(merges).where(eq(merges.id, merge.id));
     expect(row.workingText).toContain("Hello from A.");
