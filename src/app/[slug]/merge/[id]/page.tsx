@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { merges, participants, rounds, slots, textVersions } from "../../../../db/schema";
-import { roundRemainingS, warnThresholds } from "../../../../lib/schedule";
-import { effectiveT, GRACE_S } from "../../../../services/runtime-service";
+import { merges, slots, textVersions } from "../../../../db/schema";
+import { warnThresholds } from "../../../../lib/schedule";
+import { rosterFor, scheduleContext } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
 import { collabWsUrl } from "../../../../server/collab";
@@ -32,30 +32,20 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   if (!m) notFound();
   const [slot] = await db.select().from(slots).where(eq(slots.id, m.slotId));
   if (slot.tournamentId !== tournament.id) notFound();
-  const [round] = await db
-    .select()
-    .from(rounds)
-    .where(and(eq(rounds.tournamentId, tournament.id), eq(rounds.number, slot.roundNo)));
+
+  const ctx = await scheduleContext(tournament);
+  const round = ctx.allRounds.find((r) => r.number === slot.roundNo);
+  if (!round) notFound();
 
   const [textA] = m.textAId ? await db.select().from(textVersions).where(eq(textVersions.id, m.textAId)) : [];
   const [textB] = m.textBId ? await db.select().from(textVersions).where(eq(textVersions.id, m.textBId)) : [];
-  const roster = await db.select().from(participants).where(eq(participants.tournamentId, tournament.id));
+  const roster = await rosterFor(tournament.id);
   const nameOf = new Map(roster.map((p) => [p.id, p.name]));
 
   const mySide = me && m.bearerAId === me.id ? "A" : me && m.bearerBId === me.id ? "B" : null;
-  const paused = Boolean(tournament.pausedAt);
+  const paused = ctx.paused;
   const live = tournament.phase === "running" && round.state === "open" && m.state === "open";
   const canAct = Boolean(mySide) && live && !paused;
-
-  const allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, tournament.id));
-  const config = {
-    numRounds: allRounds.length,
-    roundDurationS: tournament.roundDurationS,
-    breakDurationS: tournament.breakDurationS,
-  };
-  const progress = allRounds
-    .sort((a, b) => a.number - b.number)
-    .map((r) => ({ actualStart: r.actualStartS ?? undefined, actualClose: r.actualCloseS ?? undefined }));
 
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
@@ -92,21 +82,17 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           Round {slot.roundNo}
           {m.isAdHoc ? " (ad-hoc)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
         </h1>
-        {tournament.phase === "running" && tournament.begunAt && round.state === "open" && (
+        {ctx.running && round.state === "open" && (
           <Countdown
-            remainingS={roundRemainingS(config, progress, slot.roundNo, effectiveT(tournament, new Date()))}
+            remainingS={ctx.remainingFor(slot.roundNo)}
             paused={paused}
             className="text-lg"
             {...warnThresholds(tournament.roundDurationS)}
           />
         )}
-        {tournament.phase === "running" && tournament.begunAt && round.state === "closing" && (
+        {ctx.running && round.state === "closing" && (
           <span className="text-lg text-amber-600">
-            backstop{" "}
-            <Countdown
-              remainingS={(round.actualStartS ?? 0) + tournament.roundDurationS + GRACE_S - effectiveT(tournament, new Date())}
-              paused={paused}
-            />
+            backstop <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
           </span>
         )}
       </div>

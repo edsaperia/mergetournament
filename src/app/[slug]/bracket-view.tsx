@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
-import { merges, participants, rounds, slots, textVersions, type Tournament } from "../../db/schema";
-import { globalRemainingS, projectedStarts, roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
-import { effectiveT, GRACE_S } from "../../services/runtime-service";
+import { textVersions, type Tournament } from "../../db/schema";
+import { projectedStarts, warnThresholds } from "../../lib/schedule";
+import { mergesFor, rosterFor, scheduleContext, slotsFor } from "../../server/queries";
 import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
 import { LocalTime } from "../local-time";
@@ -25,19 +25,11 @@ export async function BracketView({
   viewerId: string | null;
 }) {
   const db = await getDb();
-  const allRounds = await db
-    .select()
-    .from(rounds)
-    .where(eq(rounds.tournamentId, tournament.id))
-    .orderBy(asc(rounds.number));
-  const allSlots = await db
-    .select()
-    .from(slots)
-    .where(eq(slots.tournamentId, tournament.id))
-    .orderBy(asc(slots.roundNo), asc(slots.position));
-  const slotIds = allSlots.map((s) => s.id);
-  const allMerges = slotIds.length ? await db.select().from(merges).where(inArray(merges.slotId, slotIds)) : [];
-  const roster = await db.select().from(participants).where(eq(participants.tournamentId, tournament.id));
+  const ctx = await scheduleContext(tournament);
+  const { allRounds, config, progress, running, paused, te } = ctx;
+  const allSlots = await slotsFor(tournament.id);
+  const allMerges = await mergesFor(tournament.id);
+  const roster = await rosterFor(tournament.id);
   const texts = await db
     .select({ id: textVersions.id, kind: textVersions.kind, wordCount: textVersions.wordCount, authorId: textVersions.authorId })
     .from(textVersions)
@@ -54,18 +46,6 @@ export async function BracketView({
     return t.kind === "draft" ? `${nameOf.get(t.authorId ?? "") ?? "?"}'s draft` : `merged text (${t.wordCount}w)`;
   };
 
-  const running = tournament.phase === "running" && tournament.begunAt;
-  const te = running ? effectiveT(tournament, new Date()) : 0;
-  const config = {
-    numRounds: allRounds.length,
-    roundDurationS: tournament.roundDurationS,
-    breakDurationS: tournament.breakDurationS,
-  };
-  const progress: RoundProgress[] = allRounds.map((r) => ({
-    actualStart: r.actualStartS ?? undefined,
-    actualClose: r.actualCloseS ?? undefined,
-  }));
-  const paused = Boolean(tournament.pausedAt);
   const starts = allRounds.length > 0 ? projectedStarts(config, progress) : [];
 
   /** Wall-clock instant for an effective-seconds offset, once Begin exists. */
@@ -91,10 +71,10 @@ export async function BracketView({
 
   return (
     <div>
-      {running && tournament.phase === "running" && (
+      {running && (
         <p className="mb-4 text-sm text-muted">
           Total remaining:{" "}
-          <Countdown remainingS={globalRemainingS(config, progress, te)} paused={paused} className="text-base" />
+          <Countdown remainingS={ctx.globalRemaining()} paused={paused} className="text-base" />
         </p>
       )}
       {paused && (
@@ -146,18 +126,14 @@ export async function BracketView({
                 <span className="text-xs text-muted">
                   {round.state === "open" && running && (
                     <Countdown
-                      remainingS={roundRemainingS(config, progress, round.number, te)}
+                      remainingS={ctx.remainingFor(round.number)}
                       paused={paused}
                       {...warnThresholds(tournament.roundDurationS)}
                     />
                   )}
                   {round.state === "closing" && running && (
                     <span className="text-amber-600">
-                      backstop{" "}
-                      <Countdown
-                        remainingS={(round.actualStartS ?? 0) + tournament.roundDurationS + GRACE_S - te}
-                        paused={paused}
-                      />
+                      backstop <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
                     </span>
                   )}
                   {round.state === "closed" && "closed"}
@@ -265,11 +241,7 @@ export async function BracketView({
 }
 
 async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tournament; roundsCount: number }) {
-  const db = await getDb();
-  const [finalSlot] = await db
-    .select()
-    .from(slots)
-    .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, roundsCount)));
+  const [finalSlot] = (await slotsFor(tournament.id)).filter((s) => s.roundNo === roundsCount);
   if (finalSlot?.outState !== "filled" || !finalSlot.outTextId) {
     return (
       <div className="mt-6">

@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
-import { merges, participants, rounds, slots, type Tournament } from "../../db/schema";
-import { roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
+import { type Tournament } from "../../db/schema";
+import { warnThresholds } from "../../lib/schedule";
 import { globalRoom, messagesFor } from "../../services/chat-service";
-import { effectiveT } from "../../services/runtime-service";
 import { readyAction, workspaceAction } from "../../server/actions";
+import { mergesFor, rosterFor, scheduleContext, slotsFor } from "../../server/queries";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh, RefreshAt } from "../live";
 import { LocalTime } from "../local-time";
@@ -180,27 +180,14 @@ async function BreakPanel({
   tournament: Tournament;
   participantId: string | null;
 }) {
-  const db = await getDb();
-  const allRounds = await db
-    .select()
-    .from(rounds)
-    .where(eq(rounds.tournamentId, tournament.id))
-    .orderBy(asc(rounds.number));
+  const { allRounds } = await scheduleContext(tournament);
   // Only relevant during a break: no round open/closing, a scheduled one next.
   if (allRounds.some((r) => r.state === "open" || r.state === "closing")) return null;
   const next = allRounds.find((r) => r.state === "scheduled");
   if (!next) return null;
 
-  const nextSlots = await db
-    .select({ id: slots.id })
-    .from(slots)
-    .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, next.number)));
-  const pending = nextSlots.length
-    ? await db
-        .select()
-        .from(merges)
-        .where(and(inArray(merges.slotId, nextSlots.map((s) => s.id)), eq(merges.state, "pending")))
-    : [];
+  const nextSlotIds = new Set((await slotsFor(tournament.id)).filter((s) => s.roundNo === next.number).map((s) => s.id));
+  const pending = (await mergesFor(tournament.id)).filter((m) => nextSlotIds.has(m.slotId) && m.state === "pending");
   if (pending.length === 0) return null;
 
   const bearersTotal = pending.length * 2;
@@ -242,42 +229,21 @@ async function BellWithState({ tournament, participantId }: { tournament: Tourna
   let remainingS: number | null = null;
 
   if (tournament.phase === "running" && tournament.begunAt && !tournament.pausedAt) {
-    const db = await getDb();
-    const allRounds = await db
-      .select()
-      .from(rounds)
-      .where(eq(rounds.tournamentId, tournament.id))
-      .orderBy(asc(rounds.number));
-    const open = allRounds.find((r) => r.state === "open");
+    const ctx = await scheduleContext(tournament);
+    const open = ctx.allRounds.find((r) => r.state === "open");
     if (open) {
       roundNo = open.number;
-      const progress: RoundProgress[] = allRounds.map((r) => ({
-        actualStart: r.actualStartS ?? undefined,
-        actualClose: r.actualCloseS ?? undefined,
-      }));
-      remainingS = roundRemainingS(
-        { numRounds: allRounds.length, roundDurationS: tournament.roundDurationS, breakDurationS: tournament.breakDurationS },
-        progress,
-        open.number,
-        effectiveT(tournament, new Date())
+      remainingS = ctx.remainingFor(open.number);
+      const openSlotIds = new Set(
+        (await slotsFor(tournament.id)).filter((s) => s.roundNo === open.number).map((s) => s.id)
       );
-      const openSlots = await db
-        .select({ id: slots.id })
-        .from(slots)
-        .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, open.number)));
-      if (openSlots.length > 0) {
-        const [mine] = await db
-          .select({ id: merges.id })
-          .from(merges)
-          .where(
-            and(
-              inArray(merges.slotId, openSlots.map((s) => s.id)),
-              eq(merges.state, "open"),
-              or(eq(merges.bearerAId, participantId), eq(merges.bearerBId, participantId))
-            )
-          );
-        myOpenMergeId = mine?.id ?? null;
-      }
+      const mine = (await mergesFor(tournament.id)).find(
+        (m) =>
+          openSlotIds.has(m.slotId) &&
+          m.state === "open" &&
+          (m.bearerAId === participantId || m.bearerBId === participantId)
+      );
+      myOpenMergeId = mine?.id ?? null;
     }
   }
   return (
@@ -300,11 +266,7 @@ async function ConveningPanel({
   tournamentId: string;
   me: { id: string; role: string; ready: boolean } | null;
 }) {
-  const db = await getDb();
-  const roster = await db
-    .select()
-    .from(participants)
-    .where(and(eq(participants.tournamentId, tournamentId), eq(participants.role, "participant")));
+  const roster = (await rosterFor(tournamentId)).filter((p) => p.role === "participant");
   const readyCount = roster.filter((p) => p.ready).length;
   return (
     <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-edge p-4">
