@@ -10,9 +10,11 @@ import { readyAction, workspaceAction } from "../../server/actions";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh } from "../live";
 import { ControlButton } from "./admin/admin-controls";
+import { textVersions } from "../../db/schema";
 import { BracketView } from "./bracket-view";
 import { ChatPanel } from "./chat-panel";
 import { NotificationBell } from "./notification-bell";
+import { DraftEditor } from "./submit/draft-editor";
 
 const PHASE_LABEL: Record<string, string> = {
   setup: "Being set up",
@@ -60,9 +62,9 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
               {me.role === "admin" ? " (admin)" : ""}
             </span>
           )}
-          {me && tournament.phase === "submission" && (
-            <Link className="rounded-lg bg-accent px-3 py-2 font-medium text-accent-ink" href={`/${slug}/submit`}>
-              {me.role === "admin" ? "Submissions" : "Edit your draft"}
+          {me?.role === "admin" && tournament.phase === "submission" && (
+            <Link className="rounded-lg bg-accent px-3 py-2 font-medium text-accent-ink" href={`/${slug}/admin`}>
+              Submissions
             </Link>
           )}
           {me?.role === "admin" && (
@@ -81,12 +83,22 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
       )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
-          {tournament.phase === "submission" && (
-            <p className="text-soft">
-              Participants are writing their drafts. The bracket appears here
-              when the admin publishes it.
-            </p>
-          )}
+          {tournament.phase === "submission" &&
+            (me && me.role === "participant" ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-soft">
+                  Write your draft below.
+                  {tournament.submissionDeadline &&
+                    ` Submissions close ${tournament.submissionDeadline.toLocaleString()}.`}
+                </p>
+                <MyDraft slug={slug} participantId={me.id} template={tournament.defaultSubmission} />
+              </div>
+            ) : (
+              <p className="text-soft">
+                Participants are writing their drafts. The bracket appears here
+                when the admin publishes it.
+              </p>
+            ))}
           {tournament.phase !== "submission" && tournament.phase !== "setup" && (
             <BracketView tournament={tournament} viewerId={me?.id ?? null} />
           )}
@@ -108,6 +120,24 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
       </div>
     </main>
   );
+}
+
+/** The participant's always-open draft editor (SPEC §4 Phase 1). */
+async function MyDraft({
+  slug,
+  participantId,
+  template,
+}: {
+  slug: string;
+  participantId: string;
+  template: string;
+}) {
+  const db = await getDb();
+  const [draft] = await db
+    .select()
+    .from(textVersions)
+    .where(and(eq(textVersions.authorId, participantId), eq(textVersions.kind, "draft")));
+  return <DraftEditor slug={slug} initialBody={draft?.bodyMd ?? template} />;
 }
 
 /**

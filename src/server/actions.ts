@@ -73,14 +73,15 @@ export async function createTournamentAction(_prev: ActionState, formData: FormD
   }
 }
 
-export async function saveDraftAction(slug: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+/** Autosave a participant's draft (no explicit submit — the deadline snapshots whatever is here). */
+export async function saveDraftAction(slug: string, body: string): Promise<ActionState> {
   try {
     const participant = await requireParticipant(slug);
     const db = await getDb();
-    const draft = await saveDraft(db, participant.id, String(formData.get("body") ?? ""));
+    const draft = await saveDraft(db, participant.id, body);
     revalidatePath(`/${slug}/submit`);
     bump(participant.tournamentId);
-    return { ok: true, message: `Saved — ${draft.wordCount} words.` };
+    return { ok: true, message: `Saved · ${draft.wordCount} words` };
   } catch (e) {
     return fail(e);
   }
