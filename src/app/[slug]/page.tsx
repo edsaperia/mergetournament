@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { getDb } from "../../db";
@@ -12,6 +11,7 @@ import { AutoRefresh, RefreshAt } from "../live";
 import { LocalTime } from "../local-time";
 import { NumberedText } from "../numbered-text";
 import { ControlButton } from "./admin/admin-controls";
+import { AdminDashboard } from "./admin/dashboard";
 import { textVersions } from "../../db/schema";
 import { BracketView } from "./bracket-view";
 import { ChatPanel } from "./chat-panel";
@@ -53,12 +53,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         <RefreshAt iso={tournament.submissionDeadline.toISOString()} />
       )}
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-bold">{tournament.name}</h1>
-          <p className="mt-1 text-soft">
-            {PHASE_LABEL[tournament.phase] ?? tournament.phase}
-          </p>
-        </div>
+        <p className="text-soft">{PHASE_LABEL[tournament.phase] ?? tournament.phase}</p>
         <nav className="flex items-center gap-3 text-sm">
           {me && live && <BellWithState tournament={tournament} participantId={me.id} />}
           {me && (
@@ -66,11 +61,6 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
               {me.name}
               {me.role === "admin" ? " (admin)" : ""}
             </span>
-          )}
-          {me?.role === "admin" && (
-            <Link className="rounded-lg border border-line px-3 py-2 font-medium" href={`/${slug}/admin`}>
-              Admin
-            </Link>
           )}
         </nav>
       </div>
@@ -115,6 +105,8 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
                   readOnly={Boolean(tournament.submissionDeadline && new Date() > tournament.submissionDeadline)}
                 />
               </div>
+            ) : me?.role === "admin" ? (
+              <AdminDashboard slug={slug} />
             ) : (
               <p className="text-soft">
                 Participants are writing their drafts. The bracket appears here

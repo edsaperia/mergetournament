@@ -2,10 +2,11 @@ import Link from "next/link";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../db";
 import { merges, participants, rounds, slots, textVersions, type Tournament } from "../../db/schema";
-import { globalRemainingS, roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
+import { globalRemainingS, projectedStarts, roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
 import { effectiveT, GRACE_S } from "../../services/runtime-service";
 import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
+import { LocalTime } from "../local-time";
 
 const RESOLUTION_LABEL: Record<string, string> = {
   agreed: "agreed",
@@ -65,6 +66,28 @@ export async function BracketView({
     actualClose: r.actualCloseS ?? undefined,
   }));
   const paused = Boolean(tournament.pausedAt);
+  const starts = allRounds.length > 0 ? projectedStarts(config, progress) : [];
+
+  /** Wall-clock instant for an effective-seconds offset, once Begin exists. */
+  const wallIso = (s: number): string | null =>
+    tournament.begunAt
+      ? new Date(tournament.begunAt.getTime() + (tournament.totalPausedS + s) * 1000).toISOString()
+      : null;
+
+  const TimeSpan = ({ fromS, toS }: { fromS: number; toS: number }) => {
+    const dur = `${Math.round((toS - fromS) / 60)}m`;
+    const from = wallIso(fromS);
+    const to = wallIso(toS);
+    return from && to ? (
+      <>
+        <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly /> ({dur})
+      </>
+    ) : (
+      <>
+        +{Math.round(fromS / 60)}m – +{Math.round(toS / 60)}m ({dur})
+      </>
+    );
+  };
 
   return (
     <div>
@@ -85,21 +108,41 @@ export async function BracketView({
           const prev = allRounds[round.number - 2];
           const inThisBreak =
             running && !paused && round.state === "scheduled" && prev?.state === "closed";
+          const roundStart = round.actualStartS ?? starts[round.number - 1] ?? round.scheduledStartS;
+          const roundEnd = round.actualCloseS ?? roundStart + tournament.roundDurationS;
+          const breakStart = roundStart - tournament.breakDurationS;
           return (
             <section key={round.number}>
               {round.number > 1 && (
-                <div className="mb-3 flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-3 py-1.5 text-sm text-muted">
-                  Break ({Math.round(tournament.breakDurationS / 60)}m)
-                  {inThisBreak && prev?.actualCloseS != null && (
-                    <Countdown
-                      remainingS={prev.actualCloseS + tournament.breakDurationS - te}
-                      paused={paused}
-                    />
-                  )}
+                <div className="mb-3">
+                  <header className="mb-1 flex items-baseline justify-between">
+                    <h3 className="font-semibold text-muted">Break</h3>
+                    <span className="text-xs text-muted">
+                      <TimeSpan fromS={breakStart} toS={roundStart} />
+                    </span>
+                  </header>
+                  <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-3 py-1.5 text-sm text-muted">
+                    {inThisBreak && prev?.actualCloseS != null ? (
+                      <>
+                        back in{" "}
+                        <Countdown
+                          remainingS={prev.actualCloseS + tournament.breakDurationS - te}
+                          paused={paused}
+                        />
+                      </>
+                    ) : (
+                      <>read, lobby, find your next partner</>
+                    )}
+                  </div>
                 </div>
               )}
               <header className="mb-2 flex items-baseline justify-between">
-                <h3 className="font-semibold">Round {round.number}</h3>
+                <h3 className="font-semibold">
+                  Round {round.number}
+                  <span className="ml-2 text-xs font-normal text-muted">
+                    <TimeSpan fromS={roundStart} toS={roundEnd} />
+                  </span>
+                </h3>
                 <span className="text-xs text-muted">
                   {round.state === "open" && running && (
                     <Countdown
@@ -118,7 +161,7 @@ export async function BracketView({
                     </span>
                   )}
                   {round.state === "closed" && "closed"}
-                  {round.state === "scheduled" && `at +${Math.round(round.scheduledStartS / 60)}m`}
+                  {round.state === "scheduled" && "upcoming"}
                 </span>
               </header>
               <div className="flex flex-wrap gap-2">
@@ -227,17 +270,23 @@ async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tourna
     .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, roundsCount)));
   if (finalSlot?.outState !== "filled" || !finalSlot.outTextId) {
     return (
-      <p className="mt-6 rounded-lg border border-line p-4">
-        The tournament concluded with no canonical text.
-      </p>
+      <div className="mt-6">
+        <h2 className="mb-2 text-2xl font-bold">Merge Tournament Over!</h2>
+        <p className="rounded-lg border border-line p-4">
+          The tournament concluded with no canonical text.
+        </p>
+      </div>
     );
   }
   return (
-    <p className="mt-6 rounded-lg border-2 border-green-600 p-4 text-lg">
-      🏆 The canonical text has emerged:{" "}
-      <Link className="font-semibold underline" href={`/${tournament.slug}/text/${finalSlot.outTextId}`}>
-        read it
-      </Link>
-    </p>
+    <div className="mt-6">
+      <h2 className="mb-2 text-2xl font-bold">Merge Tournament Over!</h2>
+      <p className="rounded-lg border-2 border-green-600 p-4 text-lg">
+        🏆 The canonical text has emerged:{" "}
+        <Link className="font-semibold underline" href={`/${tournament.slug}/text/${finalSlot.outTextId}`}>
+          read it
+        </Link>
+      </p>
+    </div>
   );
 }
