@@ -9,6 +9,8 @@ import { effectiveT } from "../../services/runtime-service";
 import { readyAction, workspaceAction } from "../../server/actions";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh } from "../live";
+import { LocalTime } from "../local-time";
+import { NumberedText } from "../numbered-text";
 import { ControlButton } from "./admin/admin-controls";
 import { textVersions } from "../../db/schema";
 import { BracketView } from "./bracket-view";
@@ -87,12 +89,28 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
           {tournament.phase === "submission" &&
             (me && me.role === "participant" ? (
               <div className="flex flex-col gap-3">
-                <p className="text-soft">
-                  Write your draft below.
-                  {tournament.submissionDeadline &&
-                    ` Submissions close ${tournament.submissionDeadline.toLocaleString()}.`}
-                </p>
-                <MyDraft slug={slug} participantId={me.id} template={tournament.defaultSubmission} />
+                {tournament.submissionDeadline && new Date() > tournament.submissionDeadline ? (
+                  <p className="text-soft">
+                    Submissions closed at <LocalTime iso={tournament.submissionDeadline.toISOString()} />.
+                    Your draft is in — the bracket appears when the admin publishes it.
+                  </p>
+                ) : (
+                  <p className="text-soft">
+                    Write your draft below.
+                    {tournament.submissionDeadline && (
+                      <>
+                        {" "}Submissions will close at{" "}
+                        <LocalTime iso={tournament.submissionDeadline.toISOString()} />.
+                      </>
+                    )}
+                  </p>
+                )}
+                <MyDraft
+                  slug={slug}
+                  participantId={me.id}
+                  template={tournament.defaultSubmission}
+                  readOnly={Boolean(tournament.submissionDeadline && new Date() > tournament.submissionDeadline)}
+                />
               </div>
             ) : (
               <p className="text-soft">
@@ -130,16 +148,27 @@ async function MyDraft({
   slug,
   participantId,
   template,
+  readOnly = false,
 }: {
   slug: string;
   participantId: string;
   template: string;
+  readOnly?: boolean;
 }) {
   const db = await getDb();
   const [draft] = await db
     .select()
     .from(textVersions)
     .where(and(eq(textVersions.authorId, participantId), eq(textVersions.kind, "draft")));
+  if (readOnly) {
+    return draft ? (
+      <div className="rounded-md border border-edge">
+        <NumberedText body={draft.bodyMd} />
+      </div>
+    ) : (
+      <p className="text-faint">No draft was submitted.</p>
+    );
+  }
   return <DraftEditor slug={slug} initialBody={draft?.bodyMd ?? template} />;
 }
 

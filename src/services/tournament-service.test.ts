@@ -116,6 +116,33 @@ describe("drafts", () => {
     expect(status[0].draft?.bodyMd).toBe("Rewritten entirely, five words now.");
   });
 
+  it("enforces the submission deadline and lets the admin move or clear it until publication", async () => {
+    const emailer = new ConsoleEmailer();
+    const t = await createTournament(db, { slug: "deadline", name: "D", roundDurationS: 600, breakDurationS: 60 });
+    const p = await addParticipant(db, emailer, BASE, t.id, { name: "Late", email: "late@example.org" });
+    await saveDraft(db, p.id, "in time");
+
+    const past = new Date(Date.now() - 60_000);
+    const future = new Date(Date.now() + 60 * 60_000);
+    const { updateSubmissionDeadline } = await import("./tournament-service");
+
+    await updateSubmissionDeadline(db, t.id, past);
+    await expect(saveDraft(db, p.id, "too late")).rejects.toThrow(/deadline has passed/);
+
+    // Extending the deadline reopens submissions; clearing it does too.
+    await updateSubmissionDeadline(db, t.id, future);
+    await saveDraft(db, p.id, "revised in extra time");
+    await updateSubmissionDeadline(db, t.id, null);
+    await saveDraft(db, p.id, "revised with no deadline");
+
+    // After publication the deadline is no longer editable.
+    const p2 = await addParticipant(db, emailer, BASE, t.id, { name: "Two", email: "two@example.org" });
+    await saveDraft(db, p2.id, "second draft");
+    const { publishBracket } = await import("./runtime-service");
+    await publishBracket(db, emailer, BASE, t.id, 9);
+    await expect(updateSubmissionDeadline(db, t.id, future)).rejects.toThrow(/ended/);
+  });
+
   it("roster freezes and submissions close outside the submission phase", async () => {
     const emailer = new ConsoleEmailer();
     const t = await createTournament(db, { slug: "frozen", name: "F", roundDurationS: 600, breakDurationS: 60 });

@@ -221,6 +221,9 @@ export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
   if (tournament.phase !== "submission") {
     throw new Error("submissions are closed");
   }
+  if (tournament.submissionDeadline && new Date() > tournament.submissionDeadline) {
+    throw new Error("submissions are closed — the deadline has passed");
+  }
   const wordCount = countWords(bodyMd);
   const [existing] = await db
     .select()
@@ -240,6 +243,28 @@ export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
     .returning();
   await db.insert(chatRooms).values({ tournamentId: tournament.id, kind: "draft", subjectId: created.id });
   return created;
+}
+
+/**
+ * Set or clear the submission deadline (SPEC §4 Phase 0: optional; if unset
+ * the admin closes manually by publishing). Editable until publication —
+ * extending a passed deadline reopens submissions.
+ */
+export async function updateSubmissionDeadline(db: Db, tournamentId: string, deadline: Date | null) {
+  const tournament = await requireTournament(db, tournamentId);
+  if (tournament.phase !== "setup" && tournament.phase !== "submission") {
+    throw new Error("the submission period has ended");
+  }
+  if (deadline && Number.isNaN(deadline.getTime())) throw new Error("invalid date");
+  const [updated] = await db
+    .update(tournaments)
+    .set({ submissionDeadline: deadline })
+    .where(eq(tournaments.id, tournamentId))
+    .returning();
+  await audit(db, tournamentId, "submission_deadline_changed", {
+    deadline: deadline?.toISOString() ?? null,
+  });
+  return updated;
 }
 
 /** Admin dashboard rows (SPEC §4 Phase 1): submission status per participant. */

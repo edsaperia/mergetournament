@@ -13,7 +13,15 @@ import {
   removeParticipant,
   saveDraft,
   updateParticipant,
+  updateSubmissionDeadline,
 } from "../services/tournament-service";
+
+/** Convert a datetime-local value + the client's UTC offset into an instant. */
+function parseLocalDatetime(value: string, tzOffsetMin: number): Date {
+  const asUtc = Date.parse(`${value}:00Z`);
+  if (Number.isNaN(asUtc)) throw new Error("invalid date");
+  return new Date(asUtc + tzOffsetMin * 60_000);
+}
 import {
   beginTournament,
   mergeAction,
@@ -51,6 +59,7 @@ export async function createTournamentAction(_prev: ActionState, formData: FormD
   try {
     const db = await getDb();
     const slug = String(formData.get("slug") ?? "").trim();
+    const deadlineRaw = String(formData.get("submissionDeadline") ?? "").trim();
     const tournament = await createTournament(db, {
       slug,
       name: String(formData.get("name") ?? "").trim() || slug,
@@ -58,6 +67,9 @@ export async function createTournamentAction(_prev: ActionState, formData: FormD
       breakDurationS: Math.round(Number(formData.get("breakMinutes") ?? 10) * 60),
       visibility: formData.get("visibility") === "participants_only" ? "participants_only" : "public",
       defaultSubmission: String(formData.get("defaultSubmission") ?? ""),
+      submissionDeadline: deadlineRaw
+        ? parseLocalDatetime(deadlineRaw, Number(formData.get("tzOffsetMin") ?? 0))
+        : undefined,
     });
     await addParticipant(db, getEmailer(), baseUrl(), tournament.id, {
       name: String(formData.get("adminName") ?? "").trim() || "Admin",
@@ -229,6 +241,26 @@ export async function deleteTournamentAction(slug: string): Promise<ActionState>
     return fail(e);
   }
   redirect("/");
+}
+
+/** Set or clear the submission deadline; `local` is a datetime-local value or null. */
+export async function setDeadlineAction(
+  slug: string,
+  local: string | null,
+  tzOffsetMin: number
+): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    const deadline = local ? parseLocalDatetime(local, tzOffsetMin) : null;
+    await updateSubmissionDeadline(db, admin.tournamentId, deadline);
+    revalidatePath(`/${slug}`);
+    revalidatePath(`/${slug}/admin`);
+    bump(admin.tournamentId);
+    return { ok: true, message: deadline ? "Deadline set." : "Deadline cleared — you close submissions by publishing." };
+  } catch (e) {
+    return fail(e);
+  }
 }
 
 export async function publishBracketAction(slug: string): Promise<ActionState> {

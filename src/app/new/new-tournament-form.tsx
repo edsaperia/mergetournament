@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createTournamentAction, type ActionState } from "../../server/actions";
 import { ActionStatus } from "../action-status";
 import { field, fieldLabel as label } from "../ui";
@@ -9,8 +9,10 @@ const initial: ActionState = { ok: true, message: "" };
 
 export function NewTournamentForm() {
   const [state, formAction, pending] = useActionState(createTournamentAction, initial);
+  const [tzOffsetMin] = useState(() => new Date().getTimezoneOffset());
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      <input type="hidden" name="tzOffsetMin" value={tzOffsetMin} />
       <div>
         <label className={label} htmlFor="name">Tournament name</label>
         <input className={field} id="name" name="name" required placeholder="Our Constitutional Convention" />
@@ -32,6 +34,13 @@ export function NewTournamentForm() {
           <label className={label} htmlFor="breakMinutes">Break length (minutes)</label>
           <input className={field} id="breakMinutes" name="breakMinutes" type="number" min="0" defaultValue="10" required />
         </div>
+      </div>
+      <div>
+        <label className={label} htmlFor="submissionDeadline">Submission close (optional)</label>
+        <input className={field} id="submissionDeadline" name="submissionDeadline" type="datetime-local" />
+        <p className="mt-1 text-xs text-muted">
+          Submissions freeze at this time (your local time). Leave empty to close manually by publishing the bracket.
+        </p>
       </div>
       <div>
         <label className={label} htmlFor="visibility">Visibility</label>

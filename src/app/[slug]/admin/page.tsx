@@ -8,6 +8,7 @@ import { beginAction, deleteTournamentAction, pauseAction, publishBracketAction 
 import { latestEmailEvents } from "../../../services/sysadmin-service";
 import { currentParticipant, tournamentBySlug } from "../../../server/session";
 import { ControlButton } from "./admin-controls";
+import { DeadlineEditor } from "./deadline-editor";
 import { Roster } from "./roster";
 
 function fmtDuration(s: number): string {
@@ -84,6 +85,11 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
       </section>
       <section className="mt-10 border-t border-edge pt-6">
         <h2 className="mb-3 text-lg font-semibold">Lifecycle</h2>
+        {tournament.phase === "submission" && (
+          <div className="mb-4">
+            <DeadlineEditor slug={slug} deadlineIso={tournament.submissionDeadline?.toISOString() ?? null} />
+          </div>
+        )}
         <div className="flex flex-wrap gap-3">
           {tournament.phase === "submission" && (
             <>
