@@ -7,10 +7,6 @@
  * All wall-clock instants come in as `now` parameters (testability); all
  * schedule arithmetic happens in effective seconds since Begin. Every random
  * choice draws from a recorded seed.
- *
- * Deferred to later milestones: the 60s are-you-still-here window (backstop
- * currently treats sole-active bearers as making no choice, so their own
- * input advances), Yjs editing, SSE push, flip animation.
  */
 
 import { randomBytes } from "node:crypto";
