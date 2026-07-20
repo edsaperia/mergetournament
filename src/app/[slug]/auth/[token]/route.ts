@@ -2,10 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "../../../../db";
 import { signSession } from "../../../../lib/auth";
 import { participantForToken } from "../../../../services/tournament-service";
-import { authSecret, sessionCookieName } from "../../../../server/config";
+import { authSecret, baseUrl, sessionCookieName } from "../../../../server/config";
 
 /** The magic link (SPEC §3): visiting sets a session cookie and redirects in. */
-export async function GET(req: NextRequest, ctx: RouteContext<"/[slug]/auth/[token]">) {
+export async function GET(_req: NextRequest, ctx: RouteContext<"/[slug]/auth/[token]">) {
   const { slug, token } = await ctx.params;
   const db = await getDb();
   const participant = await participantForToken(db, slug, token);
@@ -15,7 +15,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/[slug]/auth/[tok
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
-  const res = NextResponse.redirect(new URL(`/${slug}`, req.url));
+  // Behind the reverse proxy req.url is localhost:3000 — build from BASE_URL.
+  const res = NextResponse.redirect(new URL(`/${slug}`, baseUrl()));
   res.cookies.set(sessionCookieName(slug), signSession(
     { participantId: participant.id, tournamentId: participant.tournamentId },
     authSecret()
