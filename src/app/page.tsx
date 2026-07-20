@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { Logo } from "./logo";
 
 export default function Home() {
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col justify-center gap-6 px-6 py-16">
-      <h1 className="text-4xl font-bold tracking-tight">Merge Tournament</h1>
+      <div className="flex items-center gap-4">
+        <Logo className="h-14 w-14" />
+        <h1 className="text-4xl font-bold tracking-tight">Merge Tournament</h1>
+      </div>
       <p className="text-lg text-soft">
         A fair method for combining many draft documents into one by knockout
         tournament of pairwise negotiations.

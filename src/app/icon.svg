@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
+  <defs>
+    <path id="p" d="M230 80 Q230 66 244 66 L268 66 Q282 66 282 80 L282 360 L256 430 L230 360 Z"/>
+    <mask id="mBack" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/>
+      <rect x="222" y="100" width="68" height="9" rx="4.5" fill="black"/>
+      <rect x="222" y="354" width="68" height="9" rx="4.5" fill="black"/>
+      <use xlink:href="#p" href="#p" transform="rotate(-70 256 256)" fill="black" stroke="black" stroke-width="20" stroke-linejoin="round"/>
+    </mask>
+    <mask id="mFront" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/>
+      <rect x="222" y="100" width="68" height="9" rx="4.5" fill="black"/>
+      <rect x="222" y="354" width="68" height="9" rx="4.5" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="#1F2328">
+    <use xlink:href="#p" href="#p" transform="rotate(35 256 256)" mask="url(#mBack)"/>
+    <use xlink:href="#p" href="#p" transform="rotate(-35 256 256)" mask="url(#mFront)"/>
+  </g>
+</svg>
