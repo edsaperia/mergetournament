@@ -5,8 +5,13 @@ import { getDb } from "../../../../db";
 import { merges, participants, rounds, slots, textVersions } from "../../../../db/schema";
 import { roundRemainingS } from "../../../../lib/schedule";
 import { effectiveT } from "../../../../services/runtime-service";
+import { signCollabToken } from "../../../../lib/collab-token";
+import { docName } from "../../../../server/collab-core";
+import { collabWsUrl } from "../../../../server/collab";
+import { authSecret } from "../../../../server/config";
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh, Countdown } from "../../../live";
+import { CollabEditor } from "./collab-editor";
 import { WorkspaceControls } from "./workspace-controls";
 
 export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) {
@@ -103,25 +108,34 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </section>
         <section className="rounded-lg border-2 border-neutral-300 p-4 dark:border-neutral-700">
           <h2 className="mb-2 font-semibold">Merge candidate</h2>
-          {canAct && mySide ? (
+          {m.state === "resolved" ? (
+            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+              {m.workingText || "(blank)"}
+            </pre>
+          ) : (
+            <CollabEditor
+              wsUrl={collabWsUrl()}
+              docName={docName(m.id)}
+              token={signCollabToken({ participantId: me?.id ?? "observer", mergeId: m.id }, authSecret())}
+              readOnly={!canAct || lock !== "editing"}
+              userName={me?.name ?? "observer"}
+            />
+          )}
+          {canAct && mySide && (
             <WorkspaceControls
               slug={slug}
               mergeId={m.id}
               mySide={mySide}
               partnerName={bearerName(mySide === "A" ? m.bearerBId : m.bearerAId)}
-              workingText={m.workingText}
               lock={lock === "locked" ? "editing" : (lock as "editing" | "proposed")}
               proposedBy={m.proposedBy}
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
             />
-          ) : (
-            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
-              {m.workingText || "(blank)"}
-            </pre>
           )}
           {!mySide && m.state === "open" && (
             <p className="mt-3 text-xs text-neutral-500">
-              Only this merge&apos;s bearers hold the pen. (Lobbying arrives by chat — coming soon.)
+              Only this merge&apos;s bearers hold the pen — you are watching live.
+              (Lobbying arrives by chat — coming soon.)
             </p>
           )}
         </section>

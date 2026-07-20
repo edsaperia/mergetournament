@@ -164,7 +164,14 @@ export async function workspaceAction(
   try {
     const me = await requireParticipant(slug);
     const db = await getDb();
+    const { collab, syncMergeText } = await import("./collab");
+    // Lock-in must act on the live CRDT text, not the debounced snapshot.
+    if (action.type === "propose" || action.type === "confirm") {
+      await syncMergeText(mergeId);
+    }
     await mergeAction(db, mergeId, me.id, action, new Date());
+    // Freezes (propose/lock) must reach the sync server's gate immediately.
+    collab()?.invalidateGate(mergeId);
     revalidatePath(`/${slug}/merge/${mergeId}`);
     revalidatePath(`/${slug}`);
     return { ok: true, message: "" };

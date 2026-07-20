@@ -21,6 +21,14 @@ export function startTicker(): void {
     busy = true;
     try {
       const db = await getDb();
+      // Flush live CRDT texts so backstop resolutions never act on stale rows.
+      const { collab, syncMergeText } = await import("./collab");
+      const handle = collab();
+      if (handle) {
+        for (const name of handle.server.hocuspocus.documents.keys()) {
+          if (name.startsWith("merge:")) await syncMergeText(name.slice("merge:".length));
+        }
+      }
       const running = await db.select().from(tournaments).where(eq(tournaments.phase, "running"));
       for (const t of running) {
         try {

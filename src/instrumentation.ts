@@ -2,5 +2,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startTicker } = await import("./server/ticker");
     startTicker();
+    const { startCollab } = await import("./server/collab");
+    await startCollab();
   }
 }
