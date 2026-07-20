@@ -79,11 +79,25 @@ export async function BracketView({
           Tournament paused by the admin.
         </p>
       )}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex flex-col gap-3 pb-4">
         {allRounds.map((round) => {
           const roundSlots = allSlots.filter((s) => s.roundNo === round.number);
+          const prev = allRounds[round.number - 2];
+          const inThisBreak =
+            running && !paused && round.state === "scheduled" && prev?.state === "closed";
           return (
-            <section key={round.number} className="min-w-56 flex-1">
+            <section key={round.number}>
+              {round.number > 1 && (
+                <div className="mb-3 flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-3 py-1.5 text-sm text-muted">
+                  Break ({Math.round(tournament.breakDurationS / 60)}m)
+                  {inThisBreak && prev?.actualCloseS != null && (
+                    <Countdown
+                      remainingS={prev.actualCloseS + tournament.breakDurationS - te}
+                      paused={paused}
+                    />
+                  )}
+                </div>
+              )}
               <header className="mb-2 flex items-baseline justify-between">
                 <h3 className="font-semibold">Round {round.number}</h3>
                 <span className="text-xs text-muted">
@@ -107,12 +121,12 @@ export async function BracketView({
                   {round.state === "scheduled" && `at +${Math.round(round.scheduledStartS / 60)}m`}
                 </span>
               </header>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-2">
                 {roundSlots.map((slot) => {
                   const m = mergeBySlot.get(slot.id);
                   if (!m) {
                     return (
-                      <div key={slot.id} className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+                      <div key={slot.id} className="w-64 rounded-lg border border-dashed border-line p-3 text-sm text-muted">
                         {slot.kind === "bye" ? (
                           slot.outTextId ? (
                             <>
@@ -139,21 +153,24 @@ export async function BracketView({
                       </div>
                     );
                   }
-                  const mine = viewerId !== null && (m.bearerAId === viewerId || m.bearerBId === viewerId);
+                  // "You are here" points at where you should be NOW — never
+                  // at resolved merges you've already carried forward from.
+                  const involved = viewerId !== null && (m.bearerAId === viewerId || m.bearerBId === viewerId);
+                  const here = involved && m.state === "open";
+                  const upNext = involved && m.state === "pending";
                   return (
                     <Link
                       key={slot.id}
                       href={`/${tournament.slug}/merge/${m.id}`}
-                      className={`block rounded-lg border p-3 text-sm hover:border-strong ${
-                        mine
-                          ? "border-live ring-1 ring-live"
-                          : "border-line"
+                      className={`block w-64 rounded-lg border p-3 text-sm hover:border-strong ${
+                        here ? "border-live ring-1 ring-live" : upNext ? "border-live" : "border-line"
                       }`}
                     >
                       <p className="font-medium">
                         {nameOf.get(m.bearerAId ?? "") ?? "?"} + {nameOf.get(m.bearerBId ?? "") ?? "?"}
                         {m.isAdHoc && <span className="ml-1 text-xs text-muted">(ad-hoc)</span>}
-                        {mine && <span className="ml-1 text-xs text-live-ink">you are here</span>}
+                        {here && <span className="ml-1 text-xs text-live-ink">you are here</span>}
+                        {upNext && <span className="ml-1 text-xs text-live-ink">you, up next</span>}
                       </p>
                       <p className="mt-1 text-xs text-muted">
                         {title(m.textAId)} + {title(m.textBId)}
@@ -165,6 +182,16 @@ export async function BracketView({
                               flipKey={m.id}
                               a={m.resolution === "bearer_flip" ? nameOf.get(m.bearerAId ?? "") ?? "?" : title(m.textAId)}
                               b={m.resolution === "bearer_flip" ? nameOf.get(m.bearerBId ?? "") ?? "?" : title(m.textBId)}
+                              title={
+                                m.resolution === "bearer_flip"
+                                  ? `Deciding between ${nameOf.get(m.bearerAId ?? "") ?? "?"} and ${nameOf.get(m.bearerBId ?? "") ?? "?"} to carry this merge into round ${slot.roundNo + 1}`
+                                  : `Round ${slot.roundNo}: time ran out — deciding which text advances`
+                              }
+                              winner={
+                                m.resolution === "bearer_flip"
+                                  ? nameOf.get(m.advancingBearerId ?? "") ?? "?"
+                                  : title(m.resultTextId)
+                              }
                             >
                               <span className="text-muted">
                                 {RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}

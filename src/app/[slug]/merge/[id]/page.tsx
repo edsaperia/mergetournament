@@ -18,6 +18,7 @@ import { NumberedText } from "../../../numbered-text";
 import { CollabEditor } from "./collab-editor";
 import { WindowControls } from "./window-controls";
 import { WorkspaceControls } from "./workspace-controls";
+import { WorkspaceTabs } from "./workspace-tabs";
 
 export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) {
   const { slug, id } = await props.params;
@@ -65,7 +66,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const mergeRoom = await roomForMerge(db, m.id);
   const roomA = m.textAId ? await roomForText(db, m.textAId) : null;
   const roomB = m.textBId ? await roomForText(db, m.textBId) : null;
-  const chatFor = async (room: { id: string } | null, title: string, defaultOpen: boolean) =>
+  const chatFor = async (room: { id: string } | null, title: string, defaultOpen = true) =>
     room ? (
       <ChatPanel
         slug={slug}
@@ -131,6 +132,16 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 flipKey={m.id}
                 a={m.resolution === "bearer_flip" ? bearerName(m.bearerAId) : `${bearerName(m.bearerAId)}'s input`}
                 b={m.resolution === "bearer_flip" ? bearerName(m.bearerBId) : `${bearerName(m.bearerBId)}'s input`}
+                title={
+                  m.resolution === "bearer_flip"
+                    ? `Deciding between ${bearerName(m.bearerAId)} and ${bearerName(m.bearerBId)} to carry this merge into round ${slot.roundNo + 1}`
+                    : "Time ran out — deciding which input text advances"
+                }
+                winner={
+                  m.resolution === "bearer_flip"
+                    ? bearerName(m.advancingBearerId)
+                    : `${bearerName(m.advancingBearerId)}'s input`
+                }
               >
                 {summary}
               </FlipReveal>
@@ -141,14 +152,20 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <WorkspaceTabs
+        labels={[
+          `Input A · ${bearerName(m.bearerAId)}`,
+          `Input B · ${bearerName(m.bearerBId)}`,
+          "Merge candidate",
+        ]}
+      >
         <section className="rounded-lg border border-edge p-4">
           <h2 className="mb-2 font-semibold">
             Input A · {bearerName(m.bearerAId)}
             {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
           </h2>
           {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
-          <div className="mt-3">{await chatFor(roomA, "This text's chat", false)}</div>
+          <div className="mt-3">{await chatFor(roomA, "This text's chat")}</div>
         </section>
         <section className="rounded-lg border border-edge p-4">
           <h2 className="mb-2 font-semibold">
@@ -156,7 +173,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
           </h2>
           {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
-          <div className="mt-3">{await chatFor(roomB, "This text's chat", false)}</div>
+          <div className="mt-3">{await chatFor(roomB, "This text's chat")}</div>
         </section>
         <section className="rounded-lg border-2 border-line p-4">
           <h2 className="mb-2 font-semibold">Merge candidate</h2>
@@ -201,9 +218,9 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               live. Lobbying arrives through the chat below.
             </p>
           )}
-          <div className="mt-3">{await chatFor(mergeRoom, "This merge's chat", true)}</div>
+          <div className="mt-3">{await chatFor(mergeRoom, "This merge's chat")}</div>
         </section>
-      </div>
+      </WorkspaceTabs>
     </main>
   );
 }

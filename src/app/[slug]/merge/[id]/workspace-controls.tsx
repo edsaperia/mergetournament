@@ -47,31 +47,10 @@ export function WorkspaceControls({
 
   return (
     <form action={dispatch} className="mt-3 flex flex-col gap-3">
-      {lock === "proposed" && (
-        <p className="text-sm text-amber-600">
-          {iProposed ? `You proposed to lock in — waiting for ${partnerName}` : `${partnerName} proposed to lock in`}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {lock === "editing" && (
-          <button className={btn} name="intent" value="propose" disabled={pending}>
-            Propose lock-in
-          </button>
-        )}
-        {theyProposed && (
-          <>
-            <button className={btn} name="intent" value="confirm" disabled={pending}>
-              Confirm lock-in
-            </button>
-            <button className={btnSecondary} name="intent" value="keepEditing" disabled={pending}>
-              Keep editing
-            </button>
-          </>
-        )}
-      </div>
-
+      {/* Bearer choice first: settle it before lock-in, since an unsettled
+          choice is what triggers a coin flip at confirmation. */}
       <fieldset className="rounded-md border border-edge p-3 text-sm">
-        <legend className="px-1 text-muted">Who carries the result forward?</legend>
+        <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
         <div className="flex gap-2">
           <button
             className={myPref === mySide ? btn : btnSecondary}
@@ -98,6 +77,29 @@ export function WorkspaceControls({
           <input type="hidden" name="pref" defaultValue="me" />
         </div>
       </fieldset>
+
+      {lock === "proposed" && (
+        <p className="text-sm text-amber-600">
+          {iProposed ? `You proposed to lock in — waiting for ${partnerName}` : `${partnerName} proposed to lock in`}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {lock === "editing" && (
+          <button className={btn} name="intent" value="propose" disabled={pending}>
+            Propose lock-in
+          </button>
+        )}
+        {theyProposed && (
+          <>
+            <button className={btn} name="intent" value="confirm" disabled={pending}>
+              Confirm lock-in
+            </button>
+            <button className={btnSecondary} name="intent" value="keepEditing" disabled={pending}>
+              Keep editing
+            </button>
+          </>
+        )}
+      </div>
       <ActionStatus state={state} />
     </form>
   );

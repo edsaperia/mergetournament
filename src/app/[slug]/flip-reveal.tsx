@@ -3,30 +3,37 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * The performed coin flip (SPEC §4): flashes between the two choices,
- * faster and faster, revealing the winner after about six seconds. Plays
- * once per browser session per flip; afterwards renders the static result.
+ * The performed coin flip (SPEC §4): a centered modal saying what is being
+ * decided, flashing between the two choices faster and faster for about six
+ * seconds, then showing the winner. Plays once per browser session per
+ * flip; afterwards (and for later visitors) the static result renders.
  */
 export function FlipReveal({
   flipKey,
   a,
   b,
+  title,
+  winner,
   children,
 }: {
   flipKey: string;
   a: string;
   b: string;
+  /** What this flip decides, e.g. "Deciding who carries this merge into round 2". */
+  title: string;
+  /** Label of the winning choice, shown at the reveal. */
+  winner: string;
   children: React.ReactNode;
 }) {
   const storageKey = `flip:${flipKey}`;
-  const [phase, setPhase] = useState<"pending" | "animating" | "done">("pending");
+  const [phase, setPhase] = useState<"pending" | "animating" | "revealed" | "done">("pending");
   const [face, setFace] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
     const TOTAL = 6000;
-    // Deferred so no state is set synchronously within the effect body.
+    const REVEAL_MS = 2500;
     timer.current = setTimeout(() => {
       if (cancelled) return;
       if (sessionStorage.getItem(storageKey)) {
@@ -40,7 +47,10 @@ export function FlipReveal({
         if (cancelled) return;
         const elapsed = Date.now() - started;
         if (elapsed >= TOTAL) {
-          setPhase("done");
+          setPhase("revealed");
+          timer.current = setTimeout(() => {
+            if (!cancelled) setPhase("done");
+          }, REVEAL_MS);
           return;
         }
         setFace((f) => 1 - f);
@@ -59,9 +69,24 @@ export function FlipReveal({
   if (phase === "done") return <>{children}</>;
   if (phase === "pending") return null;
   return (
-    <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
-      <span aria-hidden>🪙</span>
-      <span aria-live="off">{face === 0 ? a : b}</span>
-    </span>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border border-edge bg-background p-8 text-center shadow-2xl">
+          <span className="text-4xl" aria-hidden>
+            🪙
+          </span>
+          <p className="text-sm text-muted">{title}</p>
+          {phase === "animating" ? (
+            <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
+          ) : (
+            <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
+          )}
+          <p className="text-xs text-faint">
+            {phase === "animating" ? "the coin is in the air…" : "decided"}
+          </p>
+        </div>
+      </div>
+      {children}
+    </>
   );
 }

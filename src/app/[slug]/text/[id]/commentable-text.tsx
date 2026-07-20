@@ -24,6 +24,8 @@ export function CommentableText({
   canComment: boolean;
 }) {
   const [target, setTarget] = useState<number | null>(null);
+  /** Lines whose comment threads the reader has collapsed. */
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [state, dispatch, pending] = useActionState(
     async (_prev: ActionState, formData: FormData): Promise<ActionState> => {
       const result = await addCommentAction(
@@ -57,21 +59,36 @@ export function CommentableText({
               {i + 1}
             </span>
             <pre className="min-w-0 flex-1 whitespace-pre-wrap px-3">{line || " "}</pre>
-            {canComment && (
+            {(canComment || byLine.has(i)) && (
               <button
                 type="button"
-                onClick={() => setTarget(target === i ? null : i)}
-                title="Comment on this line"
-                aria-label={`Comment on line ${i + 1}`}
+                onClick={() => {
+                  // Toggle the whole line: thread + composer together.
+                  const open = !collapsed.has(i) && (byLine.has(i) || target === i);
+                  if (open) {
+                    setCollapsed((s) => new Set(s).add(i));
+                    if (target === i) setTarget(null);
+                  } else {
+                    setCollapsed((s) => {
+                      const next = new Set(s);
+                      next.delete(i);
+                      return next;
+                    });
+                    if (canComment) setTarget(i);
+                  }
+                }}
+                title={byLine.has(i) ? "Show or hide this line's comments" : "Comment on this line"}
+                aria-label={`Comments on line ${i + 1}`}
                 className={`w-8 shrink-0 select-none text-center text-xs leading-6 text-muted hover:text-foreground ${
-                  target === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  target === i || byLine.has(i) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
               >
-                💬
+                💬{byLine.has(i) ? byLine.get(i)!.length : ""}
               </button>
             )}
           </div>
-          {(byLine.get(i) ?? []).map((c) => (
+          {!collapsed.has(i) &&
+            (byLine.get(i) ?? []).map((c) => (
             <div key={c.id} className="ml-12 border-l-2 border-blue-200 bg-blue-50/50 px-3 py-1 font-sans text-xs dark:border-blue-900 dark:bg-blue-950/30">
               <span className="font-semibold">{c.author}</span>{" "}
               <span className="text-faint">
