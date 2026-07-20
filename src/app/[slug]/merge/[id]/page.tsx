@@ -14,6 +14,7 @@ import { currentParticipant, tournamentBySlug } from "../../../../server/session
 import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
 import { FlipReveal } from "../../flip-reveal";
+import { NumberedText } from "../../../numbered-text";
 import { CollabEditor } from "./collab-editor";
 import { WindowControls } from "./window-controls";
 import { WorkspaceControls } from "./workspace-controls";
@@ -146,7 +147,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             Input A · {bearerName(m.bearerAId)}
             {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
           </h2>
-          <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{textA?.bodyMd ?? "—"}</pre>
+          {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
           <div className="mt-3">{await chatFor(roomA, "This text's chat", false)}</div>
         </section>
         <section className="rounded-lg border border-edge p-4">
@@ -154,15 +155,17 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             Input B · {bearerName(m.bearerBId)}
             {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
           </h2>
-          <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{textB?.bodyMd ?? "—"}</pre>
+          {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
           <div className="mt-3">{await chatFor(roomB, "This text's chat", false)}</div>
         </section>
         <section className="rounded-lg border-2 border-line p-4">
           <h2 className="mb-2 font-semibold">Merge candidate</h2>
           {m.state === "resolved" ? (
-            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-soft">
-              {m.workingText || "(blank)"}
-            </pre>
+            m.workingText ? (
+              <NumberedText body={m.workingText} />
+            ) : (
+              <p className="text-faint">(blank)</p>
+            )
           ) : (
             <CollabEditor
               wsUrl={collabWsUrl()}

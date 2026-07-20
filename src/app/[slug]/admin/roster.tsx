@@ -1,13 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   addParticipantAction,
   reissueLinkAction,
   removeParticipantAction,
   type ActionState,
 } from "../../../server/actions";
+import Link from "next/link";
 import { ActionStatus } from "../../action-status";
+import { NumberedText } from "../../numbered-text";
 import { field } from "../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
@@ -18,6 +20,8 @@ export interface RosterRow {
   email: string;
   role: string;
   wordCount: number | null;
+  draftId: string | null;
+  draftBody: string | null;
   /** Latest delivery event from the email provider, e.g. "delivered", "bounced". */
   emailStatus: string | null;
 }
@@ -33,6 +37,7 @@ const EMAIL_STATUS_STYLE: Record<string, string> = {
 };
 
 export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
+  const [viewing, setViewing] = useState<RosterRow | null>(null);
   const [state, addAction, adding] = useActionState(addParticipantAction.bind(null, slug), initial);
   const [rowState, rowDispatch, rowPending] = useActionState(
     async (_prev: ActionState, form: FormData): Promise<ActionState> => {
@@ -74,7 +79,14 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
                 {r.wordCount === null ? (
                   <span className="text-faint">—</span>
                 ) : (
-                  `${r.wordCount} words`
+                  <button
+                    type="button"
+                    onClick={() => setViewing(r)}
+                    className="underline hover:no-underline"
+                    title={`Read ${r.name}'s draft`}
+                  >
+                    {r.wordCount} words
+                  </button>
                 )}
               </td>
               <td className="py-2">
@@ -123,6 +135,38 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
         </button>
       </form>
       <ActionStatus state={state} />
+
+      {viewing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setViewing(null)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-edge bg-background shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-baseline justify-between border-b border-edge px-4 py-3">
+              <p className="font-semibold">
+                {viewing.name}&apos;s draft
+                <span className="ml-2 text-sm font-normal text-muted">{viewing.wordCount} words</span>
+              </p>
+              <div className="flex gap-3 text-sm">
+                {viewing.draftId && (
+                  <Link className="underline" href={`/${slug}/text/${viewing.draftId}`}>
+                    open full page
+                  </Link>
+                )}
+                <button type="button" className="text-muted hover:text-foreground" onClick={() => setViewing(null)}>
+                  ✕ close
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto p-2">
+              <NumberedText body={viewing.draftBody ?? ""} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

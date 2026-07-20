@@ -76,6 +76,8 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
             email: participant.email,
             role: participant.role,
             wordCount: draft?.wordCount ?? null,
+            draftId: draft?.id ?? null,
+            draftBody: draft?.bodyMd ?? null,
             emailStatus: delivery.get(participant.email)?.event.replace("email.", "") ?? null,
           }))}
         />

@@ -25,7 +25,10 @@ export function NotificationBell({
   const prev = useRef({ mergeId: null as string | null, warned: null as number | null, phase });
 
   useEffect(() => {
-    setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+    const id = setTimeout(() => {
+      setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+    }, 0);
+    return () => clearTimeout(id);
   }, []);
 
   useEffect(() => {
