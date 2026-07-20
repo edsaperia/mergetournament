@@ -24,6 +24,21 @@ export function AutoRefresh({ slug, fallbackMs = 30000 }: { slug: string; fallba
   return null;
 }
 
+/**
+ * Refresh the page shortly after a known instant passes (e.g. the submission
+ * deadline), so open pages flip state without SSE. No-op beyond ~24 days.
+ */
+export function RefreshAt({ iso, bufferMs = 1500 }: { iso: string; bufferMs?: number }) {
+  const router = useRouter();
+  useEffect(() => {
+    const ms = new Date(iso).getTime() - Date.now() + bufferMs;
+    if (ms > 2 ** 31 - 1) return;
+    const id = setTimeout(() => router.refresh(), Math.max(ms, bufferMs));
+    return () => clearTimeout(id);
+  }, [router, iso, bufferMs]);
+  return null;
+}
+
 function fmt(s: number): string {
   const sign = s < 0 ? "-" : "";
   const abs = Math.max(0, Math.abs(s));

@@ -221,7 +221,9 @@ export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
   if (tournament.phase !== "submission") {
     throw new Error("submissions are closed");
   }
-  if (tournament.submissionDeadline && new Date() > tournament.submissionDeadline) {
+  // 10s grace so a debounced autosave (or the editor's unmount flush when
+  // the page flips to read-only) still captures the final keystrokes.
+  if (tournament.submissionDeadline && Date.now() > tournament.submissionDeadline.getTime() + 10_000) {
     throw new Error("submissions are closed — the deadline has passed");
   }
   const wordCount = countWords(bodyMd);

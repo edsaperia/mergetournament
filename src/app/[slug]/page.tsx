@@ -8,7 +8,7 @@ import { globalRoom, messagesFor } from "../../services/chat-service";
 import { effectiveT } from "../../services/runtime-service";
 import { readyAction, workspaceAction } from "../../server/actions";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
-import { AutoRefresh } from "../live";
+import { AutoRefresh, RefreshAt } from "../live";
 import { LocalTime } from "../local-time";
 import { NumberedText } from "../numbered-text";
 import { ControlButton } from "./admin/admin-controls";
@@ -49,6 +49,9 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
       {live && <AutoRefresh slug={slug} />}
+      {tournament.phase === "submission" && tournament.submissionDeadline && (
+        <RefreshAt iso={tournament.submissionDeadline.toISOString()} />
+      )}
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h1 className="text-3xl font-bold">{tournament.name}</h1>
