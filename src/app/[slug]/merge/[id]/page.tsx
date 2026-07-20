@@ -83,8 +83,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
       {live && <AutoRefresh slug={slug} />}
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">
-          <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
-          {" — round "}{slot.roundNo}{m.isAdHoc ? " (ad-hoc)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
+          Round {slot.roundNo}
+          {m.isAdHoc ? " (ad-hoc)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
         </h1>
         {tournament.phase === "running" && tournament.begunAt && round.state === "open" && (
           <Countdown
