@@ -1,0 +1,2 @@
+# Nightly database backup for Merge Tournament (03:17 server time).
+17 3 * * * root /usr/local/bin/mergetournament-backup

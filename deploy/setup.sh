@@ -73,6 +73,10 @@ systemctl daemon-reload
 systemctl enable --now mergetournament
 systemctl reload caddy || systemctl restart caddy
 
+# --- backups --------------------------------------------------------------
+install -m 755 deploy/backup.sh /usr/local/bin/mergetournament-backup
+install -m 644 deploy/backup.cron /etc/cron.d/mergetournament-backup
+
 # --- firewall -------------------------------------------------------------
 ufw allow OpenSSH
 ufw allow 80/tcp
