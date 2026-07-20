@@ -62,11 +62,6 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
               {me.role === "admin" ? " (admin)" : ""}
             </span>
           )}
-          {me?.role === "admin" && tournament.phase === "submission" && (
-            <Link className="rounded-lg bg-accent px-3 py-2 font-medium text-accent-ink" href={`/${slug}/admin`}>
-              Submissions
-            </Link>
-          )}
           {me?.role === "admin" && (
             <Link className="rounded-lg border border-line px-3 py-2 font-medium" href={`/${slug}/admin`}>
               Admin
@@ -81,7 +76,13 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
       {tournament.phase === "running" && (
         <BreakPanel slug={slug} tournament={tournament} participantId={me?.id ?? null} />
       )}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div
+        className={
+          tournament.phase === "submission" || tournament.phase === "setup"
+            ? "grid gap-6"
+            : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
+        }
+      >
         <div className="min-w-0">
           {tournament.phase === "submission" &&
             (me && me.role === "participant" ? (
@@ -114,9 +115,11 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
             </section>
           )}
         </div>
-        <aside className="min-w-0">
-          <GlobalChat slug={slug} tournamentId={tournament.id} canPost={Boolean(me)} />
-        </aside>
+        {tournament.phase !== "submission" && tournament.phase !== "setup" && (
+          <aside className="min-w-0">
+            <GlobalChat slug={slug} tournamentId={tournament.id} canPost={Boolean(me)} />
+          </aside>
+        )}
       </div>
     </main>
   );

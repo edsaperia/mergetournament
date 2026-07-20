@@ -70,6 +70,14 @@ describe("rooms", () => {
 });
 
 describe("posting rules", () => {
+  it("chat opens only when the bracket is published", async () => {
+    const emailer = new ConsoleEmailer();
+    const pre = await createTournament(db, { slug: "chat-pre", name: "Pre", roundDurationS: 600, breakDurationS: 60 });
+    const p = await addParticipant(db, emailer, "http://x", pre.id, { name: "Q", email: "q@pre.org" });
+    const room = await globalRoom(db, pre.id);
+    await expect(postMessage(db, room!.id, p.id, "too early")).rejects.toThrow(/bracket is published/);
+  });
+
   it("participants post anywhere; the admin only in global; attribution by name", async () => {
     const g = await globalRoom(db, tournamentId);
     const draftRoom = await roomForText(db, draftId);

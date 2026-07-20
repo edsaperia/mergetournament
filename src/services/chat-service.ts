@@ -90,6 +90,11 @@ export async function postMessage(db: Db, roomId: string, participantId: string,
   if (author.role === "admin" && room.kind !== "global") {
     throw new Error("the admin may only post in the global chat");
   }
+  // Chat opens when the bracket is published; before that, heads-down writing.
+  const [t] = await db.select().from(tournaments).where(eq(tournaments.id, room.tournamentId));
+  if (t?.phase === "setup" || t?.phase === "submission") {
+    throw new Error("chat opens when the bracket is published");
+  }
   const [row] = await db
     .insert(messages)
     .values({ roomId, authorId: participantId, kind: "user", body: trimmed })
