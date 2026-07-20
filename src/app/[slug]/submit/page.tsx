@@ -16,7 +16,7 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
     return (
       <main className="mx-auto max-w-xl flex-1 px-6 py-16">
         <h1 className="text-2xl font-bold">{tournament.name}</h1>
-        <p className="mt-4 text-neutral-600 dark:text-neutral-300">
+        <p className="mt-4 text-soft">
           To edit your draft, sign in with the personal link from your
           invitation email.
         </p>
@@ -38,7 +38,7 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
           {" — your draft"}
         </h1>
         {tournament.submissionDeadline && (
-          <span className="text-sm text-neutral-500">
+          <span className="text-sm text-muted">
             due {tournament.submissionDeadline.toLocaleString()}
           </span>
         )}
@@ -46,7 +46,7 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
       {tournament.phase === "submission" ? (
         <DraftEditor slug={slug} initialBody={draft?.bodyMd ?? tournament.defaultSubmission} />
       ) : (
-        <p className="text-neutral-600 dark:text-neutral-300">Submissions are closed.</p>
+        <p className="text-soft">Submissions are closed.</p>
       )}
     </main>
   );

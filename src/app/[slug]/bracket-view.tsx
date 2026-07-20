@@ -69,7 +69,7 @@ export async function BracketView({
   return (
     <div>
       {running && tournament.phase === "running" && (
-        <p className="mb-4 text-sm text-neutral-500">
+        <p className="mb-4 text-sm text-muted">
           Total remaining:{" "}
           <Countdown remainingS={globalRemainingS(config, progress, te)} paused={paused} className="text-base" />
         </p>
@@ -86,7 +86,7 @@ export async function BracketView({
             <section key={round.number} className="min-w-56 flex-1">
               <header className="mb-2 flex items-baseline justify-between">
                 <h3 className="font-semibold">Round {round.number}</h3>
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-muted">
                   {round.state === "open" && running && (
                     <Countdown remainingS={roundRemainingS(config, progress, round.number, te)} paused={paused} />
                   )}
@@ -108,7 +108,7 @@ export async function BracketView({
                   const m = mergeBySlot.get(slot.id);
                   if (!m) {
                     return (
-                      <div key={slot.id} className="rounded-lg border border-dashed border-neutral-300 p-3 text-sm text-neutral-500 dark:border-neutral-700">
+                      <div key={slot.id} className="rounded-lg border border-dashed border-line p-3 text-sm text-muted">
                         {slot.kind === "bye" ? (
                           slot.outTextId ? (
                             <>
@@ -140,18 +140,18 @@ export async function BracketView({
                     <Link
                       key={slot.id}
                       href={`/${tournament.slug}/merge/${m.id}`}
-                      className={`block rounded-lg border p-3 text-sm hover:border-neutral-500 ${
+                      className={`block rounded-lg border p-3 text-sm hover:border-strong ${
                         mine
-                          ? "border-blue-500 ring-1 ring-blue-500"
-                          : "border-neutral-300 dark:border-neutral-700"
+                          ? "border-live ring-1 ring-live"
+                          : "border-line"
                       }`}
                     >
                       <p className="font-medium">
                         {nameOf.get(m.bearerAId ?? "") ?? "?"} + {nameOf.get(m.bearerBId ?? "") ?? "?"}
-                        {m.isAdHoc && <span className="ml-1 text-xs text-neutral-500">(ad-hoc)</span>}
-                        {mine && <span className="ml-1 text-xs text-blue-600">you are here</span>}
+                        {m.isAdHoc && <span className="ml-1 text-xs text-muted">(ad-hoc)</span>}
+                        {mine && <span className="ml-1 text-xs text-live-ink">you are here</span>}
                       </p>
-                      <p className="mt-1 text-xs text-neutral-500">
+                      <p className="mt-1 text-xs text-muted">
                         {title(m.textAId)} + {title(m.textBId)}
                       </p>
                       <p className="mt-1 text-xs">
@@ -162,17 +162,17 @@ export async function BracketView({
                               a={m.resolution === "bearer_flip" ? nameOf.get(m.bearerAId ?? "") ?? "?" : title(m.textAId)}
                               b={m.resolution === "bearer_flip" ? nameOf.get(m.bearerBId ?? "") ?? "?" : title(m.textBId)}
                             >
-                              <span className="text-neutral-500">
+                              <span className="text-muted">
                                 {RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}
                               </span>
                             </FlipReveal>
                           ) : (
-                            <span className="text-neutral-500">{RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}</span>
+                            <span className="text-muted">{RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}</span>
                           )
                         ) : m.state === "open" ? (
                           <span className="text-green-600">negotiating</span>
                         ) : (
-                          <span className="text-neutral-400">{m.state}</span>
+                          <span className="text-faint">{m.state}</span>
                         )}
                       </p>
                     </Link>
@@ -196,7 +196,7 @@ async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tourna
     .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, roundsCount)));
   if (finalSlot?.outState !== "filled" || !finalSlot.outTextId) {
     return (
-      <p className="mt-6 rounded-lg border border-neutral-300 p-4 dark:border-neutral-700">
+      <p className="mt-6 rounded-lg border border-line p-4">
         The tournament concluded with no canonical text.
       </p>
     );

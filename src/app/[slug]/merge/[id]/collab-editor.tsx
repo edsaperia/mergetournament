@@ -84,10 +84,10 @@ export function CollabEditor({
       <div
         ref={host}
         className={`overflow-hidden rounded-md border ${
-          readOnly ? "border-amber-400" : "border-neutral-300 dark:border-neutral-700"
+          readOnly ? "border-amber-400" : "border-line"
         }`}
       />
-      <p className="mt-1 flex justify-between text-xs text-neutral-500">
+      <p className="mt-1 flex justify-between text-xs text-muted">
         <span className="tabular-nums">{words} words</span>
         <span>
           {status === "connected" ? "live" : status}

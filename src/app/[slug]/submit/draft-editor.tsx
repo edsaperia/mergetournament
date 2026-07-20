@@ -19,13 +19,13 @@ export function DraftEditor({ slug, initialBody }: { slug: string; initialBody: 
         value={body}
         onChange={(e) => setBody(e.target.value)}
         spellCheck
-        className="min-h-[24rem] flex-1 rounded-md border border-neutral-300 p-4 font-mono text-sm leading-relaxed dark:border-neutral-700 dark:bg-neutral-900"
+        className="min-h-[24rem] flex-1 rounded-md border border-line p-4 font-mono text-sm leading-relaxed"
       />
       <div className="flex items-center justify-between">
-        <span className="text-sm tabular-nums text-neutral-500">{countWords(body)} words</span>
+        <span className="text-sm tabular-nums text-muted">{countWords(body)} words</span>
         <button
           disabled={pending}
-          className="rounded-lg bg-neutral-900 px-5 py-2 font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+          className="rounded-lg bg-accent px-5 py-2 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save draft"}
         </button>

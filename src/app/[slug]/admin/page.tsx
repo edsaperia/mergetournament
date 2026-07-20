@@ -24,7 +24,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
   if (me?.role !== "admin") {
     return (
       <main className="mx-auto max-w-xl flex-1 px-6 py-16">
-        <p className="text-neutral-600 dark:text-neutral-300">
+        <p className="text-soft">
           The admin dashboard requires the administrator&apos;s personal link.
         </p>
       </main>
@@ -48,7 +48,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
         <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
         {" — admin"}
       </h1>
-      <p className="mt-2 text-sm text-neutral-500">
+      <p className="mt-2 text-sm text-muted">
         Phase: {tournament.phase} · {submitted} of {status.length} drafts submitted
         {submitted >= 2 && (
           <>
@@ -77,7 +77,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
           }))}
         />
       </section>
-      <section className="mt-10 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+      <section className="mt-10 border-t border-edge pt-6">
         <h2 className="mb-3 text-lg font-semibold">Lifecycle</h2>
         <div className="flex flex-wrap gap-3">
           {tournament.phase === "submission" && (
@@ -101,7 +101,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
             <ControlButton action={pauseAction.bind(null, slug, true)} label="Resume" />
           )}
           {(tournament.phase === "convening" || tournament.phase === "running") && (
-            <p className="w-full text-sm text-neutral-500">
+            <p className="w-full text-sm text-muted">
               There is deliberately no other live control: no extending a round,
               no reassigning a pairing, no overriding a flip.
             </p>

@@ -34,14 +34,14 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
       {live && <AutoRefresh slug={slug} />}
-      <p className="mb-2 text-sm text-neutral-500">
+      <p className="mb-2 text-sm text-muted">
         <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
         {" · "}
         {text.kind === "draft" ? `draft by ${author?.name ?? "?"}` : "merged text"}
         {" · "}{text.wordCount} words
       </p>
       {(text.parentAId || text.parentBId) && (
-        <p className="mb-4 text-sm text-neutral-500">
+        <p className="mb-4 text-sm text-muted">
           Merged from{" "}
           <Link className="underline" href={`/${slug}/text/${text.parentAId}`}>parent A</Link>
           {" and "}
@@ -67,7 +67,7 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
             />
           )}
           {Boolean(me) && (
-            <p className="mt-2 text-xs text-neutral-500">
+            <p className="mt-2 text-xs text-muted">
               Click a line number to comment on that line.
             </p>
           )}

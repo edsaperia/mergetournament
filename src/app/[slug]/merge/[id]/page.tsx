@@ -108,7 +108,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </p>
       )}
       {m.state === "resolved" && (
-        <div className="mb-4 rounded-md bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900">
+        <div className="mb-4 rounded-md bg-panel px-3 py-2 text-sm">
           {(() => {
             const summary = (
               <span>
@@ -140,26 +140,26 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <section className="rounded-lg border border-edge p-4">
           <h2 className="mb-2 font-semibold">
             Input A · {bearerName(m.bearerAId)}
-            {textA && <span className="ml-1 text-xs text-neutral-500">({textA.wordCount}w)</span>}
+            {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
           </h2>
           <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{textA?.bodyMd ?? "—"}</pre>
           <div className="mt-3">{await chatFor(roomA, "This text's chat", false)}</div>
         </section>
-        <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <section className="rounded-lg border border-edge p-4">
           <h2 className="mb-2 font-semibold">
             Input B · {bearerName(m.bearerBId)}
-            {textB && <span className="ml-1 text-xs text-neutral-500">({textB.wordCount}w)</span>}
+            {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
           </h2>
           <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{textB?.bodyMd ?? "—"}</pre>
           <div className="mt-3">{await chatFor(roomB, "This text's chat", false)}</div>
         </section>
-        <section className="rounded-lg border-2 border-neutral-300 p-4 dark:border-neutral-700">
+        <section className="rounded-lg border-2 border-line p-4">
           <h2 className="mb-2 font-semibold">Merge candidate</h2>
           {m.state === "resolved" ? (
-            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+            <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-soft">
               {m.workingText || "(blank)"}
             </pre>
           ) : (
@@ -192,7 +192,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             />
           )}
           {!mySide && m.state === "open" && (
-            <p className="mt-3 text-xs text-neutral-500">
+            <p className="mt-3 text-xs text-muted">
               Only this merge&apos;s bearers hold the pen — you are watching
               live. Lobbying arrives through the chat below.
             </p>

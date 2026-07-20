@@ -21,7 +21,7 @@ export function NewTournamentForm() {
           className={field} id="slug" name="slug" required
           pattern="[a-z0-9][a-z0-9-]{1,62}" placeholder="our-convention"
         />
-        <p className="mt-1 text-xs text-neutral-500">Lowercase letters, digits, hyphens. The tournament lives at /&lt;slug&gt;.</p>
+        <p className="mt-1 text-xs text-muted">Lowercase letters, digits, hyphens. The tournament lives at /&lt;slug&gt;.</p>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -44,7 +44,7 @@ export function NewTournamentForm() {
         <label className={label} htmlFor="defaultSubmission">Default submission (template all drafts start from)</label>
         <textarea className={`${field} font-mono text-sm`} id="defaultSubmission" name="defaultSubmission" rows={4} placeholder="# Preamble&#10;&#10;..." />
       </div>
-      <fieldset className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+      <fieldset className="rounded-md border border-edge p-4">
         <legend className="px-1 text-sm font-medium">You, the administrator</legend>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -56,11 +56,11 @@ export function NewTournamentForm() {
             <input className={field} id="adminEmail" name="adminEmail" type="email" required />
           </div>
         </div>
-        <p className="mt-2 text-xs text-neutral-500">Your admin magic link will be emailed here.</p>
+        <p className="mt-2 text-xs text-muted">Your admin magic link will be emailed here.</p>
       </fieldset>
       <button
         disabled={pending}
-        className="rounded-lg bg-neutral-900 px-5 py-3 font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+        className="rounded-lg bg-accent px-5 py-3 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
       >
         {pending ? "Creating…" : "Create tournament"}
       </button>

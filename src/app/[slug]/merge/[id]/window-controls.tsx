@@ -58,7 +58,7 @@ export function WindowControls({
               Your own input{myChoice === null && " (default)"}
             </button>
           </div>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-muted">
             If {partnerName} returns and presses YES, a coin flip between the
             two input texts decides instead.
           </p>

@@ -45,18 +45,18 @@ export function CommentableText({
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 font-mono text-sm leading-relaxed dark:border-neutral-800">
+    <div className="rounded-lg border border-edge font-mono text-sm leading-relaxed">
       {lines.map((line, i) => (
         <div key={i}>
-          <div className="group flex hover:bg-neutral-50 dark:hover:bg-neutral-900">
+          <div className="group flex hover:bg-wash">
             <button
               type="button"
               disabled={!canComment}
               onClick={() => setTarget(target === i ? null : i)}
               title={canComment ? "Comment on this line" : undefined}
-              className={`w-12 shrink-0 select-none border-r border-neutral-100 px-2 text-right text-xs leading-6 text-neutral-400 dark:border-neutral-900 ${
-                canComment ? "hover:bg-neutral-200 hover:text-neutral-700 dark:hover:bg-neutral-800" : ""
-              } ${byLine.has(i) ? "font-bold text-blue-600" : ""}`}
+              className={`w-12 shrink-0 select-none border-r border-edge-faint px-2 text-right text-xs leading-6 text-faint ${
+                canComment ? "hover:bg-panel hover:text-soft" : ""
+              } ${byLine.has(i) ? "font-bold text-live-ink" : ""}`}
             >
               {i + 1}
             </button>
@@ -65,7 +65,7 @@ export function CommentableText({
           {(byLine.get(i) ?? []).map((c) => (
             <div key={c.id} className="ml-12 border-l-2 border-blue-200 bg-blue-50/50 px-3 py-1 font-sans text-xs dark:border-blue-900 dark:bg-blue-950/30">
               <span className="font-semibold">{c.author}</span>{" "}
-              <span className="text-neutral-400">
+              <span className="text-faint">
                 {new Date(c.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
               </span>
               <p className="mt-0.5 whitespace-pre-wrap">{c.body}</p>
@@ -80,9 +80,9 @@ export function CommentableText({
                 maxLength={4000}
                 autoFocus
                 placeholder={`Comment on line ${i + 1}…`}
-                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+                className="min-w-0 flex-1 rounded-md border border-line px-2 py-1 text-xs"
               />
-              <button disabled={pending} className="rounded-md bg-neutral-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900">
+              <button disabled={pending} className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-accent-ink disabled:opacity-50">
                 Comment
               </button>
             </form>

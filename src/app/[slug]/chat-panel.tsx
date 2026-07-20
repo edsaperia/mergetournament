@@ -39,30 +39,30 @@ export function ChatPanel({
   }, [messages.length, open]);
 
   return (
-    <section className="rounded-lg border border-neutral-200 dark:border-neutral-800">
+    <section className="rounded-lg border border-edge">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-semibold"
       >
         <span>{title}</span>
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-muted">
           {messages.length} · {open ? "hide" : "show"}
         </span>
       </button>
       {open && (
-        <div className="border-t border-neutral-200 dark:border-neutral-800">
+        <div className="border-t border-edge">
           <div ref={log} className="max-h-80 space-y-2 overflow-y-auto p-3">
-            {messages.length === 0 && <p className="text-xs text-neutral-400">No messages yet.</p>}
+            {messages.length === 0 && <p className="text-xs text-faint">No messages yet.</p>}
             {messages.map((m) =>
               m.kind === "system" ? (
-                <p key={m.id} className="text-xs italic text-neutral-500">
+                <p key={m.id} className="text-xs italic text-muted">
                   ⚙ {m.body}
                 </p>
               ) : (
                 <p key={m.id} className="text-sm">
                   <span className="font-semibold">{m.author}</span>{" "}
-                  <span className="text-xs text-neutral-400">
+                  <span className="text-xs text-faint">
                     {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
                   <br />
@@ -72,16 +72,16 @@ export function ChatPanel({
             )}
           </div>
           {canPost && (
-            <form ref={formRef} action={dispatch} className="flex gap-2 border-t border-neutral-200 p-2 dark:border-neutral-800">
+            <form ref={formRef} action={dispatch} className="flex gap-2 border-t border-edge p-2">
               <input
                 name="body"
                 required
                 maxLength={4000}
                 placeholder="Say something…"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                className="min-w-0 flex-1 rounded-md border border-line px-2 py-1.5 text-sm"
               />
-              <button disabled={pending} className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900">
+              <button disabled={pending} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink disabled:opacity-50">
                 Send
               </button>
             </form>

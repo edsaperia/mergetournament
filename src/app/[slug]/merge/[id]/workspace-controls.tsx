@@ -70,8 +70,8 @@ export function WorkspaceControls({
         )}
       </div>
 
-      <fieldset className="rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-        <legend className="px-1 text-neutral-500">Who carries the result forward?</legend>
+      <fieldset className="rounded-md border border-edge p-3 text-sm">
+        <legend className="px-1 text-muted">Who carries the result forward?</legend>
         <div className="flex gap-2">
           <button
             className={myPref === mySide ? btn : btnSecondary}

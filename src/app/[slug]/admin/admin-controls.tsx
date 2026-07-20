@@ -31,8 +31,8 @@ export function ControlButton({
         disabled={pending}
         className={
           primary
-            ? "rounded-lg bg-neutral-900 px-5 py-3 font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-            : "rounded-lg border border-neutral-300 px-5 py-3 font-medium disabled:opacity-50 dark:border-neutral-700"
+            ? "rounded-lg bg-accent px-5 py-3 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
+            : "rounded-lg border border-line px-5 py-3 font-medium disabled:opacity-50"
         }
       >
         {pending ? "…" : label}

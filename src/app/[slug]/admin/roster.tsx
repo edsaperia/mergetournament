@@ -36,7 +36,7 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
     <div className="flex flex-col gap-6">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-neutral-200 text-neutral-500 dark:border-neutral-800">
+          <tr className="border-b border-edge text-muted">
             <th className="py-2 pr-4 font-medium">Name</th>
             <th className="py-2 pr-4 font-medium">Email</th>
             <th className="py-2 pr-4 font-medium">Submission</th>
@@ -45,15 +45,15 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-neutral-100 dark:border-neutral-900">
+            <tr key={r.id} className="border-b border-edge-faint">
               <td className="py-2 pr-4">
                 {r.name}
-                {r.role === "admin" && <span className="ml-1 text-xs text-neutral-500">(admin)</span>}
+                {r.role === "admin" && <span className="ml-1 text-xs text-muted">(admin)</span>}
               </td>
               <td className="py-2 pr-4 font-mono text-xs">{r.email}</td>
               <td className="py-2 pr-4">
                 {r.wordCount === null ? (
-                  <span className="text-neutral-400">—</span>
+                  <span className="text-faint">—</span>
                 ) : (
                   `${r.wordCount} words`
                 )}
@@ -98,7 +98,7 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
         </div>
         <button
           disabled={adding}
-          className="rounded-lg bg-neutral-900 px-4 py-2 font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+          className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
         >
           {adding ? "Inviting…" : "Invite participant"}
         </button>
