@@ -106,9 +106,10 @@ export async function reissueLink(
   db: Db,
   emailer: Emailer,
   baseUrl: string,
+  tournamentId: string,
   participantId: string
 ) {
-  const participant = await requireParticipant(db, participantId);
+  const participant = await requireParticipant(db, participantId, tournamentId);
   const tournament = await requireTournament(db, participant.tournamentId);
   const token = generateToken();
   await db.update(participants).set({ tokenHash: hashToken(token) }).where(eq(participants.id, participantId));
@@ -133,10 +134,11 @@ export async function updateParticipant(
   db: Db,
   emailer: Emailer,
   baseUrl: string,
+  tournamentId: string,
   participantId: string,
   patch: { name?: string; email?: string }
 ) {
-  const participant = await requireParticipant(db, participantId);
+  const participant = await requireParticipant(db, participantId, tournamentId);
   const tournament = await requireTournament(db, participant.tournamentId);
   const updates: Partial<typeof participants.$inferInsert> = {};
 
@@ -189,8 +191,8 @@ export async function updateParticipant(
   return { participant: updated, emailChanged };
 }
 
-export async function removeParticipant(db: Db, participantId: string): Promise<void> {
-  const participant = await requireParticipant(db, participantId);
+export async function removeParticipant(db: Db, tournamentId: string, participantId: string): Promise<void> {
+  const participant = await requireParticipant(db, participantId, tournamentId);
   const tournament = await requireTournament(db, participant.tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
     throw new Error("roster is frozen after publication");
@@ -357,8 +359,20 @@ async function requireTournament(db: Db, id: string) {
   return t;
 }
 
-async function requireParticipant(db: Db, id: string) {
-  const [p] = await db.select().from(participants).where(eq(participants.id, id));
+/**
+ * When `tournamentId` is given, the lookup is scoped to that tournament —
+ * callers acting on someone else's behalf (the admin roster actions) must
+ * scope, so an id from another tournament reads as "not found".
+ */
+async function requireParticipant(db: Db, id: string, tournamentId?: string) {
+  const [p] = await db
+    .select()
+    .from(participants)
+    .where(
+      tournamentId
+        ? and(eq(participants.id, id), eq(participants.tournamentId, tournamentId))
+        : eq(participants.id, id)
+    );
   if (!p) throw new Error("participant not found");
   return p;
 }

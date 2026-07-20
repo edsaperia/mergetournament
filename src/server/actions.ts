@@ -120,9 +120,9 @@ export async function addParticipantAction(slug: string, _prev: ActionState, for
 
 export async function reissueLinkAction(slug: string, participantId: string): Promise<ActionState> {
   try {
-    await requireAdmin(slug);
+    const admin = await requireAdmin(slug);
     const db = await getDb();
-    await reissueLink(db, getEmailer(), baseUrl(), participantId);
+    await reissueLink(db, getEmailer(), baseUrl(), admin.tournamentId, participantId);
     revalidatePath(`/${slug}/admin`);
     return { ok: true, message: "New link emailed.", devLink: lastDevLink() };
   } catch (e) {
@@ -138,7 +138,14 @@ export async function updateParticipantAction(
   try {
     const admin = await requireAdmin(slug);
     const db = await getDb();
-    const { participant, emailChanged } = await updateParticipant(db, getEmailer(), baseUrl(), participantId, patch);
+    const { participant, emailChanged } = await updateParticipant(
+      db,
+      getEmailer(),
+      baseUrl(),
+      admin.tournamentId,
+      participantId,
+      patch
+    );
     revalidatePath(`/${slug}/admin`);
     bump(admin.tournamentId);
     return {
@@ -153,9 +160,9 @@ export async function updateParticipantAction(
 
 export async function removeParticipantAction(slug: string, participantId: string): Promise<ActionState> {
   try {
-    await requireAdmin(slug);
+    const admin = await requireAdmin(slug);
     const db = await getDb();
-    await removeParticipant(db, participantId);
+    await removeParticipant(db, admin.tournamentId, participantId);
     revalidatePath(`/${slug}/admin`);
     return { ok: true, message: "Participant removed." };
   } catch (e) {

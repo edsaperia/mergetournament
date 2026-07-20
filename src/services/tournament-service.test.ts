@@ -53,7 +53,10 @@ describe("tournament + roster flow", () => {
     const p = await addParticipant(db, emailer, BASE, t.id, { name: "Bo", email: "bo@example.org" });
     const oldToken = extractToken(emailer.sent[0].text);
 
-    await reissueLink(db, emailer, BASE, p.id);
+    await reissueLink(db, emailer, BASE, t.id, p.id);
+    // Scoped: an id resolves only inside its own tournament.
+    const foreign = await createTournament(db, { slug: "reissue-2", name: "R2", roundDurationS: 600, breakDurationS: 60 });
+    await expect(reissueLink(db, emailer, BASE, foreign.id, p.id)).rejects.toThrow(/not found/);
     const newToken = extractToken(emailer.sent[1].text);
     expect(newToken).not.toBe(oldToken);
     expect(await participantForToken(db, "reissue", oldToken)).toBeNull();
@@ -69,14 +72,14 @@ describe("tournament + roster flow", () => {
     const oldToken = extractToken(emailer.sent[0].text);
 
     // Rename: no email sent, token untouched.
-    const renamed = await updateParticipant(db, emailer, BASE, p.id, { name: "Robert" });
+    const renamed = await updateParticipant(db, emailer, BASE, t.id, p.id, { name: "Robert" });
     expect(renamed.participant.name).toBe("Robert");
     expect(renamed.emailChanged).toBe(false);
     expect(emailer.sent).toHaveLength(2);
     expect((await participantForToken(db, "edit-p", oldToken))?.id).toBe(p.id);
 
     // Email change: invite goes to the new address, old link dies.
-    const changed = await updateParticipant(db, emailer, BASE, p.id, { email: "Robert@New.org " });
+    const changed = await updateParticipant(db, emailer, BASE, t.id, p.id, { email: "Robert@New.org " });
     expect(changed.emailChanged).toBe(true);
     expect(changed.participant.email).toBe("robert@new.org");
     expect(emailer.sent).toHaveLength(3);
@@ -86,9 +89,9 @@ describe("tournament + roster flow", () => {
     expect((await participantForToken(db, "edit-p", newToken))?.id).toBe(p.id);
 
     // Guards: duplicate email, empty name, nonsense email.
-    await expect(updateParticipant(db, emailer, BASE, p.id, { email: "zed@example.org" })).rejects.toThrow(/already uses/);
-    await expect(updateParticipant(db, emailer, BASE, p.id, { name: "  " })).rejects.toThrow(/empty/);
-    await expect(updateParticipant(db, emailer, BASE, p.id, { email: "not-an-email" })).rejects.toThrow(/email address/);
+    await expect(updateParticipant(db, emailer, BASE, t.id, p.id, { email: "zed@example.org" })).rejects.toThrow(/already uses/);
+    await expect(updateParticipant(db, emailer, BASE, t.id, p.id, { name: "  " })).rejects.toThrow(/empty/);
+    await expect(updateParticipant(db, emailer, BASE, t.id, p.id, { email: "not-an-email" })).rejects.toThrow(/email address/);
   });
 
   it("rejects bad slugs and durations", async () => {
@@ -186,6 +189,6 @@ describe("drafts", () => {
 
     await expect(saveDraft(db, p.id, "too late")).rejects.toThrow(/closed/);
     await expect(addParticipant(db, emailer, BASE, t.id, { name: "E", email: "e@example.org" })).rejects.toThrow(/frozen/);
-    await expect(removeParticipant(db, p.id)).rejects.toThrow(/frozen/);
+    await expect(removeParticipant(db, t.id, p.id)).rejects.toThrow(/frozen/);
   });
 });
