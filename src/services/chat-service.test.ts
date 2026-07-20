@@ -97,13 +97,14 @@ describe("posting rules", () => {
 describe("inline comments", () => {
   it("anchors named comments to lines, in range", async () => {
     await addComment(db, { textVersionId: draftId, authorId: p0Id, line: 1, body: "this line sings" });
-    await addComment(db, { textVersionId: draftId, authorId: adminId, line: 0, body: "formatting note" });
+    await expect(
+      addComment(db, { textVersionId: draftId, authorId: adminId, line: 0, body: "formatting note" })
+    ).rejects.toThrow(/does not comment/);
     await expect(addComment(db, { textVersionId: draftId, authorId: p0Id, line: 99, body: "x" })).rejects.toThrow(/range/);
     await expect(addComment(db, { textVersionId: draftId, authorId: p0Id, line: 1, body: " " })).rejects.toThrow(/empty/);
 
     const list = await commentsFor(db, draftId);
     expect(list.map((c) => [c.line, c.author, c.body])).toEqual([
-      [0, "Admin", "formatting note"],
       [1, "P0", "this line sings"],
     ]);
   });

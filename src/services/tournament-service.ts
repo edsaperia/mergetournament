@@ -217,6 +217,9 @@ export async function participantForToken(db: Db, slug: string, token: string) {
  */
 export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
   const participant = await requireParticipant(db, participantId);
+  if (participant.role === "admin") {
+    throw new Error("the administrator does not submit a draft (SPEC §2)");
+  }
   const tournament = await requireTournament(db, participant.tournamentId);
   if (tournament.phase !== "submission") {
     throw new Error("submissions are closed");

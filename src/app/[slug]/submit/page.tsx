@@ -12,6 +12,16 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
   if (!tournament) notFound();
 
   const me = await currentParticipant(slug);
+  if (me?.role === "admin") {
+    return (
+      <main className="mx-auto max-w-xl flex-1 px-6 py-16">
+        <p className="text-soft">
+          The administrator doesn&apos;t submit a draft — participants do.
+          Review theirs from the admin dashboard.
+        </p>
+      </main>
+    );
+  }
   if (!me) {
     return (
       <main className="mx-auto max-w-xl flex-1 px-6 py-16">

@@ -85,9 +85,13 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
           textId={text.id}
           body={text.bodyMd}
           comments={comments}
-          // Comments attach to read-only text only (SPEC §5): drafts are still
-          // editable until publication, so their comments begin at convening.
-          canComment={Boolean(me) && !(text.kind === "draft" && tournament.phase === "submission")}
+          // Non-admin participants only (the admin reads but doesn't comment),
+          // and never on drafts still editable during submission (SPEC §5).
+          canComment={
+            Boolean(me) &&
+            me!.role !== "admin" &&
+            !(text.kind === "draft" && tournament.phase === "submission")
+          }
         />
         <aside className="min-w-0">
           {room && (

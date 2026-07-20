@@ -138,6 +138,9 @@ export async function addComment(
   if (!text) throw new Error("text not found");
   const [author] = await db.select().from(participants).where(eq(participants.id, input.authorId));
   if (!author || author.tournamentId !== text.tournamentId) throw new Error("not a participant here");
+  if (author.role === "admin") {
+    throw new Error("the admin reads everything but does not comment");
+  }
   // Comments attach to read-only text only (SPEC §5): drafts stay editable
   // until publication, so they take no comments during submission.
   if (text.kind === "draft") {

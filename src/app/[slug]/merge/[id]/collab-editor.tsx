@@ -56,7 +56,9 @@ export function CollabEditor({
           basicSetup,
           markdown(),
           yCollab(ytext, provider.awareness),
+          // Both flags: `editable` alone still lets paste/drop through.
           EditorView.editable.of(!readOnly),
+          EditorState.readOnly.of(readOnly),
           EditorView.lineWrapping,
           EditorView.theme({
             "&": { fontSize: "13px", minHeight: "20rem" },
