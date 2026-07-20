@@ -8,7 +8,8 @@
  *   Rng — that one exists for reproducible fairness, never for secrets.
  */
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { signPayload, verifyPayload } from "./signing";
 
 /** Random URL-safe magic-link token (256 bits). */
 export function generateToken(): string {
@@ -25,40 +26,20 @@ export interface SessionPayload {
   tournamentId: string;
 }
 
-function hmac(data: string, secret: string): string {
-  return createHmac("sha256", secret).update(data).digest("base64url");
+function isSessionPayload(parsed: unknown): parsed is SessionPayload {
+  return (
+    typeof parsed === "object" && parsed !== null &&
+    typeof (parsed as SessionPayload).participantId === "string" &&
+    typeof (parsed as SessionPayload).tournamentId === "string"
+  );
 }
 
 /** Serialize and sign a session for a cookie value. */
 export function signSession(payload: SessionPayload, secret: string): string {
-  if (!secret) throw new Error("signSession: empty secret");
-  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${body}.${hmac(body, secret)}`;
+  return signPayload(payload, secret, "");
 }
 
 /** Verify a cookie value; returns the payload, or null for anything invalid. */
 export function verifySession(cookie: string, secret: string): SessionPayload | null {
-  if (!secret) throw new Error("verifySession: empty secret");
-  const dot = cookie.lastIndexOf(".");
-  if (dot <= 0) return null;
-  const body = cookie.slice(0, dot);
-  const sig = cookie.slice(dot + 1);
-  const expected = hmac(body, secret);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  try {
-    const parsed: unknown = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
-    if (
-      typeof parsed === "object" && parsed !== null &&
-      typeof (parsed as SessionPayload).participantId === "string" &&
-      typeof (parsed as SessionPayload).tournamentId === "string"
-    ) {
-      const { participantId, tournamentId } = parsed as SessionPayload;
-      return { participantId, tournamentId };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+  return verifyPayload(cookie, secret, "", isSessionPayload);
 }

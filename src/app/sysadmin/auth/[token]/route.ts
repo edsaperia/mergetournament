@@ -1,7 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { signSession } from "../../../../lib/auth";
-import { authSecret, baseUrl, SYSADMIN_COOKIE, sysadminToken } from "../../../../server/config";
+import { baseUrl, SYSADMIN_COOKIE, setSessionCookie, sysadminToken } from "../../../../server/config";
 
 /** Exchange the SYSADMIN_TOKEN for an operator session cookie. */
 export async function GET(_req: NextRequest, ctx: RouteContext<"/sysadmin/auth/[token]">) {
@@ -15,12 +14,6 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/sysadmin/auth/[
   }
   // Behind the reverse proxy req.url is localhost:3000 — build from BASE_URL.
   const res = NextResponse.redirect(new URL("/sysadmin", baseUrl()));
-  res.cookies.set(SYSADMIN_COOKIE, signSession({ participantId: "sysadmin", tournamentId: "*" }, authSecret()), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  setSessionCookie(res, SYSADMIN_COOKIE, { participantId: "sysadmin", tournamentId: "*" }, 60 * 60 * 24 * 7);
   return res;
 }

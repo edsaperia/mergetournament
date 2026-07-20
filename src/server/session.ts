@@ -6,7 +6,7 @@ import { verifySession } from "../lib/auth";
 import { DomainError } from "../lib/errors";
 import { participants, tournaments } from "../db/schema";
 import { getDb } from "../db";
-import { authSecret, sessionCookieName } from "./config";
+import { authSecret, sessionCookieName, SYSADMIN_COOKIE, sysadminToken } from "./config";
 
 /**
  * Data-access layer for the current visitor (per the Next 16 auth guidance:
@@ -50,7 +50,6 @@ export async function requireAdmin(slug: string) {
 
 /** Instance operator: authenticated by the SYSADMIN_TOKEN-exchanged cookie. */
 export async function isSysadmin(): Promise<boolean> {
-  const { SYSADMIN_COOKIE, sysadminToken } = await import("./config");
   if (!sysadminToken()) return false;
   const cookieStore = await cookies();
   const raw = cookieStore.get(SYSADMIN_COOKIE)?.value;

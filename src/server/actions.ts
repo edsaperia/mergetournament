@@ -30,7 +30,7 @@ import {
   type WorkspaceAction,
 } from "../services/runtime-service";
 import { deleteOwnTournament, deleteTournament } from "../services/sysadmin-service";
-import { baseUrl, getEmailer } from "./config";
+import { baseUrl, getEmailer, isProd } from "./config";
 import { bump } from "./events";
 import { requireAdmin, requireParticipant, requireSysadmin } from "./session";
 
@@ -52,7 +52,7 @@ function fail(e: unknown): ActionState {
 /** With the console emailer (no email service configured), expose the last link for the UI. */
 function lastDevLink(): string | undefined {
   const emailer = getEmailer();
-  if (process.env.NODE_ENV === "production" || !(emailer instanceof ConsoleEmailer)) return undefined;
+  if (isProd() || !(emailer instanceof ConsoleEmailer)) return undefined;
   const last = emailer.sent.at(-1);
   return last?.text.match(/https?:\S+/)?.[0];
 }

@@ -1,10 +1,16 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
+import type { NextResponse } from "next/server";
 import { ConsoleEmailer, Emailer, ResendEmailer } from "../lib/email";
+import { signSession, type SessionPayload } from "../lib/auth";
 
 /** Where magic links point. */
 export function baseUrl(): string {
   return process.env.BASE_URL ?? "http://localhost:3000";
+}
+
+export function isProd(): boolean {
+  return process.env.NODE_ENV === "production";
 }
 
 /**
@@ -16,7 +22,7 @@ const globalCache = globalThis as unknown as { __mtSecret?: string; __mtEmailer?
 export function authSecret(): string {
   const configured = process.env.AUTH_SECRET;
   if (configured) return configured;
-  if (process.env.NODE_ENV === "production") {
+  if (isProd()) {
     throw new Error("AUTH_SECRET must be set in production");
   }
   globalCache.__mtSecret ??= randomBytes(32).toString("base64url");
@@ -36,6 +42,21 @@ export function getEmailer(): Emailer {
 
 export function sessionCookieName(slug: string): string {
   return `mt_s_${slug}`;
+}
+
+/**
+ * Sign a session and set it on a redirect response — the one place that owns
+ * the cookie's security attributes, shared by the participant and sysadmin
+ * auth routes.
+ */
+export function setSessionCookie(res: NextResponse, name: string, payload: SessionPayload, maxAgeS: number): void {
+  res.cookies.set(name, signSession(payload, authSecret()), {
+    httpOnly: true,
+    secure: isProd(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: maxAgeS,
+  });
 }
 
 /** Instance-operator token; sysadmin features are disabled when unset. */
