@@ -12,6 +12,7 @@ import {
   reissueLink,
   removeParticipant,
   saveDraft,
+  updateParticipant,
 } from "../services/tournament-service";
 import {
   beginTournament,
@@ -109,6 +110,27 @@ export async function reissueLinkAction(slug: string, participantId: string): Pr
     await reissueLink(db, getEmailer(), baseUrl(), participantId);
     revalidatePath(`/${slug}/admin`);
     return { ok: true, message: "New link emailed.", devLink: lastDevLink() };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function updateParticipantAction(
+  slug: string,
+  participantId: string,
+  patch: { name?: string; email?: string }
+): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    const { participant, emailChanged } = await updateParticipant(db, getEmailer(), baseUrl(), participantId, patch);
+    revalidatePath(`/${slug}/admin`);
+    bump(admin.tournamentId);
+    return {
+      ok: true,
+      message: emailChanged ? `Updated — a fresh magic link was emailed to ${participant.email}.` : "Updated.",
+      devLink: emailChanged ? lastDevLink() : undefined,
+    };
   } catch (e) {
     return fail(e);
   }

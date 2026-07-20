@@ -9,6 +9,7 @@ import {
   removeParticipant,
   saveDraft,
   submissionStatus,
+  updateParticipant,
 } from "./tournament-service";
 
 let db: TestDb;
@@ -57,6 +58,37 @@ describe("tournament + roster flow", () => {
     expect(newToken).not.toBe(oldToken);
     expect(await participantForToken(db, "reissue", oldToken)).toBeNull();
     expect((await participantForToken(db, "reissue", newToken))?.id).toBe(p.id);
+  });
+
+  it("renames participants; email changes rotate the magic link to the new address", async () => {
+    const emailer = new ConsoleEmailer();
+    const t = await createTournament(db, { slug: "edit-p", name: "E", roundDurationS: 600, breakDurationS: 60 });
+    const p = await addParticipant(db, emailer, BASE, t.id, { name: "Bob", email: "bob@example.org" });
+    const other = await addParticipant(db, emailer, BASE, t.id, { name: "Zed", email: "zed@example.org" });
+    void other;
+    const oldToken = extractToken(emailer.sent[0].text);
+
+    // Rename: no email sent, token untouched.
+    const renamed = await updateParticipant(db, emailer, BASE, p.id, { name: "Robert" });
+    expect(renamed.participant.name).toBe("Robert");
+    expect(renamed.emailChanged).toBe(false);
+    expect(emailer.sent).toHaveLength(2);
+    expect((await participantForToken(db, "edit-p", oldToken))?.id).toBe(p.id);
+
+    // Email change: invite goes to the new address, old link dies.
+    const changed = await updateParticipant(db, emailer, BASE, p.id, { email: "Robert@New.org " });
+    expect(changed.emailChanged).toBe(true);
+    expect(changed.participant.email).toBe("robert@new.org");
+    expect(emailer.sent).toHaveLength(3);
+    expect(emailer.sent[2].to).toBe("robert@new.org");
+    expect(await participantForToken(db, "edit-p", oldToken)).toBeNull();
+    const newToken = extractToken(emailer.sent[2].text);
+    expect((await participantForToken(db, "edit-p", newToken))?.id).toBe(p.id);
+
+    // Guards: duplicate email, empty name, nonsense email.
+    await expect(updateParticipant(db, emailer, BASE, p.id, { email: "zed@example.org" })).rejects.toThrow(/already uses/);
+    await expect(updateParticipant(db, emailer, BASE, p.id, { name: "  " })).rejects.toThrow(/empty/);
+    await expect(updateParticipant(db, emailer, BASE, p.id, { email: "not-an-email" })).rejects.toThrow(/email address/);
   });
 
   it("rejects bad slugs and durations", async () => {

@@ -5,6 +5,7 @@ import {
   addParticipantAction,
   reissueLinkAction,
   removeParticipantAction,
+  updateParticipantAction,
   type ActionState,
 } from "../../../server/actions";
 import Link from "next/link";
@@ -26,6 +27,57 @@ export interface RosterRow {
   emailStatus: string | null;
 }
 
+/** Click to edit; Enter or blur saves, Escape cancels. */
+function EditableCell({
+  value,
+  mono = false,
+  label,
+  onSave,
+}: {
+  value: string;
+  mono?: boolean;
+  label: string;
+  onSave: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        title={`Click to edit ${label}`}
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
+        className={`cursor-text rounded px-1 -mx-1 text-left hover:bg-panel ${mono ? "font-mono text-xs" : ""}`}
+      >
+        {value}
+      </button>
+    );
+  }
+  const commit = () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (next && next !== value) onSave(next);
+  };
+  return (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") setEditing(false);
+      }}
+      aria-label={label}
+      className={`w-full rounded border border-line px-1 py-0.5 ${mono ? "font-mono text-xs" : "text-sm"}`}
+    />
+  );
+}
+
 const EMAIL_STATUS_STYLE: Record<string, string> = {
   delivered: "text-green-600",
   opened: "text-green-600",
@@ -38,7 +90,13 @@ const EMAIL_STATUS_STYLE: Record<string, string> = {
 
 export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
   const [viewing, setViewing] = useState<RosterRow | null>(null);
+  const [editStatus, setEditStatus] = useState<ActionState>(initial);
   const [state, addAction, adding] = useActionState(addParticipantAction.bind(null, slug), initial);
+
+  const patchParticipant = (id: string, patch: { name?: string; email?: string }) => {
+    setEditStatus({ ok: true, message: "Saving…" });
+    void updateParticipantAction(slug, id, patch).then(setEditStatus);
+  };
   const [rowState, rowDispatch, rowPending] = useActionState(
     async (_prev: ActionState, form: FormData): Promise<ActionState> => {
       const id = String(form.get("id"));
@@ -64,13 +122,18 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
           {rows.map((r) => (
             <tr key={r.id} className="border-b border-edge-faint">
               <td className="py-2 pr-4">
-                {r.name}
+                <EditableCell value={r.name} label="name" onSave={(name) => patchParticipant(r.id, { name })} />
                 {r.role === "admin" && <span className="ml-1 text-xs text-muted">(admin)</span>}
               </td>
-              <td className="py-2 pr-4 font-mono text-xs">
-                {r.email}
+              <td className="py-2 pr-4">
+                <EditableCell
+                  value={r.email}
+                  mono
+                  label="email"
+                  onSave={(email) => patchParticipant(r.id, { email })}
+                />
                 {r.emailStatus && (
-                  <span className={`ml-2 font-sans ${EMAIL_STATUS_STYLE[r.emailStatus] ?? "text-muted"}`}>
+                  <span className={`ml-2 text-xs ${EMAIL_STATUS_STYLE[r.emailStatus] ?? "text-muted"}`}>
                     {r.emailStatus.replace("_", " ")}
                   </span>
                 )}
@@ -117,6 +180,7 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
         </tbody>
       </table>
       <ActionStatus state={rowState} />
+      <ActionStatus state={editStatus} />
 
       <form action={addAction} className="flex flex-wrap items-end gap-3">
         <div>

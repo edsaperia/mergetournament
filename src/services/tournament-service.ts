@@ -123,6 +123,72 @@ export async function reissueLink(
   await audit(db, tournament.id, "link_reissued", { participantId });
 }
 
+/**
+ * Rename a participant or change their email. An email change rotates the
+ * magic link and invites the new address (the old link stops working, so a
+ * wrong address never keeps access). Allowed at any phase — this corrects
+ * identity details; the roster's composition is what freezes at publication.
+ */
+export async function updateParticipant(
+  db: Db,
+  emailer: Emailer,
+  baseUrl: string,
+  participantId: string,
+  patch: { name?: string; email?: string }
+) {
+  const participant = await requireParticipant(db, participantId);
+  const tournament = await requireTournament(db, participant.tournamentId);
+  const updates: Partial<typeof participants.$inferInsert> = {};
+
+  const name = patch.name?.trim();
+  if (name !== undefined) {
+    if (!name) throw new Error("name cannot be empty");
+    updates.name = name;
+  }
+
+  const email = patch.email?.toLowerCase().trim();
+  const emailChanged = email !== undefined && email !== participant.email;
+  let token: string | null = null;
+  if (emailChanged) {
+    if (!email.includes("@")) throw new Error("that does not look like an email address");
+    token = generateToken();
+    updates.email = email;
+    updates.tokenHash = hashToken(token);
+  }
+
+  if (Object.keys(updates).length === 0) return { participant, emailChanged: false };
+
+  let updated;
+  try {
+    [updated] = await db.update(participants).set(updates).where(eq(participants.id, participantId)).returning();
+  } catch (e) {
+    // Unique violation (23505) hides in the wrapped error's cause chain.
+    for (let err: unknown = e; err instanceof Error; err = err.cause) {
+      const code = (err as { code?: string }).code;
+      if (code === "23505" || /unique|duplicate/i.test(err.message)) {
+        throw new Error("another participant already uses that email");
+      }
+    }
+    throw e;
+  }
+
+  if (emailChanged && token) {
+    await emailer.send(
+      inviteEmail({
+        to: updated.email,
+        participantName: updated.name,
+        tournamentName: tournament.name,
+        magicLink: magicLink(baseUrl, tournament.slug, token),
+      })
+    );
+  }
+  await audit(db, tournament.id, "participant_updated", {
+    participantId,
+    changes: Object.keys(updates).filter((k) => k !== "tokenHash"),
+  });
+  return { participant: updated, emailChanged };
+}
+
 export async function removeParticipant(db: Db, participantId: string): Promise<void> {
   const participant = await requireParticipant(db, participantId);
   const tournament = await requireTournament(db, participant.tournamentId);
