@@ -14,7 +14,9 @@ import {
   saveDraft,
   updateParticipant,
   updateSubmissionDeadline,
+  updateTheme,
 } from "../services/tournament-service";
+import type { ThemeOverrides } from "../lib/theme";
 
 /** Convert a datetime-local value + the client's UTC offset into an instant. */
 function parseLocalDatetime(value: string, tzOffsetMin: number): Date {
@@ -258,6 +260,19 @@ export async function setDeadlineAction(
     revalidatePath(`/${slug}/admin`);
     bump(admin.tournamentId);
     return { ok: true, message: deadline ? "Deadline set." : "Deadline cleared — you close submissions by publishing." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function updateThemeAction(slug: string, theme: ThemeOverrides | null): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    await updateTheme(db, admin.tournamentId, theme);
+    revalidatePath(`/${slug}`, "layout");
+    bump(admin.tournamentId);
+    return { ok: true, message: theme === null ? "Theme reset to defaults." : "Theme saved." };
   } catch (e) {
     return fail(e);
   }

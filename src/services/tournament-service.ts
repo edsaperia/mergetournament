@@ -269,6 +269,20 @@ export async function updateSubmissionDeadline(db: Db, tournamentId: string, dea
   return updated;
 }
 
+/** Set or clear the tournament's color theme (validated token overrides). */
+export async function updateTheme(db: Db, tournamentId: string, theme: unknown | null) {
+  await requireTournament(db, tournamentId);
+  const { validateTheme } = await import("../lib/theme");
+  const validated = theme === null ? null : validateTheme(theme);
+  const [updated] = await db
+    .update(tournaments)
+    .set({ theme: validated })
+    .where(eq(tournaments.id, tournamentId))
+    .returning();
+  await audit(db, tournamentId, "theme_changed", { cleared: validated === null });
+  return updated;
+}
+
 /** Admin dashboard rows (SPEC §4 Phase 1): submission status per participant. */
 export async function submissionStatus(db: Db, tournamentId: string) {
   const roster = await db

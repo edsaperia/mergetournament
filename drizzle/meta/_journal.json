@@ -43,6 +43,13 @@
       "when": 1784563972838,
       "tag": "0005_commit-reveal-readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784578112479,
+      "tag": "0006_theme",
+      "breakpoints": true
     }
   ]
 }

@@ -5,9 +5,11 @@ import { submissionStatus } from "../../../services/tournament-service";
 import { beginAction, deleteTournamentAction, pauseAction, publishBracketAction } from "../../../server/actions";
 import { latestEmailEvents } from "../../../services/sysadmin-service";
 import { currentParticipant, tournamentBySlug } from "../../../server/session";
+import type { ThemeOverrides } from "../../../lib/theme";
 import { ControlButton } from "./admin-controls";
 import { DeadlineEditor } from "./deadline-editor";
 import { Roster } from "./roster";
+import { ThemeEditor } from "./theme-editor";
 
 function fmtDuration(s: number): string {
   const h = Math.floor(s / 3600);
@@ -116,6 +118,13 @@ export async function AdminDashboard({ slug }: { slug: string }) {
             </p>
           )}
         </div>
+      </section>
+      <section className="mt-10 border-t border-edge pt-6">
+        <h2 className="mb-3 text-lg font-semibold">Theme</h2>
+        <p className="mb-3 text-sm text-muted">
+          Colors for this tournament&apos;s pages, in light and dark mode.
+        </p>
+        <ThemeEditor slug={slug} current={(tournament.theme as ThemeOverrides | null) ?? null} />
       </section>
     </div>
   );

@@ -91,6 +91,8 @@ export const tournaments = pgTable("tournaments", {
   totalPausedS: integer("total_paused_s").notNull().default(0),
   /** Template all submissions initialise as. */
   defaultSubmission: text("default_submission").notNull().default(""),
+  /** Per-tournament color overrides: token key -> { light, dark } hex (src/lib/theme.ts). */
+  theme: jsonb("theme"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

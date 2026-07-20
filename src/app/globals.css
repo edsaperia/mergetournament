@@ -11,7 +11,9 @@
   color-scheme: light dark;
 }
 
-@theme inline {
+/* Not `inline`: utilities must reference var(--color-*) so per-tournament
+   theme overrides (src/lib/theme.ts) can swap values at runtime. */
+@theme {
   /* Surfaces */
   --color-background: light-dark(#ffffff, #0a0a0a);
   --color-panel: light-dark(#f5f5f5, #171717); /* raised: banners, tables, wells */
