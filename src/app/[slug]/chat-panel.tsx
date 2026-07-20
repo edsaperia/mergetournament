@@ -52,15 +52,15 @@ export function ChatPanel({
       </button>
       {open && (
         <div className="border-t border-edge">
-          <div ref={log} className="max-h-80 space-y-2 overflow-y-auto p-3">
+          <div ref={log} className="max-h-80 space-y-2 overflow-y-auto overflow-x-hidden p-3">
             {messages.length === 0 && <p className="text-xs text-faint">No messages yet.</p>}
             {messages.map((m) =>
               m.kind === "system" ? (
-                <p key={m.id} className="text-xs italic text-muted">
+                <p key={m.id} className="text-xs italic text-muted [overflow-wrap:anywhere]">
                   ⚙ {m.body}
                 </p>
               ) : (
-                <p key={m.id} className="text-sm">
+                <p key={m.id} className="text-sm [overflow-wrap:anywhere]">
                   <span className="font-semibold">{m.author}</span>{" "}
                   <span className="text-xs text-faint">
                     {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
