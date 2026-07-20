@@ -40,6 +40,7 @@ import {
   type Side,
   type TextEntry,
 } from "../lib/engine";
+import { commitmentOf, deriveSeed, makeMasterSecret } from "../lib/commit";
 import { mulberry32 } from "../lib/rng";
 import { effectiveNow, scheduledStarts } from "../lib/schedule";
 import { countWords } from "../lib/text";
@@ -103,7 +104,11 @@ export async function publishBracket(
   if (drafts.length < 2) throw new Error(`need at least 2 submitted drafts, have ${drafts.length}`);
 
   const n = drafts.length;
-  const seed = seedOverride ?? randomSeed();
+  // Commit-reveal: all randomness derives from a secret whose hash is
+  // published now and which is revealed at completion.
+  const masterSecret = makeMasterSecret();
+  const commitment = commitmentOf(masterSecret);
+  const seed = seedOverride ?? deriveSeed(masterSecret, "placement");
   const bracket = buildBracket(n);
   const seeded = seedBracket(drafts, mulberry32(seed));
 
@@ -148,13 +153,22 @@ export async function publishBracket(
     await db.insert(chatRooms).values({ tournamentId, kind: "merge", subjectId: m.id });
   }
 
-  await db.update(tournaments).set({ phase: "convening", seed }).where(eq(tournaments.id, tournamentId));
+  await db
+    .update(tournaments)
+    .set({ phase: "convening", seed, masterSecret })
+    .where(eq(tournaments.id, tournamentId));
   await audit(db, tournamentId, "bracket_published", {
     n,
     seed,
     placement: seeded.map((d) => d.id),
+    seedCommitment: commitment,
   });
-  await postSystem(db, tournamentId, `The bracket is published: ${n} drafts, ${bracket.rounds.length} rounds.`);
+  await postSystem(
+    db,
+    tournamentId,
+    `The bracket is published: ${n} drafts, ${bracket.rounds.length} rounds. ` +
+      `Randomness commitment: ${commitment} (the seed behind every coin flip is fixed now and revealed at the end).`
+  );
 
   const roster = await db.select().from(participants).where(eq(participants.tournamentId, tournamentId));
   for (const p of roster) {
@@ -222,7 +236,9 @@ export type WorkspaceAction =
   | { type: "selectBearer"; pref: Side }
   // During the are-you-still-here window only:
   | { type: "stillHere" }
-  | { type: "chooseAdvance"; choice: "working" | "input" };
+  | { type: "chooseAdvance"; choice: "working" | "input" }
+  // During the break before the merge's round opens:
+  | { type: "readyForRound" };
 
 export async function mergeAction(
   db: Db,
@@ -241,10 +257,23 @@ export async function mergeAction(
     .select()
     .from(rounds)
     .where(and(eq(rounds.tournamentId, t.id), eq(rounds.number, slot.roundNo)));
-  if (m.state !== "open") throw new Error("this merge is no longer editable");
-
   const side: Side | null = m.bearerAId === participantId ? "A" : m.bearerBId === participantId ? "B" : null;
   if (!side) throw new Error("only this merge's bearers may act on it");
+
+  // Break-time readiness (SPEC deviation agreed with Ed): a pending merge's
+  // bearer confirms they're present, which lets the round start early.
+  if (action.type === "readyForRound") {
+    if (m.state !== "pending" || round.state !== "scheduled") {
+      throw new Error("readiness applies before the round opens");
+    }
+    await db
+      .update(merges)
+      .set(side === "A" ? { readyA: true } : { readyB: true })
+      .where(eq(merges.id, mergeId));
+    return;
+  }
+
+  if (m.state !== "open") throw new Error("this merge is no longer editable");
 
   // Window actions: presence and advance-choice, only while the round is closing.
   if (action.type === "stillHere" || action.type === "chooseAdvance") {
@@ -320,7 +349,7 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
       : session.active.B && !session.active.A
         ? (m.activeChoiceB ?? null)
         : null;
-  const flipSeed = randomSeed();
+  const flipSeed = t.masterSecret ? deriveSeed(t.masterSecret, `flip:${m.id}`) : randomSeed();
   const resolved: ResolvedMerge = resolveMerge(a, b, session, activeChoice, mulberry32(flipSeed));
 
   let resultTextId: string | null = null;
@@ -429,8 +458,20 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
 
     if (current.state === "scheduled") {
       const prev = allRounds[current.number - 2];
-      const openAt = current.number === 1 ? 0 : (prev.actualCloseS ?? 0) + t.breakDurationS;
-      if (te < openAt) return changed;
+      const earliest = current.number === 1 ? 0 : (prev.actualCloseS ?? 0) + t.breakDurationS;
+      if (te < earliest) return changed;
+      // The full-schedule guarantee: a round only starts before its printed
+      // time when every bearer it requires has confirmed readiness during
+      // the break (agreed with Ed: nobody gets ambushed by an early start).
+      const guaranteed = Math.max(earliest, current.scheduledStartS);
+      let openAt: number;
+      if (te >= guaranteed) {
+        openAt = guaranteed;
+      } else if (await allBearersReady(db, tournamentId, current.number)) {
+        openAt = Math.max(earliest, Math.round(te));
+      } else {
+        return changed;
+      }
       await openRound(db, tournamentId, current.number, openAt);
       current.state = "open";
       current.actualStartS = openAt;
@@ -497,6 +538,20 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
   throw new Error("tick failed to converge");
 }
 
+/** True when every pending merge of the round has both bearers confirmed ready. */
+async function allBearersReady(db: Db, tournamentId: string, roundNo: number): Promise<boolean> {
+  const roundSlots = await db
+    .select({ id: slots.id })
+    .from(slots)
+    .where(and(eq(slots.tournamentId, tournamentId), eq(slots.roundNo, roundNo)));
+  if (roundSlots.length === 0) return true;
+  const pending = await db
+    .select()
+    .from(merges)
+    .where(and(inArray(merges.slotId, roundSlots.map((s) => s.id)), eq(merges.state, "pending")));
+  return pending.every((m) => m.readyA && m.readyB);
+}
+
 async function bracketFor(db: Db, tournamentId: string): Promise<Bracket> {
   const drafts = await db
     .select({ id: textVersions.id })
@@ -518,7 +573,7 @@ async function populateRound(db: Db, t: Tournament, bracket: Bracket, roundNo: n
       : null
   );
 
-  const roundSeed = randomSeed();
+  const roundSeed = t.masterSecret ? deriveSeed(t.masterSecret, `round:${roundNo}`) : randomSeed();
   const plan = planRound(bracket.rounds[roundNo - 1], incoming, mulberry32(roundSeed));
 
   const thisRoundSlots = await db
@@ -591,6 +646,17 @@ async function completeTournament(db: Db, emailer: Emailer, baseUrl: string, t: 
       : null;
 
   await audit(db, t.id, "tournament_complete", { canonicalTextId: canonical?.id ?? null });
+  if (t.masterSecret) {
+    await audit(db, t.id, "seed_reveal", {
+      masterSecret: t.masterSecret,
+      commitment: commitmentOf(t.masterSecret),
+    });
+    await postSystem(
+      db,
+      t.id,
+      `Randomness revealed: the master seed was ${t.masterSecret} — hash it to check the commitment from publication, and every flip can be recomputed from the audit log.`
+    );
+  }
   await postSystem(
     db,
     t.id,

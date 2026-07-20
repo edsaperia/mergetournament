@@ -240,6 +240,102 @@ describe("the are-you-still-here window", () => {
   });
 });
 
+describe("commit-reveal randomness", () => {
+  it("commits a hash at publish, derives every draw from the secret, reveals at completion", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await setup("reveal", 2, emailer);
+    await publishBracket(db, emailer, BASE, t.id); // no seed override: placement derives from the secret
+    const [pub] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
+    const { commitmentOf, deriveSeed } = await import("../lib/commit");
+    expect(pub.masterSecret).toMatch(/^[0-9a-f]{64}$/);
+    expect(pub.seed).toBe(deriveSeed(pub.masterSecret!, "placement"));
+
+    const log1 = await db.select().from(auditLog).where(eq(auditLog.tournamentId, t.id)).orderBy(asc(auditLog.id));
+    const published = log1.find((e) => e.action === "bracket_published")!;
+    const commitment = (published.payload as { seedCommitment: string }).seedCommitment;
+    expect(commitment).toBe(commitmentOf(pub.masterSecret!));
+
+    // One bearer works, the other presses YES in the window: a backstop flip.
+    await beginTournament(db, t.id, T0);
+    const [{ merge }] = await mergesOfRound(t.id, 1);
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "solo work" }, at(100));
+    await tick(db, emailer, BASE, t.id, at(600));
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "stillHere" }, at(620));
+    await tick(db, emailer, BASE, t.id, at(660));
+
+    const [resolved] = await db.select().from(merges).where(eq(merges.id, merge.id));
+    expect(resolved.resolution).toBe("backstop_flip");
+    // The flip's seed is exactly the derived one — verifiable from the reveal.
+    expect(resolved.flipSeed).toBe(deriveSeed(pub.masterSecret!, `flip:${merge.id}`));
+
+    const log2 = await db.select().from(auditLog).where(eq(auditLog.tournamentId, t.id)).orderBy(asc(auditLog.id));
+    const reveal = log2.find((e) => e.action === "seed_reveal")!;
+    const payload = reveal.payload as { masterSecret: string; commitment: string };
+    expect(payload.masterSecret).toBe(pub.masterSecret);
+    expect(commitmentOf(payload.masterSecret)).toBe(commitment);
+  });
+});
+
+describe("readiness-gated early starts", () => {
+  async function earlyCloseRound1(slug: string, emailer: CaptureEmailer) {
+    const { t } = await setup(slug, 4, emailer);
+    await publishBracket(db, emailer, BASE, t.id, 21);
+    await beginTournament(db, t.id, T0);
+    for (const { merge } of await mergesOfRound(t.id, 1)) {
+      await agreeMerge(merge.id, merge.bearerAId!, merge.bearerBId!, `merged in ${slug}`, at(100));
+    }
+    await tick(db, emailer, BASE, t.id, at(110)); // round 1 closes early at 110
+    const allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(allRounds[0].state).toBe("closed");
+    expect(allRounds[0].actualCloseS).toBe(110);
+    return t;
+  }
+
+  it("opens early only once every next-round bearer is ready", async () => {
+    const emailer = new CaptureEmailer();
+    const t = await earlyCloseRound1("gate-yes", emailer);
+
+    // Break over at 110 + 300 = 410, but nobody has confirmed: stays shut.
+    await tick(db, emailer, BASE, t.id, at(500));
+    let [, r2] = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(r2.state).toBe("scheduled");
+
+    const [{ merge: next }] = await mergesOfRound(t.id, 2);
+    expect(next.state).toBe("pending");
+    await mergeAction(db, next.id, next.bearerAId!, { type: "readyForRound" }, at(520));
+    await tick(db, emailer, BASE, t.id, at(525));
+    [, r2] = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(r2.state).toBe("scheduled"); // one of two bearers ready
+
+    await mergeAction(db, next.id, next.bearerBId!, { type: "readyForRound" }, at(530));
+    await tick(db, emailer, BASE, t.id, at(535));
+    [, r2] = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(r2.state).toBe("open");
+    expect(r2.actualStartS).toBe(535);
+  });
+
+  it("without readiness, the round waits for its printed schedule time", async () => {
+    const emailer = new CaptureEmailer();
+    const t = await earlyCloseRound1("gate-no", emailer);
+
+    await tick(db, emailer, BASE, t.id, at(899));
+    let [, r2] = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(r2.state).toBe("scheduled");
+
+    // Full-schedule guarantee: opens at exactly the published start (900).
+    await tick(db, emailer, BASE, t.id, at(900));
+    [, r2] = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(r2.state).toBe("open");
+    expect(r2.actualStartS).toBe(900);
+
+    // Readiness after the round opened is meaningless and rejected.
+    const [{ merge }] = await mergesOfRound(t.id, 2);
+    await expect(
+      mergeAction(db, merge.id, merge.bearerAId!, { type: "readyForRound" }, at(910))
+    ).rejects.toThrow(/before the round opens/);
+  });
+});
+
 describe("pause and the no-canonical-text ending", () => {
   it("pausing stretches wall-clock deadlines; total abandonment completes with no text", async () => {
     const emailer = new CaptureEmailer();

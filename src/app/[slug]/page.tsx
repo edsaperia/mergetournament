@@ -6,7 +6,7 @@ import { merges, participants, rounds, slots, type Tournament } from "../../db/s
 import { roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
 import { globalRoom, messagesFor } from "../../services/chat-service";
 import { effectiveT } from "../../services/runtime-service";
-import { readyAction } from "../../server/actions";
+import { readyAction, workspaceAction } from "../../server/actions";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh } from "../live";
 import { ControlButton } from "./admin/admin-controls";
@@ -76,6 +76,9 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
       {tournament.phase === "convening" && (
         <ConveningPanel slug={slug} tournamentId={tournament.id} me={me} />
       )}
+      {tournament.phase === "running" && (
+        <BreakPanel slug={slug} tournament={tournament} participantId={me?.id ?? null} />
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
           {tournament.phase === "submission" && (
@@ -104,6 +107,73 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         </aside>
       </div>
     </main>
+  );
+}
+
+/**
+ * During a break: the next round starts early only when every bearer in it
+ * has confirmed readiness (otherwise it waits for its printed time).
+ */
+async function BreakPanel({
+  slug,
+  tournament,
+  participantId,
+}: {
+  slug: string;
+  tournament: Tournament;
+  participantId: string | null;
+}) {
+  const db = await getDb();
+  const allRounds = await db
+    .select()
+    .from(rounds)
+    .where(eq(rounds.tournamentId, tournament.id))
+    .orderBy(asc(rounds.number));
+  // Only relevant during a break: no round open/closing, a scheduled one next.
+  if (allRounds.some((r) => r.state === "open" || r.state === "closing")) return null;
+  const next = allRounds.find((r) => r.state === "scheduled");
+  if (!next) return null;
+
+  const nextSlots = await db
+    .select({ id: slots.id })
+    .from(slots)
+    .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, next.number)));
+  const pending = nextSlots.length
+    ? await db
+        .select()
+        .from(merges)
+        .where(and(inArray(merges.slotId, nextSlots.map((s) => s.id)), eq(merges.state, "pending")))
+    : [];
+  if (pending.length === 0) return null;
+
+  const bearersTotal = pending.length * 2;
+  const bearersReady = pending.reduce((n, m) => n + (m.readyA ? 1 : 0) + (m.readyB ? 1 : 0), 0);
+  const mine = participantId
+    ? pending.find((m) => m.bearerAId === participantId || m.bearerBId === participantId)
+    : undefined;
+  const iAmReady = mine
+    ? mine.bearerAId === participantId
+      ? mine.readyA
+      : mine.readyB
+    : false;
+
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-edge p-4">
+      <div>
+        <p className="font-semibold">Break — round {next.number} is next</p>
+        <p className="text-sm text-muted">
+          Scheduled for +{Math.round(next.scheduledStartS / 60)}m; it starts
+          sooner only when all its bearers are ready ({bearersReady} of {bearersTotal} so far).
+        </p>
+      </div>
+      {mine && !iAmReady && (
+        <ControlButton
+          action={workspaceAction.bind(null, slug, mine.id, { type: "readyForRound" as const })}
+          label={`I'm ready for round ${next.number}`}
+        />
+      )}
+      {mine && iAmReady && <span className="text-sm font-medium text-green-600">You&apos;re ready ✓</span>}
+    </div>
   );
 }
 

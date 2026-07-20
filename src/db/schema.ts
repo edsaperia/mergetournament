@@ -82,6 +82,11 @@ export const tournaments = pgTable("tournaments", {
   begunAt: timestamp("begun_at", { withTimezone: true }),
   /** Master seed for bracket seeding; per-flip seeds live on merges / audit log. */
   seed: bigint("seed", { mode: "number" }),
+  /**
+   * Commit-reveal (fairness): generated at publish, its hash posted publicly
+   * then; every random draw derives from it; revealed at completion.
+   */
+  masterSecret: text("master_secret"),
   pausedAt: timestamp("paused_at", { withTimezone: true }),
   totalPausedS: integer("total_paused_s").notNull().default(0),
   /** Template all submissions initialise as. */
@@ -190,6 +195,9 @@ export const merges = pgTable(
     activeB: boolean("active_b").notNull().default(false),
     activeChoiceA: advanceChoice("active_choice_a"),
     activeChoiceB: advanceChoice("active_choice_b"),
+    /** Break-time readiness for a pending merge: gates early round starts. */
+    readyA: boolean("ready_a").notNull().default(false),
+    readyB: boolean("ready_b").notNull().default(false),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     resultTextId: uuid("result_text_id").references(() => textVersions.id),
     advancingBearerId: uuid("advancing_bearer_id").references(() => participants.id),
