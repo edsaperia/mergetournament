@@ -57,6 +57,9 @@ export function ChatPanel({
             {messages.map((m) =>
               m.kind === "system" ? (
                 <p key={m.id} className="text-xs italic text-muted [overflow-wrap:anywhere]">
+                  <span className="not-italic text-faint">
+                    {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>{" "}
                   ⚙ {m.body}
                 </p>
               ) : (
