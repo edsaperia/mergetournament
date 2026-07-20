@@ -46,3 +46,18 @@ export async function requireAdmin(slug: string) {
   if (p.role !== "admin") throw new Error("admin only");
   return p;
 }
+
+/** Instance operator: authenticated by the SYSADMIN_TOKEN-exchanged cookie. */
+export async function isSysadmin(): Promise<boolean> {
+  const { SYSADMIN_COOKIE, sysadminToken } = await import("./config");
+  if (!sysadminToken()) return false;
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(SYSADMIN_COOKIE)?.value;
+  if (!raw) return false;
+  const session = verifySession(raw, authSecret());
+  return session?.participantId === "sysadmin" && session.tournamentId === "*";
+}
+
+export async function requireSysadmin(): Promise<void> {
+  if (!(await isSysadmin())) throw new Error("sysadmin only");
+}

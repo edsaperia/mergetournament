@@ -250,6 +250,19 @@ export const comments = pgTable(
   (t) => [index("comments_text_version").on(t.textVersionId)]
 );
 
+/** Delivery events from the email provider's webhooks, keyed by address. */
+export const emailEvents = pgTable(
+  "email_events",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    email: text("email").notNull(),
+    /** e.g. email.sent, email.delivered, email.bounced, email.complained */
+    event: text("event").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("email_events_email_created").on(t.email, t.createdAt)]
+);
+
 export const auditLog = pgTable(
   "audit_log",
   {

@@ -37,3 +37,15 @@ export function getEmailer(): Emailer {
 export function sessionCookieName(slug: string): string {
   return `mt_s_${slug}`;
 }
+
+/** Instance-operator token; sysadmin features are disabled when unset. */
+export function sysadminToken(): string | null {
+  return process.env.SYSADMIN_TOKEN || null;
+}
+
+/** Webhook signing secret from the Resend dashboard; webhook 503s when unset. */
+export function resendWebhookSecret(): string | null {
+  return process.env.RESEND_WEBHOOK_SECRET || null;
+}
+
+export const SYSADMIN_COOKIE = "mt_sysadmin";

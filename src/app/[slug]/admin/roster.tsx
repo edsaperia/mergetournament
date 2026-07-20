@@ -18,7 +18,19 @@ export interface RosterRow {
   email: string;
   role: string;
   wordCount: number | null;
+  /** Latest delivery event from the email provider, e.g. "delivered", "bounced". */
+  emailStatus: string | null;
 }
+
+const EMAIL_STATUS_STYLE: Record<string, string> = {
+  delivered: "text-green-600",
+  opened: "text-green-600",
+  clicked: "text-green-600",
+  sent: "text-muted",
+  bounced: "text-red-600 font-semibold",
+  complained: "text-red-600 font-semibold",
+  delivery_delayed: "text-amber-600",
+};
 
 export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
   const [state, addAction, adding] = useActionState(addParticipantAction.bind(null, slug), initial);
@@ -50,7 +62,14 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
                 {r.name}
                 {r.role === "admin" && <span className="ml-1 text-xs text-muted">(admin)</span>}
               </td>
-              <td className="py-2 pr-4 font-mono text-xs">{r.email}</td>
+              <td className="py-2 pr-4 font-mono text-xs">
+                {r.email}
+                {r.emailStatus && (
+                  <span className={`ml-2 font-sans ${EMAIL_STATUS_STYLE[r.emailStatus] ?? "text-muted"}`}>
+                    {r.emailStatus.replace("_", " ")}
+                  </span>
+                )}
+              </td>
               <td className="py-2 pr-4">
                 {r.wordCount === null ? (
                   <span className="text-faint">—</span>

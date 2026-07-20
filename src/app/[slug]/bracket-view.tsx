@@ -2,7 +2,7 @@ import Link from "next/link";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../db";
 import { merges, participants, rounds, slots, textVersions, type Tournament } from "../../db/schema";
-import { globalRemainingS, roundRemainingS, type RoundProgress } from "../../lib/schedule";
+import { globalRemainingS, roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
 import { effectiveT, GRACE_S } from "../../services/runtime-service";
 import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
@@ -88,7 +88,11 @@ export async function BracketView({
                 <h3 className="font-semibold">Round {round.number}</h3>
                 <span className="text-xs text-muted">
                   {round.state === "open" && running && (
-                    <Countdown remainingS={roundRemainingS(config, progress, round.number, te)} paused={paused} />
+                    <Countdown
+                      remainingS={roundRemainingS(config, progress, round.number, te)}
+                      paused={paused}
+                      {...warnThresholds(tournament.roundDurationS)}
+                    />
                   )}
                   {round.state === "closing" && running && (
                     <span className="text-amber-600">

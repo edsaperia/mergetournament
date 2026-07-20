@@ -13,7 +13,15 @@ import { bump } from "./events";
  * after a crash re-derives state from the same tick function.
  */
 
-const globalCache = globalThis as unknown as { __mtTicker?: ReturnType<typeof setInterval> };
+const globalCache = globalThis as unknown as {
+  __mtTicker?: ReturnType<typeof setInterval>;
+  __mtLastTickMs?: number;
+};
+
+/** When the scheduler loop last completed, for /healthz. */
+export function lastTickMs(): number | null {
+  return globalCache.__mtLastTickMs ?? null;
+}
 
 export function startTicker(): void {
   if (globalCache.__mtTicker) return;
@@ -42,6 +50,7 @@ export function startTicker(): void {
     } catch (e) {
       console.error("[ticker]", e);
     } finally {
+      globalCache.__mtLastTickMs = Date.now();
       busy = false;
     }
   }, 1000);

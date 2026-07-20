@@ -91,6 +91,18 @@ export function globalRemainingS(
   return Math.max(0, finalEnd - nowEffectiveS);
 }
 
+/**
+ * Warning thresholds for a round countdown, scaled so rapid tournaments
+ * aren't born amber: warn at 5 minutes or 20% of the round (whichever is
+ * smaller), danger at 1 minute or 5%.
+ */
+export function warnThresholds(roundDurationS: number): { warnAtS: number; dangerAtS: number } {
+  return {
+    warnAtS: Math.min(300, Math.round(roundDurationS * 0.2)),
+    dangerAtS: Math.min(60, Math.round(roundDurationS * 0.05)),
+  };
+}
+
 /** Seconds left on one round's own clock (the workspace countdown). */
 export function roundRemainingS(
   config: ScheduleConfig,

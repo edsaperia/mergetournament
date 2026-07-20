@@ -44,10 +44,16 @@ export function Countdown({
   remainingS,
   paused = false,
   className = "",
+  warnAtS,
+  dangerAtS,
 }: {
   remainingS: number;
   paused?: boolean;
   className?: string;
+  /** Turn amber at this many seconds remaining. */
+  warnAtS?: number;
+  /** Turn red (and pulse) at this many seconds remaining. */
+  dangerAtS?: number;
 }) {
   const [display, setDisplay] = useState(remainingS);
   useEffect(() => {
@@ -61,8 +67,14 @@ export function Countdown({
     }, 250);
     return () => clearInterval(id);
   }, [remainingS, paused]);
+  const urgency =
+    !paused && dangerAtS !== undefined && display <= dangerAtS
+      ? "text-red-600 animate-pulse"
+      : !paused && warnAtS !== undefined && display <= warnAtS
+        ? "text-amber-600"
+        : "";
   return (
-    <span className={`tabular-nums font-mono ${paused ? "opacity-50" : ""} ${className}`}>
+    <span className={`tabular-nums font-mono ${paused ? "opacity-50" : ""} ${urgency} ${className}`}>
       {fmt(display)}
       {paused && " (paused)"}
     </span>

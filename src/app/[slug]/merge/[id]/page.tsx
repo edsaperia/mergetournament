@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, participants, rounds, slots, textVersions } from "../../../../db/schema";
-import { roundRemainingS } from "../../../../lib/schedule";
+import { roundRemainingS, warnThresholds } from "../../../../lib/schedule";
 import { effectiveT, GRACE_S } from "../../../../services/runtime-service";
 import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
@@ -89,6 +89,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             remainingS={roundRemainingS(config, progress, slot.roundNo, effectiveT(tournament, new Date()))}
             paused={paused}
             className="text-lg"
+            {...warnThresholds(tournament.roundDurationS)}
           />
         )}
         {tournament.phase === "running" && tournament.begunAt && round.state === "closing" && (

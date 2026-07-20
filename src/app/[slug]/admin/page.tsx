@@ -4,7 +4,8 @@ import { getDb } from "../../../db";
 import { numRounds } from "../../../lib/bracket";
 import { totalDurationS } from "../../../lib/schedule";
 import { submissionStatus } from "../../../services/tournament-service";
-import { beginAction, pauseAction, publishBracketAction } from "../../../server/actions";
+import { beginAction, deleteTournamentAction, pauseAction, publishBracketAction } from "../../../server/actions";
+import { latestEmailEvents } from "../../../services/sysadmin-service";
 import { currentParticipant, tournamentBySlug } from "../../../server/session";
 import { ControlButton } from "./admin-controls";
 import { Roster } from "./roster";
@@ -33,6 +34,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
 
   const db = await getDb();
   const status = await submissionStatus(db, tournament.id);
+  const delivery = await latestEmailEvents(db, status.map((s) => s.participant.email));
   const submitted = status.filter((s) => s.draft !== null).length;
   const n = Math.max(submitted, 2);
   const rounds = numRounds(n);
@@ -74,6 +76,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
             email: participant.email,
             role: participant.role,
             wordCount: draft?.wordCount ?? null,
+            emailStatus: delivery.get(participant.email)?.event.replace("email.", "") ?? null,
           }))}
         />
       </section>
@@ -81,11 +84,19 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
         <h2 className="mb-3 text-lg font-semibold">Lifecycle</h2>
         <div className="flex flex-wrap gap-3">
           {tournament.phase === "submission" && (
-            <ControlButton
-              action={publishBracketAction.bind(null, slug)}
-              label="Publish Bracket"
-              confirmText={`Publish the bracket with ${submitted} drafts? The roster freezes and everything becomes readable to participants.`}
-            />
+            <>
+              <ControlButton
+                action={publishBracketAction.bind(null, slug)}
+                label="Publish Bracket"
+                confirmText={`Publish the bracket with ${submitted} drafts? The roster freezes and everything becomes readable to participants.`}
+              />
+              <ControlButton
+                action={deleteTournamentAction.bind(null, slug)}
+                label="Delete tournament"
+                primary={false}
+                confirmText="Delete this tournament and all drafts? Only possible before publication. This cannot be undone."
+              />
+            </>
           )}
           {tournament.phase === "convening" && (
             <ControlButton

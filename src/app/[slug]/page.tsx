@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { getDb } from "../../db";
-import { participants } from "../../db/schema";
+import { merges, participants, rounds, slots, type Tournament } from "../../db/schema";
+import { roundRemainingS, warnThresholds, type RoundProgress } from "../../lib/schedule";
 import { globalRoom, messagesFor } from "../../services/chat-service";
+import { effectiveT } from "../../services/runtime-service";
 import { readyAction } from "../../server/actions";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh } from "../live";
 import { ControlButton } from "./admin/admin-controls";
 import { BracketView } from "./bracket-view";
 import { ChatPanel } from "./chat-panel";
+import { NotificationBell } from "./notification-bell";
 
 const PHASE_LABEL: Record<string, string> = {
   setup: "Being set up",
@@ -50,6 +53,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
           </p>
         </div>
         <nav className="flex items-center gap-3 text-sm">
+          {me && live && <BellWithState tournament={tournament} participantId={me.id} />}
           {me && (
             <span className="text-muted">
               {me.name}
@@ -100,6 +104,63 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         </aside>
       </div>
     </main>
+  );
+}
+
+/** Server-side snapshot feeding the notification bell's transition detection. */
+async function BellWithState({ tournament, participantId }: { tournament: Tournament; participantId: string }) {
+  const { warnAtS } = warnThresholds(tournament.roundDurationS);
+  let myOpenMergeId: string | null = null;
+  let roundNo: number | null = null;
+  let remainingS: number | null = null;
+
+  if (tournament.phase === "running" && tournament.begunAt && !tournament.pausedAt) {
+    const db = await getDb();
+    const allRounds = await db
+      .select()
+      .from(rounds)
+      .where(eq(rounds.tournamentId, tournament.id))
+      .orderBy(asc(rounds.number));
+    const open = allRounds.find((r) => r.state === "open");
+    if (open) {
+      roundNo = open.number;
+      const progress: RoundProgress[] = allRounds.map((r) => ({
+        actualStart: r.actualStartS ?? undefined,
+        actualClose: r.actualCloseS ?? undefined,
+      }));
+      remainingS = roundRemainingS(
+        { numRounds: allRounds.length, roundDurationS: tournament.roundDurationS, breakDurationS: tournament.breakDurationS },
+        progress,
+        open.number,
+        effectiveT(tournament, new Date())
+      );
+      const openSlots = await db
+        .select({ id: slots.id })
+        .from(slots)
+        .where(and(eq(slots.tournamentId, tournament.id), eq(slots.roundNo, open.number)));
+      if (openSlots.length > 0) {
+        const [mine] = await db
+          .select({ id: merges.id })
+          .from(merges)
+          .where(
+            and(
+              inArray(merges.slotId, openSlots.map((s) => s.id)),
+              eq(merges.state, "open"),
+              or(eq(merges.bearerAId, participantId), eq(merges.bearerBId, participantId))
+            )
+          );
+        myOpenMergeId = mine?.id ?? null;
+      }
+    }
+  }
+  return (
+    <NotificationBell
+      myOpenMergeId={myOpenMergeId}
+      roundNo={roundNo}
+      remainingS={remainingS}
+      warnAtS={warnAtS}
+      phase={tournament.phase}
+    />
   );
 }
 

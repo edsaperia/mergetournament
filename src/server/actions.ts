@@ -21,9 +21,11 @@ import {
   unpauseTournament,
   type WorkspaceAction,
 } from "../services/runtime-service";
+import { redirect } from "next/navigation";
+import { deleteOwnTournament, deleteTournament } from "../services/sysadmin-service";
 import { baseUrl, getEmailer } from "./config";
 import { bump } from "./events";
-import { requireAdmin, requireParticipant } from "./session";
+import { requireAdmin, requireParticipant, requireSysadmin } from "./session";
 
 export interface ActionState {
   ok: boolean;
@@ -180,6 +182,30 @@ export async function readyAction(slug: string): Promise<ActionState> {
   } catch (e) {
     return fail(e);
   }
+}
+
+export async function sysadminDeleteAction(tournamentId: string): Promise<ActionState> {
+  try {
+    await requireSysadmin();
+    const db = await getDb();
+    await deleteTournament(db, tournamentId);
+    revalidatePath("/sysadmin");
+    return { ok: true, message: "Tournament deleted." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Admin deletes their own tournament (pre-publication only); lands on the homepage. */
+export async function deleteTournamentAction(slug: string): Promise<ActionState> {
+  const me = await requireAdmin(slug);
+  const db = await getDb();
+  try {
+    await deleteOwnTournament(db, me.id);
+  } catch (e) {
+    return fail(e);
+  }
+  redirect("/");
 }
 
 export async function publishBracketAction(slug: string): Promise<ActionState> {
