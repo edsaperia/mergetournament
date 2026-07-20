@@ -52,7 +52,7 @@ BASE_URL=https://mergetournament.org
 COLLAB_WS_URL=wss://mergetournament.org/collab
 COLLAB_PORT=3001
 RESEND_API_KEY=
-EMAIL_FROM=Merge Tournament <noreply@mergetournament.org>
+EMAIL_FROM="Merge Tournament <noreply@mergetournament.org>"
 EOF
   chmod 600 "$ENV_FILE"
   echo ">>> Edit $ENV_FILE: set the Postgres password and RESEND_API_KEY."
