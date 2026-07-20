@@ -10,6 +10,14 @@ import {
   removeParticipant,
   saveDraft,
 } from "../services/tournament-service";
+import {
+  beginTournament,
+  mergeAction,
+  pauseTournament,
+  publishBracket,
+  unpauseTournament,
+  type WorkspaceAction,
+} from "../services/runtime-service";
 import { baseUrl, getEmailer } from "./config";
 import { requireAdmin, requireParticipant } from "./session";
 
@@ -105,6 +113,61 @@ export async function removeParticipantAction(slug: string, participantId: strin
     await removeParticipant(db, participantId);
     revalidatePath(`/${slug}/admin`);
     return { ok: true, message: "Participant removed." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function publishBracketAction(slug: string): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    const { n, numRounds } = await publishBracket(db, getEmailer(), baseUrl(), admin.tournamentId);
+    revalidatePath(`/${slug}`);
+    revalidatePath(`/${slug}/admin`);
+    return { ok: true, message: `Bracket published: ${n} drafts, ${numRounds} rounds. Convening.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function beginAction(slug: string): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    await beginTournament(db, admin.tournamentId, new Date());
+    revalidatePath(`/${slug}`);
+    return { ok: true, message: "Begin! Round 1 is open." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function pauseAction(slug: string, resume: boolean): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    if (resume) await unpauseTournament(db, admin.tournamentId, new Date());
+    else await pauseTournament(db, admin.tournamentId, new Date());
+    revalidatePath(`/${slug}`);
+    return { ok: true, message: resume ? "Resumed." : "Paused." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function workspaceAction(
+  slug: string,
+  mergeId: string,
+  action: WorkspaceAction
+): Promise<ActionState> {
+  try {
+    const me = await requireParticipant(slug);
+    const db = await getDb();
+    await mergeAction(db, mergeId, me.id, action, new Date());
+    revalidatePath(`/${slug}/merge/${mergeId}`);
+    revalidatePath(`/${slug}`);
+    return { ok: true, message: "" };
   } catch (e) {
     return fail(e);
   }

@@ -4,7 +4,9 @@ import { getDb } from "../../../db";
 import { numRounds } from "../../../lib/bracket";
 import { totalDurationS } from "../../../lib/schedule";
 import { submissionStatus } from "../../../services/tournament-service";
+import { beginAction, pauseAction, publishBracketAction } from "../../../server/actions";
 import { currentParticipant, tournamentBySlug } from "../../../server/session";
+import { ControlButton } from "./admin-controls";
 import { Roster } from "./roster";
 
 function fmtDuration(s: number): string {
@@ -76,9 +78,35 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
         />
       </section>
       <section className="mt-10 border-t border-neutral-200 pt-6 dark:border-neutral-800">
-        <p className="text-sm text-neutral-500">
-          Publish Bracket, Begin, and Pause arrive with the tournament-runtime milestone.
-        </p>
+        <h2 className="mb-3 text-lg font-semibold">Lifecycle</h2>
+        <div className="flex flex-wrap gap-3">
+          {tournament.phase === "submission" && (
+            <ControlButton
+              action={publishBracketAction.bind(null, slug)}
+              label="Publish Bracket"
+              confirmText={`Publish the bracket with ${submitted} drafts? The roster freezes and everything becomes readable to participants.`}
+            />
+          )}
+          {tournament.phase === "convening" && (
+            <ControlButton
+              action={beginAction.bind(null, slug)}
+              label="Begin!"
+              confirmText="Has everyone logged in, found their first partner, and sat down next to them? This starts the clock."
+            />
+          )}
+          {tournament.phase === "running" && !tournament.pausedAt && (
+            <ControlButton action={pauseAction.bind(null, slug, false)} label="Pause" primary={false} />
+          )}
+          {tournament.phase === "running" && tournament.pausedAt && (
+            <ControlButton action={pauseAction.bind(null, slug, true)} label="Resume" />
+          )}
+          {(tournament.phase === "convening" || tournament.phase === "running") && (
+            <p className="w-full text-sm text-neutral-500">
+              There is deliberately no other live control: no extending a round,
+              no reassigning a pairing, no overriding a flip.
+            </p>
+          )}
+        </div>
       </section>
     </main>
   );

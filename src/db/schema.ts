@@ -53,6 +53,11 @@ export const mergeResolution = pgEnum("merge_resolution", [
 
 export const roundState = pgEnum("round_state", ["scheduled", "open", "closed"]);
 
+export const mergeSide = pgEnum("merge_side", ["A", "B"]);
+
+/** A slot's output: pending until its round resolves, then filled or empty. */
+export const slotOutState = pgEnum("slot_out_state", ["pending", "filled", "empty"]);
+
 export const roomKind = pgEnum("room_kind", ["global", "draft", "merge"]);
 
 export const messageKind = pgEnum("message_kind", ["user", "system"]);
@@ -146,6 +151,10 @@ export const slots = pgTable(
     roundNo: integer("round_no").notNull(),
     position: integer("position").notNull(),
     kind: slotKind("kind").notNull(),
+    /** What this slot passes to the next round, once known. */
+    outState: slotOutState("out_state").notNull().default("pending"),
+    outTextId: uuid("out_text_id").references(() => textVersions.id),
+    outBearerId: uuid("out_bearer_id").references(() => participants.id),
   },
   (t) => [uniqueIndex("slots_tournament_round_position").on(t.tournamentId, t.roundNo, t.position)]
 );
@@ -166,6 +175,13 @@ export const merges = pgTable(
     /** Yjs document name on the sync server. */
     ydocRef: text("ydoc_ref"),
     state: mergeState("state").notNull().default("pending"),
+    /** Live negotiation state (SPEC §4 Phase 3), persisted between actions. */
+    workingText: text("working_text").notNull().default(""),
+    proposedBy: mergeSide("proposed_by"),
+    bearerPrefA: mergeSide("bearer_pref_a"),
+    bearerPrefB: mergeSide("bearer_pref_b"),
+    activeA: boolean("active_a").notNull().default(false),
+    activeB: boolean("active_b").notNull().default(false),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     resultTextId: uuid("result_text_id").references(() => textVersions.id),
     advancingBearerId: uuid("advancing_bearer_id").references(() => participants.id),

@@ -19,9 +19,9 @@ describe("mulberry32", () => {
         const rng = mulberry32(seed);
         for (let i = 0; i < 1000; i++) {
           const v = rng();
-          expect(v).toBeGreaterThanOrEqual(0);
-          expect(v).toBeLessThan(1);
+          if (v < 0 || v >= 1) return false;
         }
+        return true;
       })
     );
   });
