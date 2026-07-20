@@ -3,7 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../db";
 import { merges, participants, rounds, slots, textVersions, type Tournament } from "../../db/schema";
 import { globalRemainingS, roundRemainingS, type RoundProgress } from "../../lib/schedule";
-import { effectiveT } from "../../services/runtime-service";
+import { effectiveT, GRACE_S } from "../../services/runtime-service";
 import { Countdown } from "../live";
 
 const RESOLUTION_LABEL: Record<string, string> = {
@@ -88,6 +88,15 @@ export async function BracketView({
                 <span className="text-xs text-neutral-500">
                   {round.state === "open" && running && (
                     <Countdown remainingS={roundRemainingS(config, progress, round.number, te)} paused={paused} />
+                  )}
+                  {round.state === "closing" && running && (
+                    <span className="text-amber-600">
+                      backstop{" "}
+                      <Countdown
+                        remainingS={(round.actualStartS ?? 0) + tournament.roundDurationS + GRACE_S - te}
+                        paused={paused}
+                      />
+                    </span>
                   )}
                   {round.state === "closed" && "closed"}
                   {round.state === "scheduled" && `at +${Math.round(round.scheduledStartS / 60)}m`}

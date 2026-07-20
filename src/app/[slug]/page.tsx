@@ -37,7 +37,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
-      {live && <AutoRefresh />}
+      {live && <AutoRefresh slug={slug} />}
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h1 className="text-3xl font-bold">{tournament.name}</h1>

@@ -32,7 +32,11 @@ export function startTicker(): void {
       const running = await db.select().from(tournaments).where(eq(tournaments.phase, "running"));
       for (const t of running) {
         try {
-          await tick(db, getEmailer(), baseUrl(), t.id, new Date());
+          const changed = await tick(db, getEmailer(), baseUrl(), t.id, new Date());
+          if (changed) {
+            const { bump } = await import("./events");
+            bump(t.id);
+          }
         } catch (e) {
           console.error(`[ticker] tournament ${t.slug}:`, e);
         }

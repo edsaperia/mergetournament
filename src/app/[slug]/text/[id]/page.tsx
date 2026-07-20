@@ -33,7 +33,7 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-      {live && <AutoRefresh />}
+      {live && <AutoRefresh slug={slug} />}
       <p className="mb-2 text-sm text-neutral-500">
         <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
         {" · "}

@@ -3,13 +3,24 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** Poll-based liveness until the SSE milestone: refresh server data every 2s. */
-export function AutoRefresh({ intervalMs = 2000 }: { intervalMs?: number }) {
+/**
+ * Live updates via SSE (SPEC §7): refresh server data whenever the
+ * tournament's event stream says something changed, with a slow safety-net
+ * poll in case the stream drops. EventSource reconnects automatically.
+ */
+export function AutoRefresh({ slug, fallbackMs = 30000 }: { slug: string; fallbackMs?: number }) {
   const router = useRouter();
   useEffect(() => {
-    const id = setInterval(() => router.refresh(), intervalMs);
-    return () => clearInterval(id);
-  }, [router, intervalMs]);
+    const source = new EventSource(`/${slug}/events`);
+    source.onmessage = (e) => {
+      if (e.data === "changed") router.refresh();
+    };
+    const fallback = setInterval(() => router.refresh(), fallbackMs);
+    return () => {
+      source.close();
+      clearInterval(fallback);
+    };
+  }, [router, slug, fallbackMs]);
   return null;
 }
 

@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, participants, rounds, slots, textVersions } from "../../../../db/schema";
 import { roundRemainingS } from "../../../../lib/schedule";
-import { effectiveT } from "../../../../services/runtime-service";
+import { effectiveT, GRACE_S } from "../../../../services/runtime-service";
 import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
 import { collabWsUrl } from "../../../../server/collab";
@@ -14,6 +14,7 @@ import { currentParticipant, tournamentBySlug } from "../../../../server/session
 import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
 import { CollabEditor } from "./collab-editor";
+import { WindowControls } from "./window-controls";
 import { WorkspaceControls } from "./workspace-controls";
 
 export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) {
@@ -76,7 +77,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-      {live && <AutoRefresh />}
+      {live && <AutoRefresh slug={slug} />}
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">
           <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
@@ -88,6 +89,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             paused={paused}
             className="text-lg"
           />
+        )}
+        {tournament.phase === "running" && tournament.begunAt && round.state === "closing" && (
+          <span className="text-lg text-amber-600">
+            backstop{" "}
+            <Countdown
+              remainingS={(round.actualStartS ?? 0) + tournament.roundDurationS + GRACE_S - effectiveT(tournament, new Date())}
+              paused={paused}
+            />
+          </span>
         )}
       </div>
 
@@ -141,6 +151,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               token={signCollabToken({ participantId: me?.id ?? "observer", mergeId: m.id }, authSecret())}
               readOnly={!canAct || lock !== "editing"}
               userName={me?.name ?? "observer"}
+            />
+          )}
+          {round.state === "closing" && m.state === "open" && mySide && !paused && (
+            <WindowControls
+              slug={slug}
+              mergeId={m.id}
+              iAmActive={mySide === "A" ? m.activeA : m.activeB}
+              myChoice={mySide === "A" ? m.activeChoiceA : m.activeChoiceB}
+              partnerName={bearerName(mySide === "A" ? m.bearerBId : m.bearerAId)}
             />
           )}
           {canAct && mySide && (

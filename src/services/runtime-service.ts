@@ -51,6 +51,9 @@ export function randomSeed(): number {
   return randomBytes(4).readUInt32BE(0);
 }
 
+/** The are-you-still-here window after a round's clock expires (SPEC §4). */
+export const GRACE_S = 60;
+
 async function audit(db: Db, tournamentId: string, action: string, payload: unknown): Promise<void> {
   await db.insert(auditLog).values({ tournamentId, action, payload });
 }
@@ -217,7 +220,10 @@ export type WorkspaceAction =
   | { type: "propose" }
   | { type: "confirm" }
   | { type: "keepEditing" }
-  | { type: "selectBearer"; pref: Side };
+  | { type: "selectBearer"; pref: Side }
+  // During the are-you-still-here window only:
+  | { type: "stillHere" }
+  | { type: "chooseAdvance"; choice: "working" | "input" };
 
 export async function mergeAction(
   db: Db,
@@ -236,11 +242,25 @@ export async function mergeAction(
     .select()
     .from(rounds)
     .where(and(eq(rounds.tournamentId, t.id), eq(rounds.number, slot.roundNo)));
-  if (round.state !== "open") throw new Error("this round is not open");
   if (m.state !== "open") throw new Error("this merge is no longer editable");
 
   const side: Side | null = m.bearerAId === participantId ? "A" : m.bearerBId === participantId ? "B" : null;
   if (!side) throw new Error("only this merge's bearers may act on it");
+
+  // Window actions: presence and advance-choice, only while the round is closing.
+  if (action.type === "stillHere" || action.type === "chooseAdvance") {
+    if (round.state !== "closing") throw new Error("the backstop window is not open");
+    const patch: Partial<typeof merges.$inferInsert> =
+      side === "A" ? { activeA: true } : { activeB: true };
+    if (action.type === "chooseAdvance") {
+      if (side === "A") patch.activeChoiceA = action.choice;
+      else patch.activeChoiceB = action.choice;
+    }
+    await db.update(merges).set(patch).where(eq(merges.id, mergeId));
+    return;
+  }
+
+  if (round.state !== "open") throw new Error("this round is not open");
 
   const session = applyAction(rowToSession(m), { ...action, side } as MergeAction);
   await db
@@ -294,12 +314,24 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
   if (!m.textAId || !m.textBId || !m.bearerAId || !m.bearerBId) throw new Error("merge is missing inputs");
   const a: MergeInput = { text: m.textAId, bearer: m.bearerAId };
   const b: MergeInput = { text: m.textBId, bearer: m.bearerBId };
+  // The sole active bearer's window pick, if this resolves as ACTIVE_ADVANCE.
+  const activeChoice =
+    session.active.A && !session.active.B
+      ? (m.activeChoiceA ?? null)
+      : session.active.B && !session.active.A
+        ? (m.activeChoiceB ?? null)
+        : null;
   const flipSeed = randomSeed();
-  const resolved: ResolvedMerge = resolveMerge(a, b, session, null, mulberry32(flipSeed));
+  const resolved: ResolvedMerge = resolveMerge(a, b, session, activeChoice, mulberry32(flipSeed));
 
   let resultTextId: string | null = null;
   if (resolved.advancing) {
-    const advancesWorking = resolved.kind === "AGREED" || resolved.kind === "BEARER_FLIP";
+    // Mirrors the engine: these are the resolutions that advance the
+    // working text itself (as content); everything else advances an input id.
+    const advancesWorking =
+      resolved.kind === "AGREED" ||
+      resolved.kind === "BEARER_FLIP" ||
+      (resolved.kind === "ACTIVE_ADVANCE" && activeChoice === "working" && session.workingText.trim() !== "");
     if (advancesWorking) {
       const [version] = await db
         .insert(textVersions)
@@ -376,11 +408,14 @@ async function openRound(db: Db, tournamentId: string, number: number, atS: numb
 /**
  * Advance the tournament to where it should be at wall-clock `now`.
  * Idempotent and crash-safe: state re-derives from rounds/merges/slots.
+ * Returns true if any transition happened (callers use this to notify
+ * live clients).
  */
-export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournamentId: string, now: Date): Promise<void> {
+export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournamentId: string, now: Date): Promise<boolean> {
   const t = await requireTournament(db, tournamentId);
-  if (t.phase !== "running" || t.pausedAt) return;
+  if (t.phase !== "running" || t.pausedAt) return false;
   const te = effectiveT(t, now);
+  let changed = false;
 
   const allRounds = await db
     .select()
@@ -391,19 +426,20 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
 
   for (let guard = 0; guard < 200; guard++) {
     const current = allRounds.find((r) => r.state !== "closed");
-    if (!current) return;
+    if (!current) return changed;
 
     if (current.state === "scheduled") {
       const prev = allRounds[current.number - 2];
       const openAt = current.number === 1 ? 0 : (prev.actualCloseS ?? 0) + t.breakDurationS;
-      if (te < openAt) return;
+      if (te < openAt) return changed;
       await openRound(db, tournamentId, current.number, openAt);
       current.state = "open";
       current.actualStartS = openAt;
+      changed = true;
       continue;
     }
 
-    // current.state === "open"
+    // current.state === "open" | "closing"
     const roundSlots = await db
       .select()
       .from(slots)
@@ -415,29 +451,47 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
       : [];
     const unresolved = roundMerges.filter((m) => m.state !== "resolved");
     const expiry = (current.actualStartS ?? 0) + t.roundDurationS;
-
-    if (unresolved.length > 0 && te < expiry) return;
+    const graceEnd = expiry + GRACE_S;
 
     if (unresolved.length > 0) {
-      // The backstop (SPEC §4): resolve everything still open at expiry.
+      if (current.state === "open") {
+        if (te < expiry) return changed;
+        // Clock expired with merges unresolved: freeze editing and open the
+        // are-you-still-here window (SPEC §4).
+        await db.update(rounds).set({ state: "closing" }).where(eq(rounds.id, current.id));
+        current.state = "closing";
+        changed = true;
+        await audit(db, tournamentId, "backstop_window_opened", { round: current.number, atS: expiry });
+        await postSystem(
+          db,
+          tournamentId,
+          `Round ${current.number}: time is up. Unresolved merges have ${GRACE_S} seconds — are you still here?`
+        );
+        continue;
+      }
+      // current.state === "closing"
+      if (te < graceEnd) return changed;
+      // Window over: the backstop resolves everything still open.
       for (const m of unresolved) {
         await finalizeMerge(db, t, m, rowToSession(m));
       }
     }
     // Integer column: effective time is fractional, schedule points are whole seconds.
-    const closeAt = unresolved.length > 0 ? expiry : Math.max(Math.round(te), current.actualStartS ?? 0);
+    const closeAt =
+      unresolved.length > 0 ? graceEnd : Math.max(Math.round(te), current.actualStartS ?? 0);
     await db
       .update(rounds)
       .set({ state: "closed", actualCloseS: closeAt })
       .where(eq(rounds.id, current.id));
     current.state = "closed";
     current.actualCloseS = closeAt;
+    changed = true;
     await audit(db, tournamentId, "round_closed", { round: current.number, atS: closeAt });
     await postSystem(db, tournamentId, `Round ${current.number} has closed.`);
 
     if (current.number === allRounds.length) {
       await completeTournament(db, emailer, baseUrl, t);
-      return;
+      return true;
     }
     await populateRound(db, t, bracket, current.number + 1);
   }

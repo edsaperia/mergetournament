@@ -51,9 +51,13 @@ export const mergeResolution = pgEnum("merge_resolution", [
   "walkover",
 ]);
 
-export const roundState = pgEnum("round_state", ["scheduled", "open", "closed"]);
+/** "closing" is the 60s are-you-still-here window after the clock expires. */
+export const roundState = pgEnum("round_state", ["scheduled", "open", "closing", "closed"]);
 
 export const mergeSide = pgEnum("merge_side", ["A", "B"]);
+
+/** A sole active bearer's pick for the backstop: the working text or their own input. */
+export const advanceChoice = pgEnum("advance_choice", ["working", "input"]);
 
 /** A slot's output: pending until its round resolves, then filled or empty. */
 export const slotOutState = pgEnum("slot_out_state", ["pending", "filled", "empty"]);
@@ -182,6 +186,8 @@ export const merges = pgTable(
     bearerPrefB: mergeSide("bearer_pref_b"),
     activeA: boolean("active_a").notNull().default(false),
     activeB: boolean("active_b").notNull().default(false),
+    activeChoiceA: advanceChoice("active_choice_a"),
+    activeChoiceB: advanceChoice("active_choice_b"),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     resultTextId: uuid("result_text_id").references(() => textVersions.id),
     advancingBearerId: uuid("advancing_bearer_id").references(() => participants.id),

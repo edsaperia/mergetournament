@@ -115,16 +115,26 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
     expect(resultText.parentAId).toBe(m1.textAId);
     expect(resultText.parentBId).toBe(m1.textBId);
 
-    // Round clock expires: the untouched merge is abandoned, round closes, round 2 populates.
+    // Round clock expires: first the 60s are-you-still-here window opens…
     await tick(db, emailer, BASE, t.id, at(600));
+    let allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(allRounds[0].state).toBe("closing");
+    r1 = await mergesOfRound(t.id, 1);
+    expect(r1[1].merge.state).toBe("open");
+    // …editing is frozen during the window…
+    await expect(
+      mergeAction(db, r1[1].merge.id, r1[1].merge.bearerAId!, { type: "edit", text: "late!" }, at(610))
+    ).rejects.toThrow(/not open/);
+    // …then the untouched merge is abandoned and the round closes at expiry + 60.
+    await tick(db, emailer, BASE, t.id, at(660));
     r1 = await mergesOfRound(t.id, 1);
     expect(r1[1].merge.state).toBe("resolved");
     expect(r1[1].merge.resolution).toBe("abandoned");
     expect(r1[1].slot.outState).toBe("empty");
 
-    const allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
     expect(allRounds[0].state).toBe("closed");
-    expect(allRounds[0].actualCloseS).toBe(600);
+    expect(allRounds[0].actualCloseS).toBe(660);
 
     // Round 2: the agreed result arrives by walkover, the bye draft is idle too
     // -> they pair into one ad-hoc merge; the vacated slot propagates empty.
@@ -133,31 +143,31 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
     expect(r2[0].merge.isAdHoc).toBe(true);
     expect(r2[0].merge.state).toBe("pending");
 
-    // Break passes; round 2 opens on schedule at 900.
-    await tick(db, emailer, BASE, t.id, at(899));
+    // Break passes; round 2 opens at close (660) + break (300) = 960.
+    await tick(db, emailer, BASE, t.id, at(959));
     expect((await mergesOfRound(t.id, 2))[0].merge.state).toBe("pending");
-    await tick(db, emailer, BASE, t.id, at(900));
+    await tick(db, emailer, BASE, t.id, at(960));
     const adhoc = (await mergesOfRound(t.id, 2))[0].merge;
     expect(adhoc.state).toBe("open");
 
-    // The ad-hoc pair agrees; the round closes early (960), but the final —
-    // a walkover — still waits out the break and opens at 960 + 300 = 1260,
+    // The ad-hoc pair agrees; the round closes early (1010), but the final —
+    // a walkover — still waits out the break and opens at 1010 + 300 = 1310,
     // closing instantly since it has no merges to run.
-    await agreeMerge(adhoc.id, adhoc.bearerAId!, adhoc.bearerBId!, "The final canonical text.", at(950));
+    await agreeMerge(adhoc.id, adhoc.bearerAId!, adhoc.bearerBId!, "The final canonical text.", at(1000));
     emailer.sent = [];
     // Fractional wall-clock instant: early-close times must round to integers.
-    await tick(db, emailer, BASE, t.id, at(960.437));
+    await tick(db, emailer, BASE, t.id, at(1010.437));
     const [stillRunning] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
     expect(stillRunning.phase).toBe("running");
     const closedEarly = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
     expect(closedEarly[1].state).toBe("closed");
-    expect(closedEarly[1].actualCloseS).toBe(960);
+    expect(closedEarly[1].actualCloseS).toBe(1010);
 
-    await tick(db, emailer, BASE, t.id, at(1259));
+    await tick(db, emailer, BASE, t.id, at(1309));
     expect(
       (await db.select().from(tournaments).where(eq(tournaments.id, t.id)))[0].phase
     ).toBe("running");
-    await tick(db, emailer, BASE, t.id, at(1260));
+    await tick(db, emailer, BASE, t.id, at(1310));
 
     const [done] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
     expect(done.phase).toBe("complete");
@@ -182,6 +192,54 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
   });
 });
 
+describe("the are-you-still-here window", () => {
+  it("lets a sole active bearer advance the working text by choice", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await setup("grace1", 2, emailer);
+    await publishBracket(db, emailer, BASE, t.id, 11);
+    await beginTournament(db, t.id, T0);
+    const [{ merge }] = await mergesOfRound(t.id, 1);
+
+    // A works alone; B never shows up.
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "A's compromise draft" }, at(100));
+    await expect(
+      mergeAction(db, merge.id, merge.bearerAId!, { type: "stillHere" }, at(200))
+    ).rejects.toThrow(/window is not open/);
+
+    await tick(db, emailer, BASE, t.id, at(600));
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "chooseAdvance", choice: "working" }, at(620));
+    await tick(db, emailer, BASE, t.id, at(660));
+
+    const [{ merge: resolved, slot }] = await mergesOfRound(t.id, 1);
+    expect(resolved.resolution).toBe("active_advance");
+    expect(slot.outState).toBe("filled");
+    const [text] = await db.select().from(textVersions).where(eq(textVersions.id, resolved.resultTextId!));
+    expect(text.bodyMd).toBe("A's compromise draft");
+    expect(text.kind).toBe("merge_result");
+    expect(text.parentAId).toBe(merge.textAId);
+  });
+
+  it("a returning bearer pressing YES restores the two-active coin flip", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await setup("grace2", 2, emailer);
+    await publishBracket(db, emailer, BASE, t.id, 12);
+    await beginTournament(db, t.id, T0);
+    const [{ merge }] = await mergesOfRound(t.id, 1);
+
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "half-finished" }, at(100));
+    await tick(db, emailer, BASE, t.id, at(600));
+    // B was idle but is still in the room and presses YES.
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "stillHere" }, at(630));
+    await tick(db, emailer, BASE, t.id, at(660));
+
+    const [{ merge: resolved }] = await mergesOfRound(t.id, 1);
+    expect(resolved.resolution).toBe("backstop_flip");
+    // An input advances intact — never the half-finished working text.
+    expect([merge.textAId, merge.textBId]).toContain(resolved.resultTextId);
+    expect(resolved.flipSeed).not.toBeNull();
+  });
+});
+
 describe("pause and the no-canonical-text ending", () => {
   it("pausing stretches wall-clock deadlines; total abandonment completes with no text", async () => {
     const emailer = new CaptureEmailer();
@@ -203,7 +261,11 @@ describe("pause and the no-canonical-text ending", () => {
     let allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id));
     expect(allRounds[0].state).toBe("open");
 
+    // Expiry opens the window; the backstop resolves at wall 700 + 60.
     await tick(db, emailer, BASE, t.id, at(700));
+    allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id));
+    expect(allRounds[0].state).toBe("closing");
+    await tick(db, emailer, BASE, t.id, at(760));
     allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id));
     expect(allRounds[0].state).toBe("closed");
 
