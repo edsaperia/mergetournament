@@ -100,6 +100,8 @@ export const participants = pgTable(
     email: text("email").notNull(),
     tokenHash: text("token_hash").notNull(),
     role: participantRole("role").notNull().default("participant"),
+    /** Convening (SPEC §4): the tournament begins when every participant is ready. */
+    ready: boolean("ready").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

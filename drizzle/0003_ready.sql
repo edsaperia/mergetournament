@@ -1,0 +1,1 @@
+ALTER TABLE "participants" ADD COLUMN "ready" boolean DEFAULT false NOT NULL;

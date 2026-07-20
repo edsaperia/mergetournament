@@ -22,6 +22,36 @@ export class ConsoleEmailer implements Emailer {
   }
 }
 
+/**
+ * Production emailer via the Resend HTTP API (SPEC §11). Failures are
+ * logged, never thrown: an email outage must not break a running
+ * tournament's transitions — the audit log and UI carry the same facts.
+ */
+export class ResendEmailer implements Emailer {
+  constructor(
+    private apiKey: string,
+    private from: string
+  ) {}
+
+  async send(email: Email): Promise<void> {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ from: this.from, to: [email.to], subject: email.subject, text: email.text }),
+      });
+      if (!res.ok) {
+        console.error(`[email] resend ${res.status} for ${email.to}: ${await res.text()}`);
+      }
+    } catch (e) {
+      console.error(`[email] resend failed for ${email.to}:`, e);
+    }
+  }
+}
+
 /** The magic-link invitation (SPEC §4 Phase 1). */
 export function inviteEmail(opts: {
   to: string;

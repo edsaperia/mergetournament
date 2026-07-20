@@ -157,6 +157,37 @@ export async function addCommentAction(
   }
 }
 
+/**
+ * Convening (SPEC §4): a participant confirms readiness; when every
+ * participant is ready, the tournament begins itself.
+ */
+export async function readyAction(slug: string): Promise<ActionState> {
+  try {
+    const me = await requireParticipant(slug);
+    const db = await getDb();
+    const { and, eq } = await import("drizzle-orm");
+    const { participants, tournaments } = await import("../db/schema");
+    const [t] = await db.select().from(tournaments).where(eq(tournaments.id, me.tournamentId));
+    if (t.phase !== "convening") return { ok: false, message: "the tournament is not convening" };
+    await db.update(participants).set({ ready: true }).where(eq(participants.id, me.id));
+    const roster = await db
+      .select()
+      .from(participants)
+      .where(and(eq(participants.tournamentId, me.tournamentId), eq(participants.role, "participant")));
+    let message = "You're ready.";
+    if (roster.every((p) => p.ready)) {
+      const { beginTournament } = await import("../services/runtime-service");
+      await beginTournament(db, me.tournamentId, new Date());
+      message = "Everyone is ready — Begin! Round 1 is open.";
+    }
+    revalidatePath(`/${slug}`);
+    await notify(me.tournamentId);
+    return { ok: true, message };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function publishBracketAction(slug: string): Promise<ActionState> {
   try {
     const admin = await requireAdmin(slug);

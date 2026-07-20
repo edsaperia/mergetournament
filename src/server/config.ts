@@ -1,6 +1,6 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { ConsoleEmailer, Emailer } from "../lib/email";
+import { ConsoleEmailer, Emailer, ResendEmailer } from "../lib/email";
 
 /** Where magic links point. */
 export function baseUrl(): string {
@@ -23,9 +23,14 @@ export function authSecret(): string {
   return globalCache.__mtSecret;
 }
 
-/** Console emailer until a RESEND_API_KEY-backed one lands with deployment. */
+/** Resend when RESEND_API_KEY is set; otherwise emails print to the console. */
 export function getEmailer(): Emailer {
-  globalCache.__mtEmailer ??= new ConsoleEmailer();
+  if (!globalCache.__mtEmailer) {
+    const key = process.env.RESEND_API_KEY;
+    globalCache.__mtEmailer = key
+      ? new ResendEmailer(key, process.env.EMAIL_FROM ?? "Merge Tournament <noreply@mergetournament.org>")
+      : new ConsoleEmailer();
+  }
   return globalCache.__mtEmailer;
 }
 

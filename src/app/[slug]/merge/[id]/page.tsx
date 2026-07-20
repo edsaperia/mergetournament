@@ -13,6 +13,7 @@ import { messagesFor, roomForMerge, roomForText } from "../../../../services/cha
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
+import { FlipReveal } from "../../flip-reveal";
 import { CollabEditor } from "./collab-editor";
 import { WindowControls } from "./window-controls";
 import { WorkspaceControls } from "./workspace-controls";
@@ -107,18 +108,35 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </p>
       )}
       {m.state === "resolved" && (
-        <p className="mb-4 rounded-md bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900">
-          Resolved ({m.resolution?.replace("_", " ")})
-          {m.resultTextId && (
-            <>
-              {" · "}
-              <Link className="underline" href={`/${slug}/text/${m.resultTextId}`}>
-                see the advancing text
-              </Link>
-            </>
-          )}
-          {" · carried by "}{bearerName(m.advancingBearerId)}
-        </p>
+        <div className="mb-4 rounded-md bg-neutral-100 px-3 py-2 text-sm dark:bg-neutral-900">
+          {(() => {
+            const summary = (
+              <span>
+                Resolved ({m.resolution?.replace("_", " ")})
+                {m.resultTextId && (
+                  <>
+                    {" · "}
+                    <Link className="underline" href={`/${slug}/text/${m.resultTextId}`}>
+                      see the advancing text
+                    </Link>
+                  </>
+                )}
+                {" · carried by "}{bearerName(m.advancingBearerId)}
+              </span>
+            );
+            return m.flipSeed !== null ? (
+              <FlipReveal
+                flipKey={m.id}
+                a={m.resolution === "bearer_flip" ? bearerName(m.bearerAId) : `${bearerName(m.bearerAId)}'s input`}
+                b={m.resolution === "bearer_flip" ? bearerName(m.bearerBId) : `${bearerName(m.bearerBId)}'s input`}
+              >
+                {summary}
+              </FlipReveal>
+            ) : (
+              summary
+            );
+          })()}
+        </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">

@@ -4,6 +4,7 @@ import { getDb } from "../../db";
 import { merges, participants, rounds, slots, textVersions, type Tournament } from "../../db/schema";
 import { globalRemainingS, roundRemainingS, type RoundProgress } from "../../lib/schedule";
 import { effectiveT, GRACE_S } from "../../services/runtime-service";
+import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
 
 const RESOLUTION_LABEL: Record<string, string> = {
@@ -155,7 +156,19 @@ export async function BracketView({
                       </p>
                       <p className="mt-1 text-xs">
                         {m.state === "resolved" ? (
-                          <span className="text-neutral-500">{RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}</span>
+                          m.flipSeed !== null ? (
+                            <FlipReveal
+                              flipKey={m.id}
+                              a={m.resolution === "bearer_flip" ? nameOf.get(m.bearerAId ?? "") ?? "?" : title(m.textAId)}
+                              b={m.resolution === "bearer_flip" ? nameOf.get(m.bearerBId ?? "") ?? "?" : title(m.textBId)}
+                            >
+                              <span className="text-neutral-500">
+                                {RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}
+                              </span>
+                            </FlipReveal>
+                          ) : (
+                            <span className="text-neutral-500">{RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}</span>
+                          )
                         ) : m.state === "open" ? (
                           <span className="text-green-600">negotiating</span>
                         ) : (
