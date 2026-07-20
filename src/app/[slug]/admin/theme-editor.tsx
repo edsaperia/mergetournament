@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateThemeAction, type ActionState } from "../../../server/actions";
-import { THEME_TOKENS, type ThemeOverrides } from "../../../lib/theme";
+import { THEME_PRESETS, THEME_TOKENS, type ThemeOverrides } from "../../../lib/theme";
 import { btnPrimary, btnSecondary } from "../../ui";
 
 /**
@@ -35,10 +35,41 @@ export function ThemeEditor({ slug, current }: { slug: string; current: ThemeOve
       setStatus(result);
     });
 
+  const applyPreset = (overrides: ThemeOverrides) => {
+    setValues((v) => ({ ...v, ...overrides }));
+    setStatus({ ok: true, message: "Preset loaded — press Save theme to apply it." });
+  };
+
   const groups = [...new Set(THEME_TOKENS.map((t) => t.group))];
 
   return (
     <div className="flex flex-col gap-4">
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-muted">Presets</h3>
+        <div className="flex flex-wrap gap-2">
+          {THEME_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              title={p.blurb}
+              onClick={() => applyPreset(p.overrides)}
+              className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm hover:border-strong"
+            >
+              <span className="flex overflow-hidden rounded-full border border-line">
+                {["background", "accent", "live"].map((k) => (
+                  <span key={k} className="h-4 w-4" style={{ backgroundColor: p.overrides[k].light }} />
+                ))}
+                <span className="h-4 w-4" style={{ backgroundColor: p.overrides.background.dark }} />
+                <span className="h-4 w-4" style={{ backgroundColor: p.overrides.accent.dark }} />
+              </span>
+              {p.name}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          Loads the palette into the pickers below — tweak anything, then save.
+        </p>
+      </div>
       {groups.map((group) => (
         <div key={group}>
           <h3 className="mb-2 text-sm font-semibold text-muted">{group}</h3>

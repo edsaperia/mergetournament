@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { THEME_TOKENS, themeCss, validateTheme } from "./theme";
+import { THEME_PRESETS, THEME_TOKENS, themeCss, validateTheme } from "./theme";
 
 describe("theme validation", () => {
   it("accepts known tokens with strict hex and rejects everything else", () => {
@@ -25,5 +25,21 @@ describe("theme validation", () => {
       expect(t.dark).toMatch(/^#[0-9a-f]{6}$/i);
     }
     expect(new Set(THEME_TOKENS.map((t) => t.key)).size).toBe(THEME_TOKENS.length);
+  });
+});
+
+describe("theme presets", () => {
+  it("every preset covers every token and passes validation", () => {
+    const keys = THEME_TOKENS.map((t) => t.key).sort();
+    for (const p of THEME_PRESETS) {
+      expect(Object.keys(p.overrides).sort(), p.name).toEqual(keys);
+      expect(() => validateTheme(p.overrides), p.name).not.toThrow();
+      expect(themeCss(p.overrides)).toContain("--color-accent:");
+    }
+  });
+
+  it("preset keys and names are unique", () => {
+    expect(new Set(THEME_PRESETS.map((p) => p.key)).size).toBe(THEME_PRESETS.length);
+    expect(new Set(THEME_PRESETS.map((p) => p.name)).size).toBe(THEME_PRESETS.length);
   });
 });

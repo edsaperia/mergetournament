@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { createTournamentAction, type ActionState } from "../../server/actions";
 import { ActionStatus } from "../action-status";
 import { field, fieldLabel as label } from "../ui";
@@ -9,10 +9,8 @@ const initial: ActionState = { ok: true, message: "" };
 
 export function NewTournamentForm() {
   const [state, formAction, pending] = useActionState(createTournamentAction, initial);
-  const [tzOffsetMin] = useState(() => new Date().getTimezoneOffset());
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      <input type="hidden" name="tzOffsetMin" value={tzOffsetMin} />
       <div>
         <label className={label} htmlFor="name">Tournament name</label>
         <input className={field} id="name" name="name" required placeholder="Our Constitutional Convention" />
@@ -24,34 +22,6 @@ export function NewTournamentForm() {
           pattern="[a-z0-9][a-z0-9-]{1,62}" placeholder="our-convention"
         />
         <p className="mt-1 text-xs text-muted">Lowercase letters, digits, hyphens. The tournament lives at /&lt;slug&gt;.</p>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className={label} htmlFor="roundMinutes">Round length (minutes)</label>
-          <input className={field} id="roundMinutes" name="roundMinutes" type="number" min="1" defaultValue="30" required />
-        </div>
-        <div>
-          <label className={label} htmlFor="breakMinutes">Break length (minutes)</label>
-          <input className={field} id="breakMinutes" name="breakMinutes" type="number" min="0" defaultValue="10" required />
-        </div>
-      </div>
-      <div>
-        <label className={label} htmlFor="submissionDeadline">Submission close (optional)</label>
-        <input className={field} id="submissionDeadline" name="submissionDeadline" type="datetime-local" />
-        <p className="mt-1 text-xs text-muted">
-          Submissions freeze at this time (your local time). Leave empty to close manually by publishing the bracket.
-        </p>
-      </div>
-      <div>
-        <label className={label} htmlFor="visibility">Visibility</label>
-        <select className={field} id="visibility" name="visibility" defaultValue="public">
-          <option value="public">Public — anyone with the URL can observe</option>
-          <option value="participants_only">Participants only</option>
-        </select>
-      </div>
-      <div>
-        <label className={label} htmlFor="defaultSubmission">Default submission (template all drafts start from)</label>
-        <textarea className={`${field} font-mono text-sm`} id="defaultSubmission" name="defaultSubmission" rows={4} placeholder="# Preamble&#10;&#10;..." />
       </div>
       <fieldset className="rounded-md border border-edge p-4">
         <legend className="px-1 text-sm font-medium">You, the administrator</legend>
@@ -73,6 +43,11 @@ export function NewTournamentForm() {
       >
         {pending ? "Creating…" : "Create tournament"}
       </button>
+      <p className="text-xs text-muted">
+        Round timings, the submission deadline, visibility, the draft template,
+        and colors are all set afterwards from your admin page — nothing here is
+        final except the URL.
+      </p>
       <ActionStatus state={state} />
     </form>
   );

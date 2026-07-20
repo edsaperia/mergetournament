@@ -23,8 +23,10 @@ async function audit(db: Db, tournamentId: string, action: string, payload: unkn
 export interface CreateTournamentInput {
   slug: string;
   name: string;
-  roundDurationS: number;
-  breakDurationS: number;
+  /** Defaults to 30 minutes; adjustable from admin settings until publication. */
+  roundDurationS?: number;
+  /** Defaults to 10 minutes; adjustable from admin settings until publication. */
+  breakDurationS?: number;
   visibility?: "public" | "participants_only";
   defaultSubmission?: string;
   submissionDeadline?: Date;
@@ -35,7 +37,9 @@ export async function createTournament(db: Db, input: CreateTournamentInput) {
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(input.slug)) {
     throw new DomainError("slug must be lowercase letters, digits and hyphens (2-63 chars)");
   }
-  if (input.roundDurationS <= 0 || input.breakDurationS < 0) {
+  const roundDurationS = input.roundDurationS ?? 1800;
+  const breakDurationS = input.breakDurationS ?? 600;
+  if (roundDurationS <= 0 || breakDurationS < 0) {
     throw new DomainError("durations must be positive (break may be zero)");
   }
   const [tournament] = await db
@@ -43,8 +47,8 @@ export async function createTournament(db: Db, input: CreateTournamentInput) {
     .values({
       slug: input.slug,
       name: input.name,
-      roundDurationS: input.roundDurationS,
-      breakDurationS: input.breakDurationS,
+      roundDurationS,
+      breakDurationS,
       visibility: input.visibility ?? "public",
       defaultSubmission: input.defaultSubmission ?? "",
       submissionDeadline: input.submissionDeadline,
@@ -288,6 +292,8 @@ export async function updateSettings(
     breakDurationS?: number;
     startAt?: Date | null;
     defaultSubmission?: string;
+    /** Editable at any phase — a display concern, not part of the record. */
+    visibility?: "public" | "participants_only";
   }
 ) {
   const t = await requireTournament(db, tournamentId);
@@ -307,6 +313,9 @@ export async function updateSettings(
   }
   if (patch.defaultSubmission !== undefined) {
     updates.defaultSubmission = patch.defaultSubmission;
+  }
+  if (patch.visibility !== undefined) {
+    updates.visibility = patch.visibility;
   }
   if (patch.startAt !== undefined) {
     if (t.begunAt || t.phase === "running" || t.phase === "complete") {

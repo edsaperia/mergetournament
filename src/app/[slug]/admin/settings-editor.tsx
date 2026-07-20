@@ -18,6 +18,7 @@ export function SettingsEditor({
   breakMinutes,
   startAtIso,
   defaultSubmission,
+  visibility,
 }: {
   slug: string;
   prePublish: boolean;
@@ -26,12 +27,14 @@ export function SettingsEditor({
   breakMinutes: number;
   startAtIso: string | null;
   defaultSubmission: string;
+  visibility: "public" | "participants_only";
 }) {
   const [round, setRound] = useState(String(roundMinutes));
   const [brk, setBrk] = useState(String(breakMinutes));
   const [startLocal, setStartLocal] = useState("");
   const [clearStart, setClearStart] = useState(false);
   const [template, setTemplate] = useState(defaultSubmission);
+  const [vis, setVis] = useState(visibility);
   const [status, setStatus] = useState<ActionState>({ ok: true, message: "" });
   const [pending, startTransition] = useTransition();
 
@@ -41,6 +44,7 @@ export function SettingsEditor({
         await updateSettingsAction(
           slug,
           {
+            visibility: vis,
             ...(prePublish
               ? { roundMinutes: Number(round), breakMinutes: Number(brk), defaultSubmission: template }
               : {}),
@@ -68,6 +72,19 @@ export function SettingsEditor({
         </div>
       </div>
       {!prePublish && <p className="-mt-2 text-xs text-muted">Durations froze when the bracket was published.</p>}
+
+      <div className="sm:max-w-md">
+        <label className={fieldLabel} htmlFor="s-visibility">Visibility</label>
+        <select
+          className={field}
+          id="s-visibility"
+          value={vis}
+          onChange={(e) => setVis(e.target.value as "public" | "participants_only")}
+        >
+          <option value="public">Public — anyone with the URL can observe</option>
+          <option value="participants_only">Participants only</option>
+        </select>
+      </div>
 
       <div>
         <label className={fieldLabel} htmlFor="s-start">Tournament start</label>

@@ -94,6 +94,15 @@ describe("tournament + roster flow", () => {
     await expect(updateParticipant(db, emailer, BASE, t.id, p.id, { email: "not-an-email" })).rejects.toThrow(/email address/);
   });
 
+  it("creation needs only a name and slug; durations default to 30m/10m", async () => {
+    const minimal = await createTournament(db, { slug: "minimal", name: "Minimal" });
+    expect(minimal.roundDurationS).toBe(1800);
+    expect(minimal.breakDurationS).toBe(600);
+    expect(minimal.visibility).toBe("public");
+    expect(minimal.defaultSubmission).toBe("");
+    expect(minimal.submissionDeadline).toBeNull();
+  });
+
   it("rejects bad slugs and durations", async () => {
     const base = { name: "X", roundDurationS: 600, breakDurationS: 60 };
     await expect(createTournament(db, { ...base, slug: "Bad Slug" })).rejects.toThrow();
@@ -169,10 +178,13 @@ describe("drafts", () => {
 
     const { publishBracket } = await import("./runtime-service");
     await publishBracket(db, emailer, BASE, t.id);
-    // Post-publish: durations frozen, start still editable (not begun).
+    // Post-publish: durations frozen, start still editable (not begun),
+    // visibility editable at any phase.
     await expect(updateSettings(db, t.id, { roundDurationS: 1200 })).rejects.toThrow(/published/);
     const cleared = await updateSettings(db, t.id, { startAt: null });
     expect(cleared.startAt).toBeNull();
+    const hidden = await updateSettings(db, t.id, { visibility: "participants_only" });
+    expect(hidden.visibility).toBe("participants_only");
 
     const { beginTournament } = await import("./runtime-service");
     await beginTournament(db, t.id, new Date());

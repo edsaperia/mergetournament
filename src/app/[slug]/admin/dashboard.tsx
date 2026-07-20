@@ -130,6 +130,7 @@ export async function AdminDashboard({ slug }: { slug: string }) {
           breakMinutes={Math.round(tournament.breakDurationS / 60)}
           startAtIso={tournament.startAt?.toISOString() ?? null}
           defaultSubmission={tournament.defaultSubmission}
+          visibility={tournament.visibility}
         />
       </section>
       <section className="mt-10 border-t border-edge pt-6">

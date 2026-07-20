@@ -115,17 +115,12 @@ export async function createTournamentAction(_prev: ActionState, formData: FormD
   try {
     const db = await getDb();
     const slug = String(formData.get("slug") ?? "").trim();
-    const deadlineRaw = String(formData.get("submissionDeadline") ?? "").trim();
+    // Name, slug, and the admin's identity are all creation asks for; every
+    // other knob (durations, deadline, visibility, template, theme) lives in
+    // admin settings with sensible defaults.
     const tournament = await createTournament(db, {
       slug,
       name: String(formData.get("name") ?? "").trim() || slug,
-      roundDurationS: Math.round(Number(formData.get("roundMinutes") ?? 30) * 60),
-      breakDurationS: Math.round(Number(formData.get("breakMinutes") ?? 10) * 60),
-      visibility: formData.get("visibility") === "participants_only" ? "participants_only" : "public",
-      defaultSubmission: String(formData.get("defaultSubmission") ?? ""),
-      submissionDeadline: deadlineRaw
-        ? parseLocalDatetime(deadlineRaw, Number(formData.get("tzOffsetMin") ?? 0))
-        : undefined,
     });
     await addParticipant(db, getEmailer(), baseUrl(), tournament.id, {
       name: String(formData.get("adminName") ?? "").trim() || "Admin",
@@ -278,6 +273,7 @@ export async function updateSettingsAction(
     /** datetime-local value, null to clear, undefined to leave unchanged. */
     startAtLocal?: string | null;
     defaultSubmission?: string;
+    visibility?: "public" | "participants_only";
   },
   tzOffsetMin: number
 ): Promise<ActionState> {
@@ -292,6 +288,7 @@ export async function updateSettingsAction(
             ? null
             : parseLocalDatetime(payload.startAtLocal, tzOffsetMin),
       defaultSubmission: payload.defaultSubmission,
+      visibility: payload.visibility,
     });
     return { message: "Settings saved." };
   });
