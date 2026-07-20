@@ -159,24 +159,29 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           "Merge candidate",
         ]}
       >
-        <section className="rounded-lg border border-edge p-4">
-          <h2 className="mb-2 font-semibold">
-            Input A · {bearerName(m.bearerAId)}
-            {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
-          </h2>
-          {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
-          <div className="mt-3">{await chatFor(roomA, "This text's chat")}</div>
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0 rounded-lg border border-edge p-4">
+            <h2 className="mb-2 font-semibold">
+              Input A · {bearerName(m.bearerAId)}
+              {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
+            </h2>
+            {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
+          </div>
+          <aside className="min-w-0">{await chatFor(roomA, "This text's chat")}</aside>
         </section>
-        <section className="rounded-lg border border-edge p-4">
-          <h2 className="mb-2 font-semibold">
-            Input B · {bearerName(m.bearerBId)}
-            {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
-          </h2>
-          {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
-          <div className="mt-3">{await chatFor(roomB, "This text's chat")}</div>
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0 rounded-lg border border-edge p-4">
+            <h2 className="mb-2 font-semibold">
+              Input B · {bearerName(m.bearerBId)}
+              {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
+            </h2>
+            {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
+          </div>
+          <aside className="min-w-0">{await chatFor(roomB, "This text's chat")}</aside>
         </section>
-        <section className="rounded-lg border-2 border-line p-4">
-          <h2 className="mb-2 font-semibold">Merge candidate</h2>
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="min-w-0 rounded-lg border-2 border-line p-4">
+            <h2 className="mb-2 font-semibold">Merge candidate</h2>
           {m.state === "resolved" ? (
             m.workingText ? (
               <NumberedText body={m.workingText} />
@@ -212,13 +217,14 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
             />
           )}
-          {!mySide && m.state === "open" && (
-            <p className="mt-3 text-xs text-muted">
-              Only this merge&apos;s bearers hold the pen — you are watching
-              live. Lobbying arrives through the chat below.
-            </p>
-          )}
-          <div className="mt-3">{await chatFor(mergeRoom, "This merge's chat")}</div>
+            {!mySide && m.state === "open" && (
+              <p className="mt-3 text-xs text-muted">
+                Only this merge&apos;s bearers hold the pen — you are watching
+                live. Lobbying arrives through the chat on the right.
+              </p>
+            )}
+          </div>
+          <aside className="min-w-0">{await chatFor(mergeRoom, "This merge's chat")}</aside>
         </section>
       </WorkspaceTabs>
     </main>
