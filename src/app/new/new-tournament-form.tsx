@@ -3,11 +3,9 @@
 import { useActionState } from "react";
 import { createTournamentAction, type ActionState } from "../../server/actions";
 import { ActionStatus } from "../action-status";
+import { field, fieldLabel as label } from "../ui";
 
 const initial: ActionState = { ok: true, message: "" };
-
-const field = "w-full rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900";
-const label = "block text-sm font-medium mb-1";
 
 export function NewTournamentForm() {
   const [state, formAction, pending] = useActionState(createTournamentAction, initial);

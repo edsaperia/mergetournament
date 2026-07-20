@@ -26,7 +26,6 @@ import {
   textVersions,
   tournaments,
   type Merge,
-  type SlotRow,
   type Tournament,
 } from "../db/schema";
 import { buildBracket, seedBracket, type Bracket } from "../lib/bracket";

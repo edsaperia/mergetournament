@@ -2,7 +2,9 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { tournaments } from "../db/schema";
 import { tick } from "../services/runtime-service";
+import { collab, syncMergeText } from "./collab";
 import { baseUrl, getEmailer } from "./config";
+import { bump } from "./events";
 
 /**
  * The scheduler (SPEC §7): a 1s interval that advances every running
@@ -22,7 +24,6 @@ export function startTicker(): void {
     try {
       const db = await getDb();
       // Flush live CRDT texts so backstop resolutions never act on stale rows.
-      const { collab, syncMergeText } = await import("./collab");
       const handle = collab();
       if (handle) {
         for (const name of handle.server.hocuspocus.documents.keys()) {
@@ -33,10 +34,7 @@ export function startTicker(): void {
       for (const t of running) {
         try {
           const changed = await tick(db, getEmailer(), baseUrl(), t.id, new Date());
-          if (changed) {
-            const { bump } = await import("./events");
-            bump(t.id);
-          }
+          if (changed) bump(t.id);
         } catch (e) {
           console.error(`[ticker] tournament ${t.slug}:`, e);
         }

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
-import { merges, textVersions } from "../db/schema";
+import { merges } from "../db/schema";
 import { ConsoleEmailer } from "../lib/email";
 import {
   addComment,

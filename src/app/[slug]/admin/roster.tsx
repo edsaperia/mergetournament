@@ -8,9 +8,9 @@ import {
   type ActionState,
 } from "../../../server/actions";
 import { ActionStatus } from "../../action-status";
+import { field } from "../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
-const field = "rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900";
 
 export interface RosterRow {
   id: string;

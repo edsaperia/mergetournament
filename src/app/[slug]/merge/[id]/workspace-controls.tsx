@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
 import { ActionStatus } from "../../../action-status";
+import { btnPrimary as btn, btnSecondary } from "../../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -43,10 +44,6 @@ export function WorkspaceControls({
 
   const iProposed = lock === "proposed" && proposedBy === mySide;
   const theyProposed = lock === "proposed" && proposedBy !== mySide;
-  const btn =
-    "rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900";
-  const btnSecondary =
-    "rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 border border-neutral-300 dark:border-neutral-700";
 
   return (
     <form action={dispatch} className="mt-3 flex flex-col gap-3">

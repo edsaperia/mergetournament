@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import { buildBracket, Slot } from "./bracket";
+import { buildBracket } from "./bracket";
 import {
   applyAction,
   completeRound,

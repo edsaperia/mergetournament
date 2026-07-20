@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { and, asc, eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
-import { auditLog, merges, participants, rounds, slots, textVersions, tournaments } from "../db/schema";
+import { auditLog, merges, rounds, slots, textVersions, tournaments } from "../db/schema";
 import type { Email, Emailer } from "../lib/email";
 import {
   beginTournament,

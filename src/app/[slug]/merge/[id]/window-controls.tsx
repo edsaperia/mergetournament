@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import { ActionStatus } from "../../../action-status";
+import { btnPrimary as btn, btnSecondary } from "../../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -33,11 +34,6 @@ export function WindowControls({
     },
     initial
   );
-
-  const btn =
-    "rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900";
-  const btnSecondary =
-    "rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 border border-neutral-300 dark:border-neutral-700";
 
   return (
     <form action={dispatch} className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-amber-500 bg-amber-50 p-4 dark:bg-amber-950/30">

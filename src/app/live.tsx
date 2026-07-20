@@ -36,8 +36,9 @@ function fmt(s: number): string {
 }
 
 /**
- * Ticking countdown seeded from server-computed remaining seconds; the
- * AutoRefresh poll corrects drift. Frozen while paused.
+ * Ticking countdown seeded from server-computed remaining seconds; SSE
+ * refreshes re-anchor it (the prop change resets the baseline). Frozen
+ * while paused.
  */
 export function Countdown({
   remainingS,
@@ -48,17 +49,21 @@ export function Countdown({
   paused?: boolean;
   className?: string;
 }) {
-  const [renderedAt] = useState(() => Date.now());
-  const [, force] = useState(0);
+  const [display, setDisplay] = useState(remainingS);
   useEffect(() => {
-    if (paused) return;
-    const id = setInterval(() => force((x) => x + 1), 250);
+    if (paused) {
+      const sync = setTimeout(() => setDisplay(remainingS), 0);
+      return () => clearTimeout(sync);
+    }
+    const anchoredAt = Date.now();
+    const id = setInterval(() => {
+      setDisplay(remainingS - (Date.now() - anchoredAt) / 1000);
+    }, 250);
     return () => clearInterval(id);
-  }, [paused]);
-  const left = paused ? remainingS : remainingS - (Date.now() - renderedAt) / 1000;
+  }, [remainingS, paused]);
   return (
     <span className={`tabular-nums font-mono ${paused ? "opacity-50" : ""} ${className}`}>
-      {fmt(left)}
+      {fmt(display)}
       {paused && " (paused)"}
     </span>
   );

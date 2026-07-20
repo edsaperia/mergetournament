@@ -1,5 +1,7 @@
 import "server-only";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
+import { merges } from "../db/schema";
 import { authSecret } from "./config";
 import { createCollabServer, type CollabHandle } from "./collab-core";
 
@@ -36,8 +38,6 @@ export async function syncMergeText(mergeId: string): Promise<void> {
   const live = handle?.liveText(mergeId);
   if (live === null || live === undefined) return;
   const db = await getDb();
-  const { merges } = await import("../db/schema");
-  const { and, eq } = await import("drizzle-orm");
   await db
     .update(merges)
     .set({ workingText: live })

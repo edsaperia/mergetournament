@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
+import { participants, tournaments } from "../db/schema";
 import { ConsoleEmailer } from "../lib/email";
+import { addComment, postMessage } from "../services/chat-service";
 import {
   addParticipant,
   createTournament,
@@ -19,6 +22,7 @@ import {
   type WorkspaceAction,
 } from "../services/runtime-service";
 import { baseUrl, getEmailer } from "./config";
+import { bump } from "./events";
 import { requireAdmin, requireParticipant } from "./session";
 
 export interface ActionState {
@@ -30,11 +34,6 @@ export interface ActionState {
 
 function fail(e: unknown): ActionState {
   return { ok: false, message: e instanceof Error ? e.message : "something went wrong" };
-}
-
-async function notify(tournamentId: string): Promise<void> {
-  const { bump } = await import("./events");
-  bump(tournamentId);
 }
 
 /** With the console emailer (no email service configured), expose the last link for the UI. */
@@ -78,7 +77,7 @@ export async function saveDraftAction(slug: string, _prev: ActionState, formData
     const db = await getDb();
     const draft = await saveDraft(db, participant.id, String(formData.get("body") ?? ""));
     revalidatePath(`/${slug}/submit`);
-    await notify(participant.tournamentId);
+    bump(participant.tournamentId);
     return { ok: true, message: `Saved — ${draft.wordCount} words.` };
   } catch (e) {
     return fail(e);
@@ -128,10 +127,9 @@ export async function postMessageAction(slug: string, roomId: string, body: stri
   try {
     const me = await requireParticipant(slug);
     const db = await getDb();
-    const { postMessage } = await import("../services/chat-service");
     await postMessage(db, roomId, me.id, body);
     revalidatePath(`/${slug}`, "layout");
-    await notify(me.tournamentId);
+    bump(me.tournamentId);
     return { ok: true, message: "" };
   } catch (e) {
     return fail(e);
@@ -147,10 +145,9 @@ export async function addCommentAction(
   try {
     const me = await requireParticipant(slug);
     const db = await getDb();
-    const { addComment } = await import("../services/chat-service");
     await addComment(db, { textVersionId, authorId: me.id, line, body });
     revalidatePath(`/${slug}/text/${textVersionId}`);
-    await notify(me.tournamentId);
+    bump(me.tournamentId);
     return { ok: true, message: "" };
   } catch (e) {
     return fail(e);
@@ -165,8 +162,6 @@ export async function readyAction(slug: string): Promise<ActionState> {
   try {
     const me = await requireParticipant(slug);
     const db = await getDb();
-    const { and, eq } = await import("drizzle-orm");
-    const { participants, tournaments } = await import("../db/schema");
     const [t] = await db.select().from(tournaments).where(eq(tournaments.id, me.tournamentId));
     if (t.phase !== "convening") return { ok: false, message: "the tournament is not convening" };
     await db.update(participants).set({ ready: true }).where(eq(participants.id, me.id));
@@ -176,12 +171,11 @@ export async function readyAction(slug: string): Promise<ActionState> {
       .where(and(eq(participants.tournamentId, me.tournamentId), eq(participants.role, "participant")));
     let message = "You're ready.";
     if (roster.every((p) => p.ready)) {
-      const { beginTournament } = await import("../services/runtime-service");
       await beginTournament(db, me.tournamentId, new Date());
       message = "Everyone is ready — Begin! Round 1 is open.";
     }
     revalidatePath(`/${slug}`);
-    await notify(me.tournamentId);
+    bump(me.tournamentId);
     return { ok: true, message };
   } catch (e) {
     return fail(e);
@@ -195,7 +189,7 @@ export async function publishBracketAction(slug: string): Promise<ActionState> {
     const { n, numRounds } = await publishBracket(db, getEmailer(), baseUrl(), admin.tournamentId);
     revalidatePath(`/${slug}`);
     revalidatePath(`/${slug}/admin`);
-    await notify(admin.tournamentId);
+    bump(admin.tournamentId);
     return { ok: true, message: `Bracket published: ${n} drafts, ${numRounds} rounds. Convening.` };
   } catch (e) {
     return fail(e);
@@ -208,7 +202,7 @@ export async function beginAction(slug: string): Promise<ActionState> {
     const db = await getDb();
     await beginTournament(db, admin.tournamentId, new Date());
     revalidatePath(`/${slug}`);
-    await notify(admin.tournamentId);
+    bump(admin.tournamentId);
     return { ok: true, message: "Begin! Round 1 is open." };
   } catch (e) {
     return fail(e);
@@ -222,7 +216,7 @@ export async function pauseAction(slug: string, resume: boolean): Promise<Action
     if (resume) await unpauseTournament(db, admin.tournamentId, new Date());
     else await pauseTournament(db, admin.tournamentId, new Date());
     revalidatePath(`/${slug}`);
-    await notify(admin.tournamentId);
+    bump(admin.tournamentId);
     return { ok: true, message: resume ? "Resumed." : "Paused." };
   } catch (e) {
     return fail(e);
@@ -247,7 +241,7 @@ export async function workspaceAction(
     collab()?.invalidateGate(mergeId);
     revalidatePath(`/${slug}/merge/${mergeId}`);
     revalidatePath(`/${slug}`);
-    await notify(me.tournamentId);
+    bump(me.tournamentId);
     return { ok: true, message: "" };
   } catch (e) {
     return fail(e);

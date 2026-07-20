@@ -25,28 +25,31 @@ export function FlipReveal({
 
   useEffect(() => {
     let cancelled = false;
-    if (sessionStorage.getItem(storageKey)) {
-      setPhase("done");
-      return;
-    }
-    sessionStorage.setItem(storageKey, "1");
-    setPhase("animating");
-
     const TOTAL = 6000;
-    const started = Date.now();
-    const step = () => {
+    // Deferred so no state is set synchronously within the effect body.
+    timer.current = setTimeout(() => {
       if (cancelled) return;
-      const elapsed = Date.now() - started;
-      if (elapsed >= TOTAL) {
+      if (sessionStorage.getItem(storageKey)) {
         setPhase("done");
         return;
       }
-      setFace((f) => 1 - f);
-      // Faster and faster: 500ms flashes accelerating to 60ms.
-      const delay = Math.max(60, 500 - (440 * elapsed) / TOTAL);
-      timer.current = setTimeout(step, delay);
-    };
-    step();
+      sessionStorage.setItem(storageKey, "1");
+      setPhase("animating");
+      const started = Date.now();
+      const step = () => {
+        if (cancelled) return;
+        const elapsed = Date.now() - started;
+        if (elapsed >= TOTAL) {
+          setPhase("done");
+          return;
+        }
+        setFace((f) => 1 - f);
+        // Faster and faster: 500ms flashes accelerating to 60ms.
+        const delay = Math.max(60, 500 - (440 * elapsed) / TOTAL);
+        timer.current = setTimeout(step, delay);
+      };
+      step();
+    }, 0);
     return () => {
       cancelled = true;
       if (timer.current) clearTimeout(timer.current);
