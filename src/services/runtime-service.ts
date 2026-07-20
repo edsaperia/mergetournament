@@ -9,7 +9,6 @@
  * choice draws from a recorded seed.
  */
 
-import { randomBytes } from "node:crypto";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   auditLog,
@@ -43,10 +42,6 @@ import { countWords } from "../lib/text";
 import { Emailer } from "../lib/email";
 import type { Db } from "./tournament-service";
 
-export function randomSeed(): number {
-  return randomBytes(4).readUInt32BE(0);
-}
-
 /** The are-you-still-here window after a round's clock expires (SPEC §4). */
 export const GRACE_S = 60;
 
@@ -72,6 +67,12 @@ async function requireTournament(db: Db, id: string): Promise<Tournament> {
   return t;
 }
 
+/** Every post-publish draw derives from the committed secret — no fallback. */
+function requireMasterSecret(t: Tournament): string {
+  if (!t.masterSecret) throw new Error("tournament has no master secret; the bracket was never published");
+  return t.masterSecret;
+}
+
 /** Effective seconds since Begin at wall-clock `now`. */
 export function effectiveT(t: Tournament, now: Date): number {
   if (!t.begunAt) throw new Error("tournament has not begun");
@@ -82,13 +83,7 @@ export function effectiveT(t: Tournament, now: Date): number {
 // Publish
 // ---------------------------------------------------------------------------
 
-export async function publishBracket(
-  db: Db,
-  emailer: Emailer,
-  baseUrl: string,
-  tournamentId: string,
-  seedOverride?: number
-) {
+export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, tournamentId: string) {
   const t = await requireTournament(db, tournamentId);
   if (t.phase !== "submission") throw new Error("bracket can only be published from the submission phase");
 
@@ -104,7 +99,7 @@ export async function publishBracket(
   // published now and which is revealed at completion.
   const masterSecret = makeMasterSecret();
   const commitment = commitmentOf(masterSecret);
-  const seed = seedOverride ?? deriveSeed(masterSecret, "placement");
+  const seed = deriveSeed(masterSecret, "placement");
   const bracket = buildBracket(n);
   const seeded = seedBracket(drafts, mulberry32(seed));
 
@@ -345,18 +340,12 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
       : session.active.B && !session.active.A
         ? (m.activeChoiceB ?? null)
         : null;
-  const flipSeed = t.masterSecret ? deriveSeed(t.masterSecret, `flip:${m.id}`) : randomSeed();
+  const flipSeed = deriveSeed(requireMasterSecret(t), `flip:${m.id}`);
   const resolved: ResolvedMerge = resolveMerge(a, b, session, activeChoice, mulberry32(flipSeed));
 
   let resultTextId: string | null = null;
   if (resolved.advancing) {
-    // Mirrors the engine: these are the resolutions that advance the
-    // working text itself (as content); everything else advances an input id.
-    const advancesWorking =
-      resolved.kind === "AGREED" ||
-      resolved.kind === "BEARER_FLIP" ||
-      (resolved.kind === "ACTIVE_ADVANCE" && activeChoice === "working" && session.workingText.trim() !== "");
-    if (advancesWorking) {
+    if (resolved.advancing.source === "working") {
       const [version] = await db
         .insert(textVersions)
         .values({
@@ -570,7 +559,7 @@ async function populateRound(db: Db, t: Tournament, bracket: Bracket, roundNo: n
       : null
   );
 
-  const roundSeed = t.masterSecret ? deriveSeed(t.masterSecret, `round:${roundNo}`) : randomSeed();
+  const roundSeed = deriveSeed(requireMasterSecret(t), `round:${roundNo}`);
   const plan = planRound(bracket.rounds[roundNo - 1], incoming, mulberry32(roundSeed));
 
   const thisRoundSlots = await db

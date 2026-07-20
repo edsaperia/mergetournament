@@ -68,14 +68,18 @@ describe("resolveMerge", () => {
       lock: "locked", workingText: "(<a>+<b>)",
       bearerPref: { A: "B", B: "B" }, active: { A: true, B: true },
     }), null, rng());
-    expect(both).toEqual({ kind: "AGREED", advancing: { text: "(<a>+<b>)", bearer: "bob" }, flips: [] });
+    expect(both).toEqual({
+      kind: "AGREED",
+      advancing: { source: "working", text: "(<a>+<b>)", bearer: "bob" },
+      flips: [],
+    });
 
     const single = resolveMerge(A, B, session({
       lock: "locked", workingText: "m",
       bearerPref: { A: "A", B: null }, active: { A: true, B: true },
     }), null, rng());
     expect(single.kind).toBe("AGREED");
-    expect(single.advancing).toEqual({ text: "m", bearer: "alice" });
+    expect(single.advancing).toEqual({ source: "working", text: "m", bearer: "alice" });
   });
 
   it("BEARER_FLIP: locked with conflicting or absent preferences", () => {
@@ -94,17 +98,22 @@ describe("resolveMerge", () => {
       workingText: "half-finished", active: { A: true, B: true },
     }), null, rng());
     expect(r.kind).toBe("BACKSTOP_FLIP");
-    expect([A, B]).toContainEqual(r.advancing);
+    expect(r.advancing!.source).toBe("input");
+    expect([A, B]).toContainEqual({ text: r.advancing!.text, bearer: r.advancing!.bearer });
     expect(r.flips).toHaveLength(1);
   });
 
   it("ACTIVE_ADVANCE: sole active bearer's choice governs, defaulting to their input", () => {
     const active = session({ workingText: "wip", active: { A: false, B: true } });
-    expect(resolveMerge(A, B, active, "working", rng()).advancing).toEqual({ text: "wip", bearer: "bob" });
-    expect(resolveMerge(A, B, active, "input", rng()).advancing).toEqual({ text: "<b>", bearer: "bob" });
-    expect(resolveMerge(A, B, active, null, rng()).advancing).toEqual({ text: "<b>", bearer: "bob" });
+    expect(resolveMerge(A, B, active, "working", rng()).advancing)
+      .toEqual({ source: "working", text: "wip", bearer: "bob" });
+    expect(resolveMerge(A, B, active, "input", rng()).advancing)
+      .toEqual({ source: "input", text: "<b>", bearer: "bob" });
+    expect(resolveMerge(A, B, active, null, rng()).advancing)
+      .toEqual({ source: "input", text: "<b>", bearer: "bob" });
     const blank = session({ workingText: "   ", active: { A: true, B: false } });
-    expect(resolveMerge(A, B, blank, "working", rng()).advancing).toEqual({ text: "<a>", bearer: "alice" });
+    expect(resolveMerge(A, B, blank, "working", rng()).advancing)
+      .toEqual({ source: "input", text: "<a>", bearer: "alice" });
   });
 
   it("ABANDONED: neither bearer active empties the slot", () => {
@@ -165,10 +174,14 @@ describe("planRound / completeRound", () => {
 
     const resolutions = new Map<number, ResolvedMerge>();
     for (const [i] of plan.merges) {
-      resolutions.set(i, { kind: "AGREED", advancing: { text: "m", bearer: "x" }, flips: [] });
+      resolutions.set(i, { kind: "AGREED", advancing: { source: "working", text: "m", bearer: "x" }, flips: [] });
     }
     for (const m of plan.adHoc) {
-      resolutions.set(m.resultSlot, { kind: "AGREED", advancing: { text: "adhoc", bearer: "y" }, flips: [] });
+      resolutions.set(m.resultSlot, {
+        kind: "AGREED",
+        advancing: { source: "working", text: "adhoc", bearer: "y" },
+        flips: [],
+      });
     }
     const out = completeRound(slots, plan, resolutions);
     expect(out).toHaveLength(slots.length);

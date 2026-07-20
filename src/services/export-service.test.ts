@@ -20,7 +20,7 @@ beforeAll(async () => {
     const p = await addParticipant(db, emailer, "http://x", t.id, { name, email: `${name}@exp.org` });
     await saveDraft(db, p.id, `${name}'s draft text.`);
   }
-  await publishBracket(db, emailer, "http://x", t.id, 3);
+  await publishBracket(db, emailer, "http://x", t.id);
   await beginTournament(db, t.id, T0);
   const [m] = await db.select().from(merges);
   const now = new Date(T0.getTime() + 60_000);
@@ -69,7 +69,8 @@ describe("exports", () => {
     const entries = jsonl.split("\n").map((l) => JSON.parse(l));
     expect(entries.length).toBeGreaterThan(4);
     const published = entries.find((e) => e.action === "bracket_published");
-    expect(published.payload.seed).toBe(3);
+    expect(typeof published.payload.seed).toBe("number");
+    expect(published.payload.seedCommitment).toMatch(/^[0-9a-f]{64}$/);
     expect(entries.every((e) => typeof e.at === "string")).toBe(true);
   });
 });

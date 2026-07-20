@@ -45,7 +45,7 @@ beforeAll(async () => {
     const p = await addParticipant(db, emailer, "http://x", t.id, { name: `P${i}`, email: `p${i}@c.org` });
     await saveDraft(db, p.id, `Draft ${i}`);
   }
-  await publishBracket(db, emailer, "http://x", t.id, 1);
+  await publishBracket(db, emailer, "http://x", t.id);
   await beginTournament(db, t.id, new Date());
   [merge] = await db.select().from(merges);
   expect(merge.state).toBe("open");

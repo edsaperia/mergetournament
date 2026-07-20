@@ -70,12 +70,13 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
   it("publishes the bracket: rounds, slots, round-1 merges, bye pass-through, emails", async () => {
     const { t } = await setup("run5", 5, emailer);
     emailer.sent = [];
-    const result = await publishBracket(db, emailer, BASE, t.id, 42);
-    expect(result).toEqual({ n: 5, seed: 42, numRounds: 3 });
+    const result = await publishBracket(db, emailer, BASE, t.id);
+    expect(result.n).toBe(5);
+    expect(result.numRounds).toBe(3);
 
     const [row] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
     expect(row.phase).toBe("convening");
-    expect(row.seed).toBe(42);
+    expect(row.seed).toBe(result.seed);
 
     const allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
     expect(allRounds.map((r) => r.scheduledStartS)).toEqual([0, 900, 1800]);
@@ -196,7 +197,7 @@ describe("the are-you-still-here window", () => {
   it("lets a sole active bearer advance the working text by choice", async () => {
     const emailer = new CaptureEmailer();
     const { t } = await setup("grace1", 2, emailer);
-    await publishBracket(db, emailer, BASE, t.id, 11);
+    await publishBracket(db, emailer, BASE, t.id);
     await beginTournament(db, t.id, T0);
     const [{ merge }] = await mergesOfRound(t.id, 1);
 
@@ -222,7 +223,7 @@ describe("the are-you-still-here window", () => {
   it("a returning bearer pressing YES restores the two-active coin flip", async () => {
     const emailer = new CaptureEmailer();
     const { t } = await setup("grace2", 2, emailer);
-    await publishBracket(db, emailer, BASE, t.id, 12);
+    await publishBracket(db, emailer, BASE, t.id);
     await beginTournament(db, t.id, T0);
     const [{ merge }] = await mergesOfRound(t.id, 1);
 
@@ -244,7 +245,7 @@ describe("commit-reveal randomness", () => {
   it("commits a hash at publish, derives every draw from the secret, reveals at completion", async () => {
     const emailer = new CaptureEmailer();
     const { t } = await setup("reveal", 2, emailer);
-    await publishBracket(db, emailer, BASE, t.id); // no seed override: placement derives from the secret
+    await publishBracket(db, emailer, BASE, t.id); // placement derives from the committed secret
     const [pub] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
     const { commitmentOf, deriveSeed } = await import("../lib/commit");
     expect(pub.masterSecret).toMatch(/^[0-9a-f]{64}$/);
@@ -279,7 +280,7 @@ describe("commit-reveal randomness", () => {
 describe("readiness-gated early starts", () => {
   async function earlyCloseRound1(slug: string, emailer: CaptureEmailer) {
     const { t } = await setup(slug, 4, emailer);
-    await publishBracket(db, emailer, BASE, t.id, 21);
+    await publishBracket(db, emailer, BASE, t.id);
     await beginTournament(db, t.id, T0);
     for (const { merge } of await mergesOfRound(t.id, 1)) {
       await agreeMerge(merge.id, merge.bearerAId!, merge.bearerBId!, `merged in ${slug}`, at(100));
@@ -340,7 +341,7 @@ describe("pause and the no-canonical-text ending", () => {
   it("pausing stretches wall-clock deadlines; total abandonment completes with no text", async () => {
     const emailer = new CaptureEmailer();
     const { t } = await setup("run2", 2, emailer);
-    await publishBracket(db, emailer, BASE, t.id, 7);
+    await publishBracket(db, emailer, BASE, t.id);
     await beginTournament(db, t.id, T0);
 
     await pauseTournament(db, t.id, at(100));

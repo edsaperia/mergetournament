@@ -95,8 +95,12 @@ export interface FlipRecord {
 
 export interface ResolvedMerge {
   kind: ResolutionKind;
-  /** What advances, or null if the slot empties (ABANDONED). */
-  advancing: { text: string; bearer: string } | null;
+  /**
+   * What advances, or null if the slot empties (ABANDONED). `source` says
+   * whether `text` is the session's working text (new content) or one of the
+   * inputs advancing intact — callers persist accordingly.
+   */
+  advancing: { source: "working" | "input"; text: string; bearer: string } | null;
   flips: FlipRecord[];
 }
 
@@ -129,7 +133,7 @@ export function resolveMerge(
     }
     return {
       kind,
-      advancing: { text: session.workingText, bearer: side === "A" ? a.bearer : b.bearer },
+      advancing: { source: "working", text: session.workingText, bearer: side === "A" ? a.bearer : b.bearer },
       flips,
     };
   }
@@ -139,14 +143,18 @@ export function resolveMerge(
     const outcome = flip(rng);
     flips.push({ purpose: "backstop", outcome });
     const winner = outcome === 0 ? a : b;
-    return { kind: "BACKSTOP_FLIP", advancing: { ...winner }, flips };
+    return { kind: "BACKSTOP_FLIP", advancing: { source: "input", ...winner }, flips };
   }
   if (activeA || activeB) {
     const own = activeA ? a : b;
     const workingUsable = activeChoice === "working" && session.workingText.trim() !== "";
     return {
       kind: "ACTIVE_ADVANCE",
-      advancing: { text: workingUsable ? session.workingText : own.text, bearer: own.bearer },
+      advancing: {
+        source: workingUsable ? "working" : "input",
+        text: workingUsable ? session.workingText : own.text,
+        bearer: own.bearer,
+      },
       flips,
     };
   }
@@ -256,7 +264,7 @@ export function completeRound(
     if (plan.merges.has(i) || adHocResults.has(i)) {
       const r = resolutions.get(i);
       if (!r) throw new Error(`missing resolution for slot ${slot.round}:${i}`);
-      return r.advancing ? { ...r.advancing } : null;
+      return r.advancing ? { text: r.advancing.text, bearer: r.advancing.bearer } : null;
     }
     const stand = plan.standOver.get(i);
     return stand ? { ...stand } : null;

@@ -139,7 +139,7 @@ describe("drafts", () => {
     const p2 = await addParticipant(db, emailer, BASE, t.id, { name: "Two", email: "two@example.org" });
     await saveDraft(db, p2.id, "second draft");
     const { publishBracket } = await import("./runtime-service");
-    await publishBracket(db, emailer, BASE, t.id, 9);
+    await publishBracket(db, emailer, BASE, t.id);
     await expect(updateSubmissionDeadline(db, t.id, future)).rejects.toThrow(/ended/);
   });
 
@@ -165,7 +165,7 @@ describe("drafts", () => {
     await expect(updateSettings(db, t.id, { roundDurationS: 0 })).rejects.toThrow(/positive/);
 
     const { publishBracket } = await import("./runtime-service");
-    await publishBracket(db, emailer, BASE, t.id, 4);
+    await publishBracket(db, emailer, BASE, t.id);
     // Post-publish: durations frozen, start still editable (not begun).
     await expect(updateSettings(db, t.id, { roundDurationS: 1200 })).rejects.toThrow(/published/);
     const cleared = await updateSettings(db, t.id, { startAt: null });

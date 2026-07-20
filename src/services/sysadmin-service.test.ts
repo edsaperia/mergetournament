@@ -37,7 +37,7 @@ describe("sysadmin overview", () => {
   it("reports slug, status, creator email, and counts per tournament", async () => {
     await make("ov-a", 3, 2);
     const { t: b } = await make("ov-b", 2, 2);
-    await publishBracket(db, emailer, "http://x", b.id, 1);
+    await publishBracket(db, emailer, "http://x", b.id);
 
     const rows = await overview(db);
     const a = rows.find((r) => r.slug === "ov-a")!;
@@ -56,7 +56,7 @@ describe("deletion rules", () => {
     expect(await db.select().from(tournaments).where(eq(tournaments.id, t.id))).toHaveLength(0);
 
     const { t: pub, admin: pubAdmin, people } = await make("del-b", 2, 2);
-    await publishBracket(db, emailer, "http://x", pub.id, 1);
+    await publishBracket(db, emailer, "http://x", pub.id);
     await expect(deleteOwnTournament(db, pubAdmin.id)).rejects.toThrow(/published/);
     await expect(deleteOwnTournament(db, people[0].id)).rejects.toThrow(/admin/);
     await deleteTournament(db, pub.id);

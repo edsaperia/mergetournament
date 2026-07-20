@@ -34,7 +34,7 @@ beforeAll(async () => {
   const d0 = await saveDraft(db, p0.id, "Line zero.\nLine one.\nLine two.");
   draftId = d0.id;
   await saveDraft(db, p1.id, "Other draft.");
-  await publishBracket(db, emailer, "http://x", t.id, 5);
+  await publishBracket(db, emailer, "http://x", t.id);
   await beginTournament(db, t.id, new Date());
 });
 
