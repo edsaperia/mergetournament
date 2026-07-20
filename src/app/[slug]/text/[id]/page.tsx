@@ -2,7 +2,34 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { participants, textVersions } from "../../../../db/schema";
+import { merges, participants, textVersions } from "../../../../db/schema";
+import type { Db } from "../../../../services/tournament-service";
+
+/**
+ * A human name for a text: a draft is "<author>'s draft"; a merge result is
+ * the bearer pairing that produced it ("Ada + Bo") — far more memorable
+ * than "parent A".
+ */
+async function labelForText(db: Db, textId: string): Promise<string> {
+  const [t] = await db.select().from(textVersions).where(eq(textVersions.id, textId));
+  if (!t) return "unknown text";
+  if (t.kind === "draft") {
+    const [author] = t.authorId
+      ? await db.select().from(participants).where(eq(participants.id, t.authorId))
+      : [];
+    return author ? `${author.name}'s draft` : "a draft";
+  }
+  const [producer] = await db.select().from(merges).where(eq(merges.resultTextId, t.id));
+  if (producer?.bearerAId && producer.bearerBId) {
+    const roster = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.tournamentId, t.tournamentId));
+    const nameOf = new Map(roster.map((p) => [p.id, p.name]));
+    return `${nameOf.get(producer.bearerAId) ?? "?"} + ${nameOf.get(producer.bearerBId) ?? "?"}`;
+  }
+  return "merged text";
+}
 import { commentsFor, messagesFor, roomForText } from "../../../../services/chat-service";
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh } from "../../../live";
@@ -40,12 +67,16 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
         {text.kind === "draft" ? `draft by ${author?.name ?? "?"}` : "merged text"}
         {" · "}{text.wordCount} words
       </p>
-      {(text.parentAId || text.parentBId) && (
+      {text.parentAId && text.parentBId && (
         <p className="mb-4 text-sm text-muted">
           Merged from{" "}
-          <Link className="underline" href={`/${slug}/text/${text.parentAId}`}>parent A</Link>
+          <Link className="underline" href={`/${slug}/text/${text.parentAId}`}>
+            {await labelForText(db, text.parentAId)}
+          </Link>
           {" and "}
-          <Link className="underline" href={`/${slug}/text/${text.parentBId}`}>parent B</Link>
+          <Link className="underline" href={`/${slug}/text/${text.parentBId}`}>
+            {await labelForText(db, text.parentBId)}
+          </Link>
         </p>
       )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
