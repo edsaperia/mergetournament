@@ -1,0 +1,23 @@
+# /etc/caddy/Caddyfile
+# Caddy terminates TLS (automatic Let's Encrypt) and proxies:
+#   /collab/*  -> the Hocuspocus WebSocket server (:3001)
+#   everything -> Next.js (:3000), including SSE at /<slug>/events
+
+mergetournament.org {
+	encode gzip
+
+	handle_path /collab* {
+		reverse_proxy localhost:3001
+	}
+
+	handle {
+		# flush_interval -1 keeps SSE streaming unbuffered
+		reverse_proxy localhost:3000 {
+			flush_interval -1
+		}
+	}
+}
+
+www.mergetournament.org {
+	redir https://mergetournament.org{uri} permanent
+}

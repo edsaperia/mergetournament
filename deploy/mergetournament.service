@@ -1,0 +1,18 @@
+# /etc/systemd/system/mergetournament.service
+[Unit]
+Description=Merge Tournament (Next.js + scheduler + collab sync)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mt
+WorkingDirectory=/opt/mergetournament
+EnvironmentFile=/etc/mergetournament.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+# The tick is idempotent and crash-safe; restarts lose nothing.
+
+[Install]
+WantedBy=multi-user.target

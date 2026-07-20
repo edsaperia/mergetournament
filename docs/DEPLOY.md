@@ -40,6 +40,27 @@ managed Postgres.
    allow long-lived connections (SSE and WebSockets).
 5. Set up Resend: verify the sending domain, create an API key.
 
+## DigitalOcean (recommended path)
+
+Ready-made artifacts live in [`deploy/`](../deploy): a `Caddyfile` (TLS +
+proxying `/collab` to the sync server, SSE unbuffered), a systemd unit, a
+first-time `setup.sh` for a fresh Ubuntu 24.04 droplet, and an `update.sh`
+for subsequent deploys.
+
+1. Create a droplet: Ubuntu 24.04, smallest size is plenty for ~20 users
+   (1 GB / 1 vCPU; 2 GB is comfortable). Use App Platform **not** — it fights
+   the second WebSocket port and the single-process design.
+2. Point DNS: `A` records for `mergetournament.org` (and `www`) → droplet IP.
+   Do this before running setup so Caddy can obtain certificates.
+3. Postgres: either keep the local-Postgres section of `setup.sh` (cheapest;
+   add a `pg_dump` cron for backups) or create a DO Managed Postgres and put
+   its connection string in `/etc/mergetournament.env` instead.
+4. `ssh root@<ip>`, then:
+   `curl -fsSL https://raw.githubusercontent.com/edsaperia/mergetournament/main/deploy/setup.sh | bash`
+5. Edit `/etc/mergetournament.env` (Postgres password, `RESEND_API_KEY`),
+   `systemctl restart mergetournament`.
+6. Subsequent deploys: `bash /opt/mergetournament/deploy/update.sh`.
+
 ## Fly.io sketch
 
 - One app, one machine, `internal_port = 3000`, plus a second service for
