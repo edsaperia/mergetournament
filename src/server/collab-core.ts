@@ -53,23 +53,32 @@ export function createCollabServer(config: CollabConfig) {
     const cached = gateCache.get(mergeId);
     if (cached && Date.now() - cached.at < maxAgeMs) return cached.gate;
     const db = await config.getDb();
-    const [m] = await db.select().from(merges).where(eq(merges.id, mergeId));
-    if (!m) throw new Error("merge not found");
-    const [slot] = await db.select().from(slots).where(eq(slots.id, m.slotId));
-    const [t] = await db.select().from(tournaments).where(eq(tournaments.id, slot.tournamentId));
-    const [round] = await db
-      .select()
-      .from(rounds)
-      .where(and(eq(rounds.tournamentId, t.id), eq(rounds.number, slot.roundNo)));
+    // One round-trip on the hot write path: merge -> slot -> tournament -> round.
+    const [row] = await db
+      .select({
+        mergeState: merges.state,
+        proposedBy: merges.proposedBy,
+        bearerAId: merges.bearerAId,
+        bearerBId: merges.bearerBId,
+        roundState: rounds.state,
+        phase: tournaments.phase,
+        pausedAt: tournaments.pausedAt,
+      })
+      .from(merges)
+      .innerJoin(slots, eq(slots.id, merges.slotId))
+      .innerJoin(tournaments, eq(tournaments.id, slots.tournamentId))
+      .leftJoin(rounds, and(eq(rounds.tournamentId, slots.tournamentId), eq(rounds.number, slots.roundNo)))
+      .where(eq(merges.id, mergeId));
+    if (!row) throw new Error("merge not found");
     const gate: Gate = {
       writable:
-        m.state === "open" &&
-        m.proposedBy === null &&
-        round?.state === "open" &&
-        t.phase === "running" &&
-        t.pausedAt === null,
-      bearerAId: m.bearerAId,
-      bearerBId: m.bearerBId,
+        row.mergeState === "open" &&
+        row.proposedBy === null &&
+        row.roundState === "open" &&
+        row.phase === "running" &&
+        row.pausedAt === null,
+      bearerAId: row.bearerAId,
+      bearerBId: row.bearerBId,
     };
     gateCache.set(mergeId, { at: Date.now(), gate });
     return gate;
@@ -128,6 +137,14 @@ export function createCollabServer(config: CollabConfig) {
         .update(merges)
         .set({ workingText: content })
         .where(and(eq(merges.id, mergeIdOf(documentName)), eq(merges.state, "open")));
+    },
+
+    async afterUnloadDocument({ documentName }) {
+      // Long-lived process: drop per-document state once the doc unloads,
+      // or these maps grow with every merge ever edited.
+      gateCache.delete(mergeIdOf(documentName));
+      activityMarked.delete(`${documentName}:A`);
+      activityMarked.delete(`${documentName}:B`);
     },
   });
 
