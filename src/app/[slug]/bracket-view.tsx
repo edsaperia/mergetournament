@@ -220,7 +220,9 @@ export async function BracketView({
                       </p>
                       <p className="mt-1 text-xs">
                         {m.state === "resolved" ? (
-                          m.flipSeed !== null ? (
+                          m.flipSeed !== null &&
+                          m.resolvedAt &&
+                          Date.now() - m.resolvedAt.getTime() < 120_000 ? (
                             <FlipReveal
                               flipKey={m.id}
                               a={m.resolution === "bearer_flip" ? nameOf.get(m.bearerAId ?? "") ?? "?" : title(m.textAId)}
@@ -283,7 +285,7 @@ async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tourna
       <h2 className="mb-2 text-2xl font-bold">Merge Tournament Over!</h2>
       <p className="rounded-lg border-2 border-green-600 p-4 text-lg">
         🏆 The canonical text has emerged:{" "}
-        <Link className="font-semibold underline" href={`/${tournament.slug}/text/${finalSlot.outTextId}`}>
+        <Link className="font-semibold underline" href={`/${tournament.slug}/text`}>
           read it
         </Link>
       </p>

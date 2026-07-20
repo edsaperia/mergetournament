@@ -1,0 +1,1 @@
+ALTER TABLE "merges" ADD COLUMN "resolved_at" timestamp with time zone;

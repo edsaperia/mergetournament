@@ -13,6 +13,7 @@ export function ChatPanel({
   title,
   messages,
   canPost,
+  readOnlyNote,
   defaultOpen = true,
 }: {
   slug: string;
@@ -20,6 +21,8 @@ export function ChatPanel({
   title: string;
   messages: MessageView[];
   canPost: boolean;
+  /** Shown instead of the composer when the viewer cannot post. */
+  readOnlyNote?: string;
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -88,6 +91,9 @@ export function ChatPanel({
                 Send
               </button>
             </form>
+          )}
+          {!canPost && readOnlyNote && (
+            <p className="border-t border-edge px-3 py-2 text-xs text-muted">{readOnlyNote}</p>
           )}
           {!state.ok && <p className="px-3 pb-2 text-xs text-red-600">{state.message}</p>}
         </div>

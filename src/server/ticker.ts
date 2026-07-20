@@ -38,6 +38,20 @@ export function startTicker(): void {
           if (name.startsWith("merge:")) await syncMergeText(name.slice("merge:".length));
         }
       }
+      // Auto-begin: a convening tournament whose start datetime has arrived.
+      const convening = await db.select().from(tournaments).where(eq(tournaments.phase, "convening"));
+      for (const t of convening) {
+        if (t.startAt && t.startAt.getTime() <= Date.now()) {
+          try {
+            const { beginTournament } = await import("../services/runtime-service");
+            await beginTournament(db, t.id, new Date());
+            bump(t.id);
+          } catch (e) {
+            console.error(`[ticker] auto-begin ${t.slug}:`, e);
+          }
+        }
+      }
+
       const running = await db.select().from(tournaments).where(eq(tournaments.phase, "running"));
       for (const t of running) {
         try {

@@ -269,6 +269,53 @@ export async function updateSubmissionDeadline(db: Db, tournamentId: string, dea
   return updated;
 }
 
+/**
+ * Edit tournament settings (SPEC §4 Phase 0): durations and the default
+ * submission until the bracket is published; the start datetime until the
+ * tournament has begun (when set, it auto-begins once convening).
+ */
+export async function updateSettings(
+  db: Db,
+  tournamentId: string,
+  patch: {
+    roundDurationS?: number;
+    breakDurationS?: number;
+    startAt?: Date | null;
+    defaultSubmission?: string;
+  }
+) {
+  const t = await requireTournament(db, tournamentId);
+  const prePublish = t.phase === "setup" || t.phase === "submission";
+  const updates: Partial<typeof tournaments.$inferInsert> = {};
+
+  if (patch.roundDurationS !== undefined || patch.breakDurationS !== undefined || patch.defaultSubmission !== undefined) {
+    if (!prePublish) throw new Error("durations and the template are editable until the bracket is published");
+  }
+  if (patch.roundDurationS !== undefined) {
+    if (!Number.isInteger(patch.roundDurationS) || patch.roundDurationS <= 0) throw new Error("round duration must be positive");
+    updates.roundDurationS = patch.roundDurationS;
+  }
+  if (patch.breakDurationS !== undefined) {
+    if (!Number.isInteger(patch.breakDurationS) || patch.breakDurationS < 0) throw new Error("break duration cannot be negative");
+    updates.breakDurationS = patch.breakDurationS;
+  }
+  if (patch.defaultSubmission !== undefined) {
+    updates.defaultSubmission = patch.defaultSubmission;
+  }
+  if (patch.startAt !== undefined) {
+    if (t.begunAt || t.phase === "running" || t.phase === "complete") {
+      throw new Error("the tournament has already started");
+    }
+    if (patch.startAt && Number.isNaN(patch.startAt.getTime())) throw new Error("invalid date");
+    updates.startAt = patch.startAt;
+  }
+  if (Object.keys(updates).length === 0) return t;
+
+  const [updated] = await db.update(tournaments).set(updates).where(eq(tournaments.id, tournamentId)).returning();
+  await audit(db, tournamentId, "settings_changed", { changes: Object.keys(updates) });
+  return updated;
+}
+
 /** Set or clear the tournament's color theme (validated token overrides). */
 export async function updateTheme(db: Db, tournamentId: string, theme: unknown | null) {
   await requireTournament(db, tournamentId);

@@ -66,6 +66,11 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const mergeRoom = await roomForMerge(db, m.id);
   const roomA = m.textAId ? await roomForText(db, m.textAId) : null;
   const roomB = m.textBId ? await roomForText(db, m.textBId) : null;
+  const chatNote = !me
+    ? "Sign in with your invitation link to chat."
+    : me.role === "admin"
+      ? "The admin reads everything but posts only in the tournament chat."
+      : undefined;
   const chatFor = async (room: { id: string } | null, title: string, defaultOpen = true) =>
     room ? (
       <ChatPanel
@@ -74,6 +79,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         title={title}
         messages={await messagesFor(db, room.id)}
         canPost={canChat}
+        readOnlyNote={chatNote}
         defaultOpen={defaultOpen}
       />
     ) : null;
@@ -127,7 +133,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 {" · carried by "}{bearerName(m.advancingBearerId)}
               </span>
             );
-            return m.flipSeed !== null ? (
+            // Only animate flips that just happened; cold visitors see history.
+            return m.flipSeed !== null && m.resolvedAt && Date.now() - m.resolvedAt.getTime() < 120_000 ? (
               <FlipReveal
                 flipKey={m.id}
                 a={m.resolution === "bearer_flip" ? bearerName(m.bearerAId) : `${bearerName(m.bearerAId)}'s input`}

@@ -143,6 +143,39 @@ describe("drafts", () => {
     await expect(updateSubmissionDeadline(db, t.id, future)).rejects.toThrow(/ended/);
   });
 
+  it("settings: durations/template until publish, start datetime until begun", async () => {
+    const emailer = new ConsoleEmailer();
+    const t = await createTournament(db, { slug: "settings", name: "S", roundDurationS: 600, breakDurationS: 60 });
+    for (const name of ["A", "B"]) {
+      const p = await addParticipant(db, emailer, BASE, t.id, { name, email: `${name}@s.org` });
+      await saveDraft(db, p.id, `${name} draft`);
+    }
+    const { updateSettings } = await import("./tournament-service");
+
+    const updated = await updateSettings(db, t.id, {
+      roundDurationS: 900,
+      breakDurationS: 120,
+      defaultSubmission: "# New template",
+      startAt: new Date(Date.now() + 3600_000),
+    });
+    expect(updated.roundDurationS).toBe(900);
+    expect(updated.defaultSubmission).toBe("# New template");
+    expect(updated.startAt).not.toBeNull();
+
+    await expect(updateSettings(db, t.id, { roundDurationS: 0 })).rejects.toThrow(/positive/);
+
+    const { publishBracket } = await import("./runtime-service");
+    await publishBracket(db, emailer, BASE, t.id, 4);
+    // Post-publish: durations frozen, start still editable (not begun).
+    await expect(updateSettings(db, t.id, { roundDurationS: 1200 })).rejects.toThrow(/published/);
+    const cleared = await updateSettings(db, t.id, { startAt: null });
+    expect(cleared.startAt).toBeNull();
+
+    const { beginTournament } = await import("./runtime-service");
+    await beginTournament(db, t.id, new Date());
+    await expect(updateSettings(db, t.id, { startAt: new Date() })).rejects.toThrow(/already started/);
+  });
+
   it("roster freezes and submissions close outside the submission phase", async () => {
     const emailer = new ConsoleEmailer();
     const t = await createTournament(db, { slug: "frozen", name: "F", roundDurationS: 600, breakDurationS: 60 });

@@ -97,7 +97,17 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
               title="This text's chat"
               messages={await messagesFor(db, room.id)}
               canPost={Boolean(me) && me!.role !== "admin"}
+              readOnlyNote={
+                !me
+                  ? "Sign in with your invitation link to chat."
+                  : me.role === "admin"
+                    ? "The admin reads everything but posts only in the tournament chat."
+                    : undefined
+              }
             />
+          )}
+          {!me && (
+            <p className="mt-2 text-xs text-muted">Sign in with your invitation link to comment.</p>
           )}
           {Boolean(me) && !(text.kind === "draft" && tournament.phase === "submission") && (
             <p className="mt-2 text-xs text-muted">

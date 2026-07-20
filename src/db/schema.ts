@@ -205,6 +205,8 @@ export const merges = pgTable(
     advancingBearerId: uuid("advancing_bearer_id").references(() => participants.id),
     resolution: mergeResolution("resolution"),
     flipSeed: bigint("flip_seed", { mode: "number" }),
+    /** When the resolution happened — flips only animate if it was recent. */
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
   (t) => [index("merges_slot").on(t.slotId)]
 );

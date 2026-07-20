@@ -386,6 +386,7 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
       resultTextId,
       advancingBearerId: resolved.advancing?.bearer ?? null,
       flipSeed: resolved.flips.length > 0 ? flipSeed : null,
+      resolvedAt: new Date(),
     })
     .where(eq(merges.id, m.id));
   await db

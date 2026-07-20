@@ -2,6 +2,7 @@ import Link from "next/link";
 import { themeCss, type ThemeOverrides } from "../../lib/theme";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { SiteLogo } from "../site-logo";
+import { ThemeToggle } from "../theme-toggle";
 
 /**
  * Tournament chrome: logo left, tournament name centred (links home for
@@ -30,18 +31,19 @@ export default async function TournamentLayout(props: LayoutProps<"/[slug]">) {
         ) : (
           <span />
         )}
-        {me?.role === "admin" ? (
-          <Link
-            href={`/${slug}/admin`}
-            aria-label="Admin"
-            title="Admin"
-            className="justify-self-end text-xl text-muted transition-colors hover:text-foreground"
-          >
-            ⚙
-          </Link>
-        ) : (
-          <span />
-        )}
+        <div className="flex items-center gap-3 justify-self-end">
+          <ThemeToggle />
+          {me?.role === "admin" && (
+            <Link
+              href={`/${slug}/admin`}
+              aria-label="Admin"
+              title="Admin"
+              className="text-xl text-muted transition-colors hover:text-foreground"
+            >
+              ⚙
+            </Link>
+          )}
+        </div>
       </header>
       {props.children}
     </>

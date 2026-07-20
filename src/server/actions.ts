@@ -13,6 +13,7 @@ import {
   removeParticipant,
   saveDraft,
   updateParticipant,
+  updateSettings,
   updateSubmissionDeadline,
   updateTheme,
 } from "../services/tournament-service";
@@ -260,6 +261,40 @@ export async function setDeadlineAction(
     revalidatePath(`/${slug}/admin`);
     bump(admin.tournamentId);
     return { ok: true, message: deadline ? "Deadline set." : "Deadline cleared — you close submissions by publishing." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function updateSettingsAction(
+  slug: string,
+  payload: {
+    roundMinutes?: number;
+    breakMinutes?: number;
+    /** datetime-local value, null to clear, undefined to leave unchanged. */
+    startAtLocal?: string | null;
+    defaultSubmission?: string;
+  },
+  tzOffsetMin: number
+): Promise<ActionState> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    await updateSettings(db, admin.tournamentId, {
+      roundDurationS: payload.roundMinutes !== undefined ? Math.round(payload.roundMinutes * 60) : undefined,
+      breakDurationS: payload.breakMinutes !== undefined ? Math.round(payload.breakMinutes * 60) : undefined,
+      startAt:
+        payload.startAtLocal === undefined
+          ? undefined
+          : payload.startAtLocal === null
+            ? null
+            : parseLocalDatetime(payload.startAtLocal, tzOffsetMin),
+      defaultSubmission: payload.defaultSubmission,
+    });
+    revalidatePath(`/${slug}`);
+    revalidatePath(`/${slug}/admin`);
+    bump(admin.tournamentId);
+    return { ok: true, message: "Settings saved." };
   } catch (e) {
     return fail(e);
   }

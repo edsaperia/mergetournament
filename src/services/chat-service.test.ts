@@ -108,3 +108,13 @@ describe("inline comments", () => {
     ]);
   });
 });
+
+describe("perpetual after completion", () => {
+  it("participants still chat and comment once the tournament is complete", async () => {
+    const { tournaments: tt } = await import("../db/schema");
+    await db.update(tt).set({ phase: "complete" }).where(eq(tt.id, tournamentId));
+    const g = await globalRoom(db, tournamentId);
+    await postMessage(db, g!.id, p0Id, "post-tournament reflection");
+    await addComment(db, { textVersionId: draftId, authorId: p0Id, line: 2, body: "for posterity" });
+  });
+});

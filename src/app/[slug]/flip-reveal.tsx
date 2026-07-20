@@ -33,7 +33,6 @@ export function FlipReveal({
   useEffect(() => {
     let cancelled = false;
     const TOTAL = 6000;
-    const REVEAL_MS = 2500;
     timer.current = setTimeout(() => {
       if (cancelled) return;
       if (sessionStorage.getItem(storageKey)) {
@@ -47,10 +46,8 @@ export function FlipReveal({
         if (cancelled) return;
         const elapsed = Date.now() - started;
         if (elapsed >= TOTAL) {
+          // Stays revealed until the viewer clicks outside the modal.
           setPhase("revealed");
-          timer.current = setTimeout(() => {
-            if (!cancelled) setPhase("done");
-          }, REVEAL_MS);
           return;
         }
         setFace((f) => 1 - f);
@@ -70,8 +67,16 @@ export function FlipReveal({
   if (phase === "pending") return null;
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-        <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border border-edge bg-background p-8 text-center shadow-2xl">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        onClick={() => {
+          if (phase === "revealed") setPhase("done");
+        }}
+      >
+        <div
+          className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border border-edge bg-background p-8 text-center shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           <span className="text-4xl" aria-hidden>
             🪙
           </span>
@@ -82,7 +87,7 @@ export function FlipReveal({
             <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
           )}
           <p className="text-xs text-faint">
-            {phase === "animating" ? "the coin is in the air…" : "decided"}
+            {phase === "animating" ? "the coin is in the air…" : "decided — click outside to dismiss"}
           </p>
         </div>
       </div>

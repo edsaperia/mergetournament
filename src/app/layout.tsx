@@ -28,7 +28,15 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <script
+          // Apply the stored theme choice before first paint (no flash).
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem("mt-theme");if(t==="light"||t==="dark")document.documentElement.style.colorScheme=t}catch(e){}`,
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

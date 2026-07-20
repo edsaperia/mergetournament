@@ -9,6 +9,7 @@ import type { ThemeOverrides } from "../../../lib/theme";
 import { ControlButton } from "./admin-controls";
 import { DeadlineEditor } from "./deadline-editor";
 import { Roster } from "./roster";
+import { SettingsEditor } from "./settings-editor";
 import { ThemeEditor } from "./theme-editor";
 
 function fmtDuration(s: number): string {
@@ -118,6 +119,18 @@ export async function AdminDashboard({ slug }: { slug: string }) {
             </p>
           )}
         </div>
+      </section>
+      <section className="mt-10 border-t border-edge pt-6">
+        <h2 className="mb-3 text-lg font-semibold">Settings</h2>
+        <SettingsEditor
+          slug={slug}
+          prePublish={tournament.phase === "setup" || tournament.phase === "submission"}
+          begun={Boolean(tournament.begunAt) || tournament.phase === "running" || tournament.phase === "complete"}
+          roundMinutes={Math.round(tournament.roundDurationS / 60)}
+          breakMinutes={Math.round(tournament.breakDurationS / 60)}
+          startAtIso={tournament.startAt?.toISOString() ?? null}
+          defaultSubmission={tournament.defaultSubmission}
+        />
       </section>
       <section className="mt-10 border-t border-edge pt-6">
         <h2 className="mb-3 text-lg font-semibold">Theme</h2>
