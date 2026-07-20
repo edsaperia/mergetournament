@@ -7,6 +7,7 @@
  */
 
 import { Slot } from "./bracket";
+import { DomainError } from "./errors";
 import { flip, Rng } from "./rng";
 
 export type Side = "A" | "B";
@@ -54,18 +55,18 @@ export function applyAction(s: MergeSession, a: MergeAction): MergeSession {
   });
   switch (a.type) {
     case "edit":
-      if (s.lock !== "editing") throw new Error(`cannot edit while ${s.lock}`);
+      if (s.lock !== "editing") throw new DomainError(`cannot edit while ${s.lock}`);
       return touched({ workingText: a.text });
     case "propose":
-      if (s.lock !== "editing") throw new Error(`cannot propose while ${s.lock}`);
+      if (s.lock !== "editing") throw new DomainError(`cannot propose while ${s.lock}`);
       return touched({ lock: "proposed", proposedBy: a.side });
     case "confirm":
-      if (s.lock !== "proposed") throw new Error(`cannot confirm while ${s.lock}`);
-      if (a.side === s.proposedBy) throw new Error("proposer cannot confirm their own proposal");
+      if (s.lock !== "proposed") throw new DomainError(`cannot confirm while ${s.lock}`);
+      if (a.side === s.proposedBy) throw new DomainError("proposer cannot confirm their own proposal");
       return touched({ lock: "locked", proposedBy: null });
     case "keepEditing":
-      if (s.lock !== "proposed") throw new Error(`cannot keep-editing while ${s.lock}`);
-      if (a.side === s.proposedBy) throw new Error("only the other bearer may keep editing");
+      if (s.lock !== "proposed") throw new DomainError(`cannot keep-editing while ${s.lock}`);
+      if (a.side === s.proposedBy) throw new DomainError("only the other bearer may keep editing");
       return touched({ lock: "editing", proposedBy: null });
     case "selectBearer":
       return touched({ bearerPref: { ...s.bearerPref, [a.side]: a.pref } });

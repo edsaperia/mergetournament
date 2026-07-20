@@ -6,6 +6,7 @@
 
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { emailEvents, merges, participants, slots, textVersions, tournaments, type Tournament } from "../db/schema";
+import { DomainError } from "../lib/errors";
 import type { Db } from "./tournament-service";
 
 export type TournamentStatus = "awaiting drafts" | "convening" | "in progress" | "paused" | "complete";
@@ -90,11 +91,11 @@ export async function deleteTournament(db: Db, tournamentId: string): Promise<vo
  */
 export async function deleteOwnTournament(db: Db, adminParticipantId: string): Promise<void> {
   const [admin] = await db.select().from(participants).where(eq(participants.id, adminParticipantId));
-  if (!admin || admin.role !== "admin") throw new Error("only the tournament admin may delete it");
+  if (!admin || admin.role !== "admin") throw new DomainError("only the tournament admin may delete it");
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, admin.tournamentId));
-  if (!t) throw new Error("tournament not found");
+  if (!t) throw new DomainError("tournament not found");
   if (t.phase !== "setup" && t.phase !== "submission") {
-    throw new Error("a published tournament cannot be deleted by its admin");
+    throw new DomainError("a published tournament cannot be deleted by its admin");
   }
   await deleteTournament(db, t.id);
 }

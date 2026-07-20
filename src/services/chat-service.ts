@@ -9,6 +9,7 @@
  */
 
 import { and, asc, eq } from "drizzle-orm";
+import { DomainError } from "../lib/errors";
 import {
   chatRooms,
   comments,
@@ -81,19 +82,19 @@ export async function messagesFor(db: Db, roomId: string): Promise<MessageView[]
 
 export async function postMessage(db: Db, roomId: string, participantId: string, body: string) {
   const trimmed = body.trim();
-  if (!trimmed) throw new Error("empty message");
-  if (trimmed.length > 4000) throw new Error("message too long");
+  if (!trimmed) throw new DomainError("empty message");
+  if (trimmed.length > 4000) throw new DomainError("message too long");
   const [room] = await db.select().from(chatRooms).where(eq(chatRooms.id, roomId));
-  if (!room) throw new Error("room not found");
+  if (!room) throw new DomainError("room not found");
   const [author] = await db.select().from(participants).where(eq(participants.id, participantId));
-  if (!author || author.tournamentId !== room.tournamentId) throw new Error("not a participant here");
+  if (!author || author.tournamentId !== room.tournamentId) throw new DomainError("not a participant here");
   if (author.role === "admin" && room.kind !== "global") {
-    throw new Error("the admin may only post in the global chat");
+    throw new DomainError("the admin may only post in the global chat");
   }
   // Chat opens when the bracket is published; before that, heads-down writing.
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, room.tournamentId));
   if (t?.phase === "setup" || t?.phase === "submission") {
-    throw new Error("chat opens when the bracket is published");
+    throw new DomainError("chat opens when the bracket is published");
   }
   const [row] = await db
     .insert(messages)
@@ -131,26 +132,26 @@ export async function addComment(
   input: { textVersionId: string; authorId: string; line: number; body: string }
 ) {
   const trimmed = input.body.trim();
-  if (!trimmed) throw new Error("empty comment");
-  if (trimmed.length > 4000) throw new Error("comment too long");
-  if (!Number.isInteger(input.line) || input.line < 0) throw new Error("bad line");
+  if (!trimmed) throw new DomainError("empty comment");
+  if (trimmed.length > 4000) throw new DomainError("comment too long");
+  if (!Number.isInteger(input.line) || input.line < 0) throw new DomainError("bad line");
   const [text] = await db.select().from(textVersions).where(eq(textVersions.id, input.textVersionId));
-  if (!text) throw new Error("text not found");
+  if (!text) throw new DomainError("text not found");
   const [author] = await db.select().from(participants).where(eq(participants.id, input.authorId));
-  if (!author || author.tournamentId !== text.tournamentId) throw new Error("not a participant here");
+  if (!author || author.tournamentId !== text.tournamentId) throw new DomainError("not a participant here");
   if (author.role === "admin") {
-    throw new Error("the admin reads everything but does not comment");
+    throw new DomainError("the admin reads everything but does not comment");
   }
   // Comments attach to read-only text only (SPEC §5): drafts stay editable
   // until publication, so they take no comments during submission.
   if (text.kind === "draft") {
     const [t] = await db.select().from(tournaments).where(eq(tournaments.id, text.tournamentId));
     if (t?.phase === "setup" || t?.phase === "submission") {
-      throw new Error("drafts take comments once the bracket is published");
+      throw new DomainError("drafts take comments once the bracket is published");
     }
   }
   const lineCount = text.bodyMd.split("\n").length;
-  if (input.line >= lineCount) throw new Error("line out of range");
+  if (input.line >= lineCount) throw new DomainError("line out of range");
   const [row] = await db
     .insert(comments)
     .values({

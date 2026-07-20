@@ -3,6 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 import { verifySession } from "../lib/auth";
+import { DomainError } from "../lib/errors";
 import { participants, tournaments } from "../db/schema";
 import { getDb } from "../db";
 import { authSecret, sessionCookieName } from "./config";
@@ -37,13 +38,13 @@ export const currentParticipant = cache(async (slug: string) => {
 
 export async function requireParticipant(slug: string) {
   const p = await currentParticipant(slug);
-  if (!p) throw new Error("not signed in");
+  if (!p) throw new DomainError("not signed in");
   return p;
 }
 
 export async function requireAdmin(slug: string) {
   const p = await requireParticipant(slug);
-  if (p.role !== "admin") throw new Error("admin only");
+  if (p.role !== "admin") throw new DomainError("admin only");
   return p;
 }
 
@@ -59,5 +60,5 @@ export async function isSysadmin(): Promise<boolean> {
 }
 
 export async function requireSysadmin(): Promise<void> {
-  if (!(await isSysadmin())) throw new Error("sysadmin only");
+  if (!(await isSysadmin())) throw new DomainError("sysadmin only");
 }

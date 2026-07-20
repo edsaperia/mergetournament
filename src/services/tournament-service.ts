@@ -11,6 +11,7 @@ import * as schema from "../db/schema";
 import { auditLog, chatRooms, participants, textVersions, tournaments } from "../db/schema";
 import { generateToken, hashToken } from "../lib/auth";
 import { Emailer, inviteEmail, magicLink } from "../lib/email";
+import { DomainError } from "../lib/errors";
 import { countWords } from "../lib/text";
 
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
@@ -32,10 +33,10 @@ export interface CreateTournamentInput {
 
 export async function createTournament(db: Db, input: CreateTournamentInput) {
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(input.slug)) {
-    throw new Error("slug must be lowercase letters, digits and hyphens (2-63 chars)");
+    throw new DomainError("slug must be lowercase letters, digits and hyphens (2-63 chars)");
   }
   if (input.roundDurationS <= 0 || input.breakDurationS < 0) {
-    throw new Error("durations must be positive (break may be zero)");
+    throw new DomainError("durations must be positive (break may be zero)");
   }
   const [tournament] = await db
     .insert(tournaments)
@@ -76,7 +77,7 @@ export async function addParticipant(
 ) {
   const tournament = await requireTournament(db, tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
-    throw new Error("roster is frozen after publication");
+    throw new DomainError("roster is frozen after publication");
   }
   const token = generateToken();
   const [participant] = await db
@@ -144,7 +145,7 @@ export async function updateParticipant(
 
   const name = patch.name?.trim();
   if (name !== undefined) {
-    if (!name) throw new Error("name cannot be empty");
+    if (!name) throw new DomainError("name cannot be empty");
     updates.name = name;
   }
 
@@ -152,7 +153,7 @@ export async function updateParticipant(
   const emailChanged = email !== undefined && email !== participant.email;
   let token: string | null = null;
   if (emailChanged) {
-    if (!email.includes("@")) throw new Error("that does not look like an email address");
+    if (!email.includes("@")) throw new DomainError("that does not look like an email address");
     token = generateToken();
     updates.email = email;
     updates.tokenHash = hashToken(token);
@@ -168,7 +169,7 @@ export async function updateParticipant(
     for (let err: unknown = e; err instanceof Error; err = err.cause) {
       const code = (err as { code?: string }).code;
       if (code === "23505" || /unique|duplicate/i.test(err.message)) {
-        throw new Error("another participant already uses that email");
+        throw new DomainError("another participant already uses that email");
       }
     }
     throw e;
@@ -195,7 +196,7 @@ export async function removeParticipant(db: Db, tournamentId: string, participan
   const participant = await requireParticipant(db, participantId, tournamentId);
   const tournament = await requireTournament(db, participant.tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
-    throw new Error("roster is frozen after publication");
+    throw new DomainError("roster is frozen after publication");
   }
   await db.delete(participants).where(eq(participants.id, participantId));
   await audit(db, tournament.id, "participant_removed", { participantId, email: participant.email });
@@ -220,16 +221,16 @@ export async function participantForToken(db: Db, slug: string, token: string) {
 export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
   const participant = await requireParticipant(db, participantId);
   if (participant.role === "admin") {
-    throw new Error("the administrator does not submit a draft (SPEC §2)");
+    throw new DomainError("the administrator does not submit a draft (SPEC §2)");
   }
   const tournament = await requireTournament(db, participant.tournamentId);
   if (tournament.phase !== "submission") {
-    throw new Error("submissions are closed");
+    throw new DomainError("submissions are closed");
   }
   // 10s grace so a debounced autosave (or the editor's unmount flush when
   // the page flips to read-only) still captures the final keystrokes.
   if (tournament.submissionDeadline && Date.now() > tournament.submissionDeadline.getTime() + 10_000) {
-    throw new Error("submissions are closed — the deadline has passed");
+    throw new DomainError("submissions are closed — the deadline has passed");
   }
   const wordCount = countWords(bodyMd);
   const [existing] = await db
@@ -260,9 +261,9 @@ export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
 export async function updateSubmissionDeadline(db: Db, tournamentId: string, deadline: Date | null) {
   const tournament = await requireTournament(db, tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
-    throw new Error("the submission period has ended");
+    throw new DomainError("the submission period has ended");
   }
-  if (deadline && Number.isNaN(deadline.getTime())) throw new Error("invalid date");
+  if (deadline && Number.isNaN(deadline.getTime())) throw new DomainError("invalid date");
   const [updated] = await db
     .update(tournaments)
     .set({ submissionDeadline: deadline })
@@ -294,14 +295,14 @@ export async function updateSettings(
   const updates: Partial<typeof tournaments.$inferInsert> = {};
 
   if (patch.roundDurationS !== undefined || patch.breakDurationS !== undefined || patch.defaultSubmission !== undefined) {
-    if (!prePublish) throw new Error("durations and the template are editable until the bracket is published");
+    if (!prePublish) throw new DomainError("durations and the template are editable until the bracket is published");
   }
   if (patch.roundDurationS !== undefined) {
-    if (!Number.isInteger(patch.roundDurationS) || patch.roundDurationS <= 0) throw new Error("round duration must be positive");
+    if (!Number.isInteger(patch.roundDurationS) || patch.roundDurationS <= 0) throw new DomainError("round duration must be positive");
     updates.roundDurationS = patch.roundDurationS;
   }
   if (patch.breakDurationS !== undefined) {
-    if (!Number.isInteger(patch.breakDurationS) || patch.breakDurationS < 0) throw new Error("break duration cannot be negative");
+    if (!Number.isInteger(patch.breakDurationS) || patch.breakDurationS < 0) throw new DomainError("break duration cannot be negative");
     updates.breakDurationS = patch.breakDurationS;
   }
   if (patch.defaultSubmission !== undefined) {
@@ -309,9 +310,9 @@ export async function updateSettings(
   }
   if (patch.startAt !== undefined) {
     if (t.begunAt || t.phase === "running" || t.phase === "complete") {
-      throw new Error("the tournament has already started");
+      throw new DomainError("the tournament has already started");
     }
-    if (patch.startAt && Number.isNaN(patch.startAt.getTime())) throw new Error("invalid date");
+    if (patch.startAt && Number.isNaN(patch.startAt.getTime())) throw new DomainError("invalid date");
     updates.startAt = patch.startAt;
   }
   if (Object.keys(updates).length === 0) return t;
@@ -355,7 +356,7 @@ export async function submissionStatus(db: Db, tournamentId: string) {
 
 async function requireTournament(db: Db, id: string) {
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, id));
-  if (!t) throw new Error("tournament not found");
+  if (!t) throw new DomainError("tournament not found");
   return t;
 }
 
@@ -373,6 +374,6 @@ async function requireParticipant(db: Db, id: string, tournamentId?: string) {
         ? and(eq(participants.id, id), eq(participants.tournamentId, tournamentId))
         : eq(participants.id, id)
     );
-  if (!p) throw new Error("participant not found");
+  if (!p) throw new DomainError("participant not found");
   return p;
 }

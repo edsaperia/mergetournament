@@ -18,7 +18,9 @@ export async function GET() {
     await db.execute(sql`select 1`);
     checks.database = "ok";
   } catch (e) {
-    checks.database = `error: ${e instanceof Error ? e.message : "unknown"}`;
+    // Unauthenticated endpoint: log the detail, report only that it failed.
+    console.error("[healthz] database check failed:", e);
+    checks.database = "error";
     healthy = false;
   }
 

@@ -1,8 +1,10 @@
-/**
+﻿/**
  * The design tokens as data: single source for the theme editor, validation,
  * and per-tournament CSS overrides. Keep in sync with the @theme block in
  * src/app/globals.css (the build-time defaults).
  */
+
+import { DomainError } from "./errors";
 
 export interface ThemeToken {
   key: string;
@@ -40,14 +42,14 @@ const KEYS = new Set(THEME_TOKENS.map((t) => t.key));
 /** Throws unless every entry is a known token with strict hex values. */
 export function validateTheme(theme: unknown): ThemeOverrides {
   if (typeof theme !== "object" || theme === null || Array.isArray(theme)) {
-    throw new Error("theme must be an object");
+    throw new DomainError("theme must be an object");
   }
   const out: ThemeOverrides = {};
   for (const [key, value] of Object.entries(theme)) {
-    if (!KEYS.has(key)) throw new Error(`unknown theme token: ${key}`);
+    if (!KEYS.has(key)) throw new DomainError(`unknown theme token: ${key}`);
     const { light, dark } = (value ?? {}) as { light?: string; dark?: string };
     if (typeof light !== "string" || !HEX.test(light) || typeof dark !== "string" || !HEX.test(dark)) {
-      throw new Error(`token ${key}: colors must be #rrggbb`);
+      throw new DomainError(`token ${key}: colors must be #rrggbb`);
     }
     out[key] = { light, dark };
   }
@@ -56,7 +58,7 @@ export function validateTheme(theme: unknown): ThemeOverrides {
 
 /**
  * CSS overriding the token variables for a tournament. Values are
- * re-validated here — nothing unvalidated ever reaches a style tag.
+ * re-validated here â€” nothing unvalidated ever reaches a style tag.
  */
 export function themeCss(theme: ThemeOverrides): string {
   const safe = validateTheme(theme);

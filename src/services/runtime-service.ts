@@ -40,6 +40,7 @@ import { mulberry32 } from "../lib/rng";
 import { effectiveNow, scheduledStarts } from "../lib/schedule";
 import { countWords } from "../lib/text";
 import type { Email, Emailer } from "../lib/email";
+import { DomainError } from "../lib/errors";
 import type { Db } from "./tournament-service";
 
 /** The are-you-still-here window after a round's clock expires (SPEC §4). */
@@ -63,7 +64,7 @@ async function postSystem(db: Db, tournamentId: string, body: string, mergeId?: 
 
 async function requireTournament(db: Db, id: string): Promise<Tournament> {
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, id));
-  if (!t) throw new Error("tournament not found");
+  if (!t) throw new DomainError("tournament not found");
   return t;
 }
 
@@ -85,14 +86,14 @@ export function effectiveT(t: Tournament, now: Date): number {
 
 export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, tournamentId: string) {
   const t = await requireTournament(db, tournamentId);
-  if (t.phase !== "submission") throw new Error("bracket can only be published from the submission phase");
+  if (t.phase !== "submission") throw new DomainError("bracket can only be published from the submission phase");
 
   const drafts = await db
     .select()
     .from(textVersions)
     .where(and(eq(textVersions.tournamentId, tournamentId), eq(textVersions.kind, "draft")))
     .orderBy(asc(textVersions.createdAt));
-  if (drafts.length < 2) throw new Error(`need at least 2 submitted drafts, have ${drafts.length}`);
+  if (drafts.length < 2) throw new DomainError(`need at least 2 submitted drafts, have ${drafts.length}`);
 
   const n = drafts.length;
   // Commit-reveal: all randomness derives from a secret whose hash is
@@ -181,7 +182,7 @@ export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, 
 
 export async function beginTournament(db: Db, tournamentId: string, now: Date) {
   const t = await requireTournament(db, tournamentId);
-  if (t.phase !== "convening") throw new Error("begin is only available while convening");
+  if (t.phase !== "convening") throw new DomainError("begin is only available while convening");
   await db.transaction(async (tx) => {
     await tx.update(tournaments).set({ phase: "running", begunAt: now }).where(eq(tournaments.id, tournamentId));
     await openRound(tx, tournamentId, 1, 0);
@@ -192,7 +193,7 @@ export async function beginTournament(db: Db, tournamentId: string, now: Date) {
 
 export async function pauseTournament(db: Db, tournamentId: string, now: Date) {
   const t = await requireTournament(db, tournamentId);
-  if (t.phase !== "running" || t.pausedAt) throw new Error("nothing to pause");
+  if (t.phase !== "running" || t.pausedAt) throw new DomainError("nothing to pause");
   await db.update(tournaments).set({ pausedAt: now }).where(eq(tournaments.id, tournamentId));
   await audit(db, tournamentId, "pause", { at: now.toISOString() });
   await postSystem(db, tournamentId, "Tournament paused by the admin.");
@@ -200,7 +201,7 @@ export async function pauseTournament(db: Db, tournamentId: string, now: Date) {
 
 export async function unpauseTournament(db: Db, tournamentId: string, now: Date) {
   const t = await requireTournament(db, tournamentId);
-  if (t.phase !== "running" || !t.pausedAt) throw new Error("not paused");
+  if (t.phase !== "running" || !t.pausedAt) throw new DomainError("not paused");
   const pausedS = Math.round((now.getTime() - t.pausedAt.getTime()) / 1000);
   await db
     .update(tournaments)
@@ -244,23 +245,23 @@ export async function mergeAction(
   now: Date
 ) {
   const [m] = await db.select().from(merges).where(eq(merges.id, mergeId));
-  if (!m) throw new Error("merge not found");
+  if (!m) throw new DomainError("merge not found");
   const [slot] = await db.select().from(slots).where(eq(slots.id, m.slotId));
   const t = await requireTournament(db, slot.tournamentId);
-  if (t.phase !== "running") throw new Error("the tournament is not running");
-  if (t.pausedAt) throw new Error("the tournament is paused");
+  if (t.phase !== "running") throw new DomainError("the tournament is not running");
+  if (t.pausedAt) throw new DomainError("the tournament is paused");
   const [round] = await db
     .select()
     .from(rounds)
     .where(and(eq(rounds.tournamentId, t.id), eq(rounds.number, slot.roundNo)));
   const side: Side | null = m.bearerAId === participantId ? "A" : m.bearerBId === participantId ? "B" : null;
-  if (!side) throw new Error("only this merge's bearers may act on it");
+  if (!side) throw new DomainError("only this merge's bearers may act on it");
 
   // Break-time readiness (SPEC deviation agreed with Ed): a pending merge's
   // bearer confirms they're present, which lets the round start early.
   if (action.type === "readyForRound") {
     if (m.state !== "pending" || round.state !== "scheduled") {
-      throw new Error("readiness applies before the round opens");
+      throw new DomainError("readiness applies before the round opens");
     }
     await db
       .update(merges)
@@ -269,11 +270,11 @@ export async function mergeAction(
     return;
   }
 
-  if (m.state !== "open") throw new Error("this merge is no longer editable");
+  if (m.state !== "open") throw new DomainError("this merge is no longer editable");
 
   // Window actions: presence and advance-choice, only while the round is closing.
   if (action.type === "stillHere" || action.type === "chooseAdvance") {
-    if (round.state !== "closing") throw new Error("the backstop window is not open");
+    if (round.state !== "closing") throw new DomainError("the backstop window is not open");
     const patch: Partial<typeof merges.$inferInsert> =
       side === "A" ? { activeA: true } : { activeB: true };
     if (action.type === "chooseAdvance") {
@@ -284,7 +285,7 @@ export async function mergeAction(
     return;
   }
 
-  if (round.state !== "open") throw new Error("this round is not open");
+  if (round.state !== "open") throw new DomainError("this round is not open");
 
   const session = applyAction(rowToSession(m), { ...action, side } as MergeAction);
   await db.transaction(async (tx) => {
