@@ -16,6 +16,7 @@ import {
   messages,
   participants,
   textVersions,
+  tournaments,
 } from "../db/schema";
 import type { Db } from "./tournament-service";
 
@@ -132,6 +133,14 @@ export async function addComment(
   if (!text) throw new Error("text not found");
   const [author] = await db.select().from(participants).where(eq(participants.id, input.authorId));
   if (!author || author.tournamentId !== text.tournamentId) throw new Error("not a participant here");
+  // Comments attach to read-only text only (SPEC §5): drafts stay editable
+  // until publication, so they take no comments during submission.
+  if (text.kind === "draft") {
+    const [t] = await db.select().from(tournaments).where(eq(tournaments.id, text.tournamentId));
+    if (t?.phase === "setup" || t?.phase === "submission") {
+      throw new Error("drafts take comments once the bracket is published");
+    }
+  }
   const lineCount = text.bodyMd.split("\n").length;
   if (input.line >= lineCount) throw new Error("line out of range");
   const [row] = await db

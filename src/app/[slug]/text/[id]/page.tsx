@@ -54,7 +54,9 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
           textId={text.id}
           body={text.bodyMd}
           comments={comments}
-          canComment={Boolean(me)}
+          // Comments attach to read-only text only (SPEC §5): drafts are still
+          // editable until publication, so their comments begin at convening.
+          canComment={Boolean(me) && !(text.kind === "draft" && tournament.phase === "submission")}
         />
         <aside className="min-w-0">
           {room && (
@@ -66,9 +68,9 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
               canPost={Boolean(me) && me!.role !== "admin"}
             />
           )}
-          {Boolean(me) && (
+          {Boolean(me) && !(text.kind === "draft" && tournament.phase === "submission") && (
             <p className="mt-2 text-xs text-muted">
-              Click a line number to comment on that line.
+              Hover a line and click 💬 to comment on it.
             </p>
           )}
         </aside>

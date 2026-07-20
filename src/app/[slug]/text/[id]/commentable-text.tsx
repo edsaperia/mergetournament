@@ -49,18 +49,27 @@ export function CommentableText({
       {lines.map((line, i) => (
         <div key={i}>
           <div className="group flex hover:bg-wash">
-            <button
-              type="button"
-              disabled={!canComment}
-              onClick={() => setTarget(target === i ? null : i)}
-              title={canComment ? "Comment on this line" : undefined}
+            <span
               className={`w-12 shrink-0 select-none border-r border-edge-faint px-2 text-right text-xs leading-6 text-faint ${
-                canComment ? "hover:bg-panel hover:text-soft" : ""
-              } ${byLine.has(i) ? "font-bold text-live-ink" : ""}`}
+                byLine.has(i) ? "font-bold text-live-ink" : ""
+              }`}
             >
               {i + 1}
-            </button>
+            </span>
             <pre className="min-w-0 flex-1 whitespace-pre-wrap px-3">{line || " "}</pre>
+            {canComment && (
+              <button
+                type="button"
+                onClick={() => setTarget(target === i ? null : i)}
+                title="Comment on this line"
+                aria-label={`Comment on line ${i + 1}`}
+                className={`w-8 shrink-0 select-none text-center text-xs leading-6 text-muted hover:text-foreground ${
+                  target === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+              >
+                💬
+              </button>
+            )}
           </div>
           {(byLine.get(i) ?? []).map((c) => (
             <div key={c.id} className="ml-12 border-l-2 border-blue-200 bg-blue-50/50 px-3 py-1 font-sans text-xs dark:border-blue-900 dark:bg-blue-950/30">
