@@ -9,8 +9,10 @@ import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
 import { collabWsUrl } from "../../../../server/collab";
 import { authSecret } from "../../../../server/config";
+import { messagesFor, roomForMerge, roomForText } from "../../../../services/chat-service";
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh, Countdown } from "../../../live";
+import { ChatPanel } from "../../chat-panel";
 import { CollabEditor } from "./collab-editor";
 import { WorkspaceControls } from "./workspace-controls";
 
@@ -53,6 +55,24 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
 
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
+
+  // Chats: the merge's own room, and each input's room (a draft's chat, or
+  // the chat of the merge that produced it — discussion travels with texts).
+  const canChat = Boolean(me) && me!.role !== "admin";
+  const mergeRoom = await roomForMerge(db, m.id);
+  const roomA = m.textAId ? await roomForText(db, m.textAId) : null;
+  const roomB = m.textBId ? await roomForText(db, m.textBId) : null;
+  const chatFor = async (room: { id: string } | null, title: string, defaultOpen: boolean) =>
+    room ? (
+      <ChatPanel
+        slug={slug}
+        roomId={room.id}
+        title={title}
+        messages={await messagesFor(db, room.id)}
+        canPost={canChat}
+        defaultOpen={defaultOpen}
+      />
+    ) : null;
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
@@ -98,6 +118,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             {textA && <span className="ml-1 text-xs text-neutral-500">({textA.wordCount}w)</span>}
           </h2>
           <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{textA?.bodyMd ?? "—"}</pre>
+          <div className="mt-3">{await chatFor(roomA, "This text's chat", false)}</div>
         </section>
         <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="mb-2 font-semibold">
@@ -105,6 +126,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             {textB && <span className="ml-1 text-xs text-neutral-500">({textB.wordCount}w)</span>}
           </h2>
           <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{textB?.bodyMd ?? "—"}</pre>
+          <div className="mt-3">{await chatFor(roomB, "This text's chat", false)}</div>
         </section>
         <section className="rounded-lg border-2 border-neutral-300 p-4 dark:border-neutral-700">
           <h2 className="mb-2 font-semibold">Merge candidate</h2>
@@ -134,10 +156,11 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           )}
           {!mySide && m.state === "open" && (
             <p className="mt-3 text-xs text-neutral-500">
-              Only this merge&apos;s bearers hold the pen — you are watching live.
-              (Lobbying arrives by chat — coming soon.)
+              Only this merge&apos;s bearers hold the pen — you are watching
+              live. Lobbying arrives through the chat below.
             </p>
           )}
+          <div className="mt-3">{await chatFor(mergeRoom, "This merge's chat", true)}</div>
         </section>
       </div>
     </main>

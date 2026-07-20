@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import * as Y from "yjs";
-import WebSocket from "ws";
 import { eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
 import { merges } from "../db/schema";
@@ -24,7 +23,6 @@ function connect(participantId: string, mergeId: string) {
     name: docName(mergeId),
     token: signCollabToken({ participantId, mergeId }, SECRET),
     document,
-    WebSocketPolyfill: WebSocket as unknown as typeof globalThis.WebSocket,
   });
   return { provider, text: document.getText("content") };
 }
@@ -94,7 +92,6 @@ describe("collab write gates", () => {
       name: docName(merge.id),
       token: "forged.token",
       document,
-      WebSocketPolyfill: WebSocket as unknown as typeof globalThis.WebSocket,
       onAuthenticationFailed: () => {
         failed = true;
       },

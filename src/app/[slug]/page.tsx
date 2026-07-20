@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getDb } from "../../db";
+import { globalRoom, messagesFor } from "../../services/chat-service";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh } from "../live";
 import { BracketView } from "./bracket-view";
+import { ChatPanel } from "./chat-panel";
 
 const PHASE_LABEL: Record<string, string> = {
   setup: "Being set up",
@@ -62,15 +65,30 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         </nav>
       </div>
 
-      {tournament.phase === "submission" && (
-        <p className="text-neutral-600 dark:text-neutral-300">
-          Participants are writing their drafts. The bracket appears here when
-          the admin publishes it.
-        </p>
-      )}
-      {tournament.phase !== "submission" && tournament.phase !== "setup" && (
-        <BracketView tournament={tournament} viewerId={me?.id ?? null} />
-      )}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0">
+          {tournament.phase === "submission" && (
+            <p className="text-neutral-600 dark:text-neutral-300">
+              Participants are writing their drafts. The bracket appears here
+              when the admin publishes it.
+            </p>
+          )}
+          {tournament.phase !== "submission" && tournament.phase !== "setup" && (
+            <BracketView tournament={tournament} viewerId={me?.id ?? null} />
+          )}
+        </div>
+        <aside className="min-w-0">
+          <GlobalChat slug={slug} tournamentId={tournament.id} canPost={Boolean(me)} />
+        </aside>
+      </div>
     </main>
   );
+}
+
+async function GlobalChat({ slug, tournamentId, canPost }: { slug: string; tournamentId: string; canPost: boolean }) {
+  const db = await getDb();
+  const room = await globalRoom(db, tournamentId);
+  if (!room) return null;
+  const messages = await messagesFor(db, room.id);
+  return <ChatPanel slug={slug} roomId={room.id} title="Tournament chat" messages={messages} canPost={canPost} />;
 }

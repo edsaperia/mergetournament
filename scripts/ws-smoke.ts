@@ -4,7 +4,6 @@
  *   AUTH_SECRET=... npx tsx scripts/ws-smoke.ts <mergeId> [participantId]
  */
 
-import WebSocket from "ws";
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { signCollabToken } from "../src/lib/collab-token";
@@ -22,7 +21,6 @@ const provider = new HocuspocusProvider({
   name: `merge:${mergeId}`,
   token: signCollabToken({ participantId, mergeId }, secret),
   document,
-  WebSocketPolyfill: WebSocket as unknown as typeof globalThis.WebSocket,
   onAuthenticationFailed: (m) => {
     console.error("AUTH FAILED", m);
     process.exit(1);

@@ -118,6 +118,37 @@ export async function removeParticipantAction(slug: string, participantId: strin
   }
 }
 
+export async function postMessageAction(slug: string, roomId: string, body: string): Promise<ActionState> {
+  try {
+    const me = await requireParticipant(slug);
+    const db = await getDb();
+    const { postMessage } = await import("../services/chat-service");
+    await postMessage(db, roomId, me.id, body);
+    revalidatePath(`/${slug}`, "layout");
+    return { ok: true, message: "" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function addCommentAction(
+  slug: string,
+  textVersionId: string,
+  line: number,
+  body: string
+): Promise<ActionState> {
+  try {
+    const me = await requireParticipant(slug);
+    const db = await getDb();
+    const { addComment } = await import("../services/chat-service");
+    await addComment(db, { textVersionId, authorId: me.id, line, body });
+    revalidatePath(`/${slug}/text/${textVersionId}`);
+    return { ok: true, message: "" };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function publishBracketAction(slug: string): Promise<ActionState> {
   try {
     const admin = await requireAdmin(slug);
