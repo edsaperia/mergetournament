@@ -8,6 +8,7 @@ import { readyAction, workspaceAction } from "../../server/actions";
 import { mergesFor, rosterFor, scheduleContext, slotsFor } from "../../server/queries";
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh, RefreshAt } from "../live";
+import { HowItWorks } from "./how-it-works";
 import { LocalTime } from "../local-time";
 import { NumberedText } from "../numbered-text";
 import { ControlButton } from "./admin/admin-controls";
@@ -65,6 +66,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         </nav>
       </div>
 
+      <IntroSection tournament={tournament} viewerRole={me?.role ?? null} />
       {tournament.phase === "convening" && (
         <ConveningPanel slug={slug} tournamentId={tournament.id} me={me} />
       )}
@@ -135,6 +137,52 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         )}
       </div>
     </main>
+  );
+}
+
+/**
+ * The onboarding block: the admin's brief, the built-in explainer, and the
+ * schedule as known. Prominent while submissions are open (a first-time
+ * participant's landing view); tucked into a collapsible afterwards.
+ */
+function IntroSection({ tournament, viewerRole }: { tournament: Tournament; viewerRole: string | null }) {
+  const intro = tournament.intro.trim();
+  const preStart = tournament.phase === "setup" || tournament.phase === "submission";
+  if (!intro && !preStart) return null;
+  return (
+    <section className="mb-6 flex flex-col gap-3">
+      {intro &&
+        (preStart ? (
+          <div className="rounded-lg border border-edge bg-panel p-4">
+            <h2 className="mb-2 font-semibold">About this tournament</h2>
+            <p className="whitespace-pre-wrap text-sm text-soft">{intro}</p>
+          </div>
+        ) : (
+          <details className="rounded-md border border-edge px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-semibold">About this tournament</summary>
+            <p className="mt-2 whitespace-pre-wrap text-soft">{intro}</p>
+          </details>
+        ))}
+      {preStart && (
+        <>
+          <HowItWorks open={viewerRole === "participant"} />
+          {(tournament.publishAt || tournament.startAt) && (
+            <p className="text-sm text-muted">
+              {tournament.publishAt && (
+                <>
+                  The tournament starts <LocalTime iso={tournament.publishAt.toISOString()} />.
+                </>
+              )}
+              {tournament.startAt && (
+                <>
+                  {" "}Round 1 opens <LocalTime iso={tournament.startAt.toISOString()} />.
+                </>
+              )}
+            </p>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

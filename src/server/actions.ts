@@ -15,6 +15,7 @@ import {
   reissueLink,
   removeParticipant,
   saveDraft,
+  sendTestInvite,
   updateParticipant,
   updateSettings,
   updateSubmissionDeadline,
@@ -54,7 +55,7 @@ function lastDevLink(): string | undefined {
   const emailer = getEmailer();
   if (isProd() || !(emailer instanceof ConsoleEmailer)) return undefined;
   const last = emailer.sent.at(-1);
-  return last?.text.match(/https?:\S+/)?.[0];
+  return last?.text.match(/https?:\S+\/auth\/\S+/)?.[0];
 }
 
 /** Convert a datetime-local value + the client's UTC offset into an instant. */
@@ -260,7 +261,7 @@ export async function setDeadlineAction(
 ): Promise<ActionState> {
   return withAdmin(slug, { revalidate: [`/${slug}`, `/${slug}/admin`] }, async (db, admin) => {
     const deadline = local ? parseLocalDatetime(local, tzOffsetMin) : null;
-    await updateSubmissionDeadline(db, admin.tournamentId, deadline);
+    await updateSubmissionDeadline(db, admin.tournamentId, deadline, tzOffsetMin);
     return { message: deadline ? "Deadline set." : "Deadline cleared — submissions close when you start the tournament." };
   });
 }
@@ -274,6 +275,7 @@ export async function updateSettingsAction(
     publishAtLocal?: string | null;
     startAtLocal?: string | null;
     defaultSubmission?: string;
+    intro?: string;
     visibility?: "public" | "participants_only";
   },
   tzOffsetMin: number
@@ -287,9 +289,19 @@ export async function updateSettingsAction(
       publishAt: fromLocal(payload.publishAtLocal),
       startAt: fromLocal(payload.startAtLocal),
       defaultSubmission: payload.defaultSubmission,
+      intro: payload.intro,
       visibility: payload.visibility,
+      tzOffsetMin,
     });
     return { message: "Saved." };
+  });
+}
+
+/** Email the admin a preview of the invite, with a placeholder for the link. */
+export async function sendTestInviteAction(slug: string): Promise<ActionState> {
+  return withAdmin(slug, { notify: false }, async (db, admin) => {
+    await sendTestInvite(db, getEmailer(), baseUrl(), admin.tournamentId);
+    return { message: `Test invite sent to ${admin.email}.`, devLink: undefined };
   });
 }
 

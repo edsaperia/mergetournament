@@ -5,6 +5,7 @@ import {
   addParticipantAction,
   reissueLinkAction,
   removeParticipantAction,
+  sendTestInviteAction,
   updateParticipantAction,
   type ActionState,
 } from "../../../server/actions";
@@ -88,10 +89,20 @@ const EMAIL_STATUS_STYLE: Record<string, string> = {
   delivery_delayed: "text-amber-600",
 };
 
-export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
+export function Roster({
+  slug,
+  rows,
+  introDone = true,
+}: {
+  slug: string;
+  rows: RosterRow[];
+  /** Inviting is gated (UI-only) until the tournament has an intro. */
+  introDone?: boolean;
+}) {
   const [viewing, setViewing] = useState<RosterRow | null>(null);
   const [editStatus, setEditStatus] = useState<ActionState>(initial);
   const [state, addAction, adding] = useActionState(addParticipantAction.bind(null, slug), initial);
+  const [testState, testAction, testing] = useActionState(async () => sendTestInviteAction(slug), initial);
 
   const patchParticipant = (id: string, patch: { name?: string; email?: string }) => {
     setEditStatus({ ok: true, message: "Saving…" });
@@ -185,20 +196,40 @@ export function Roster({ slug, rows }: { slug: string; rows: RosterRow[] }) {
       <form action={addAction} className="flex flex-wrap items-end gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="p-name">Name</label>
-          <input className={field} id="p-name" name="name" required />
+          <input className={field} id="p-name" name="name" required disabled={!introDone} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium" htmlFor="p-email">Email</label>
-          <input className={field} id="p-email" name="email" type="email" required />
+          <input className={field} id="p-email" name="email" type="email" required disabled={!introDone} />
         </div>
         <button
-          disabled={adding}
+          disabled={adding || !introDone}
+          title={introDone ? undefined : "write the intro first"}
           className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
         >
           {adding ? "Inviting…" : "Invite participant"}
         </button>
       </form>
+      {!introDone && (
+        <p className="-mt-4 text-sm text-muted">
+          Invites include your intro, so participants arrive knowing what this is —{" "}
+          <a className="underline" href="#intro">write the intro first →</a>
+        </p>
+      )}
       <ActionStatus state={state} />
+
+      <form action={testAction} className="flex flex-wrap items-center gap-3 border-t border-edge-faint pt-4">
+        <button
+          disabled={testing}
+          className="rounded-md border border-line px-3 py-1.5 text-sm font-medium hover:border-strong disabled:opacity-50"
+        >
+          {testing ? "Sending…" : "Email me a test invite"}
+        </button>
+        <span className="text-xs text-muted">
+          see exactly what participants will receive, before you send the real ones
+        </span>
+        <ActionStatus state={testState} />
+      </form>
 
       {viewing && (
         <div

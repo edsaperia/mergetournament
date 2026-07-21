@@ -7,6 +7,7 @@ import { currentParticipant, tournamentBySlug } from "../../../server/session";
 import type { ThemeOverrides } from "../../../lib/theme";
 import { Tabs } from "../tabs";
 import { ControlButton } from "./admin-controls";
+import { IntroEditor } from "./intro-editor";
 import { Roster } from "./roster";
 import { TemplateEditor } from "./template-editor";
 import { ThemeEditor } from "./theme-editor";
@@ -36,8 +37,8 @@ export async function AdminDashboard({ slug }: { slug: string }) {
 
   return (
     <Tabs
-      labels={["Timeline", "Template", "Roster", "Theme", "Settings"]}
-      ids={["timeline", "template", "roster", "theme", "settings"]}
+      labels={["Timeline", "Intro", "Template", "Roster", "Theme", "Settings"]}
+      ids={["timeline", "intro", "template", "roster", "theme", "settings"]}
     >
       <Timeline
         slug={slug}
@@ -47,6 +48,8 @@ export async function AdminDashboard({ slug }: { slug: string }) {
         invited={invited}
       />
 
+      <IntroEditor slug={slug} intro={tournament.intro} adminName={me.name} tournamentName={tournament.name} />
+
       <TemplateEditor
         slug={slug}
         prePublish={tournament.phase === "setup" || tournament.phase === "submission"}
@@ -55,6 +58,7 @@ export async function AdminDashboard({ slug }: { slug: string }) {
 
       <Roster
         slug={slug}
+        introDone={tournament.intro.trim() !== ""}
         rows={status.map(({ participant, draft }) => ({
           id: participant.id,
           name: participant.name,

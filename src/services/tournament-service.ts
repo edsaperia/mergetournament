@@ -10,7 +10,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "../db/schema";
 import { auditLog, chatRooms, participants, textVersions, tournaments } from "../db/schema";
 import { generateToken, hashToken } from "../lib/auth";
-import { Emailer, inviteEmail, magicLink } from "../lib/email";
+import { Emailer, inviteEmail, magicLink, scheduleLine, type Email } from "../lib/email";
 import { DomainError } from "../lib/errors";
 import { countWords } from "../lib/text";
 
@@ -95,15 +95,62 @@ export async function addParticipant(
     })
     .returning();
   await emailer.send(
-    inviteEmail({
+    await buildInvite(db, baseUrl, tournament, {
       to: participant.email,
       participantName: participant.name,
-      tournamentName: tournament.name,
+      selfIsAdmin: participant.role === "admin",
       magicLink: magicLink(baseUrl, tournament.slug, token),
     })
   );
   await audit(db, tournamentId, "participant_added", { participantId: participant.id, email: participant.email });
   return participant;
+}
+
+/**
+ * The full invitation: who invited you, the admin's brief, the schedule as
+ * currently known, then the magic link. One builder so every path that
+ * (re)sends a link — add, re-issue, email change, test — reads the same.
+ */
+async function buildInvite(
+  db: Db,
+  baseUrl: string,
+  tournament: typeof tournaments.$inferSelect,
+  opts: { to: string; participantName: string; selfIsAdmin?: boolean; magicLink: string }
+): Promise<Email> {
+  const [admin] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.tournamentId, tournament.id), eq(participants.role, "admin")));
+  return inviteEmail({
+    to: opts.to,
+    participantName: opts.participantName,
+    tournamentName: tournament.name,
+    adminName: opts.selfIsAdmin ? undefined : admin?.name,
+    intro: tournament.intro,
+    schedule: scheduleLine(tournament),
+    magicLink: opts.magicLink,
+    baseUrl,
+  });
+}
+
+/**
+ * Send the admin a preview of the invite email exactly as a participant
+ * would receive it — with a placeholder where the personal link goes, so no
+ * live token ever lands in a forwardable test email.
+ */
+export async function sendTestInvite(db: Db, emailer: Emailer, baseUrl: string, tournamentId: string) {
+  const tournament = await requireTournament(db, tournamentId);
+  const [admin] = await db
+    .select()
+    .from(participants)
+    .where(and(eq(participants.tournamentId, tournamentId), eq(participants.role, "admin")));
+  if (!admin) throw new DomainError("no administrator on the roster");
+  const email = await buildInvite(db, baseUrl, tournament, {
+    to: admin.email,
+    participantName: "Sam Participant",
+    magicLink: "(each participant gets their own personal sign-in link here)",
+  });
+  await emailer.send({ ...email, subject: `[Test] ${email.subject}` });
 }
 
 /** Re-issue a magic link (SPEC §3: "admin can re-issue links"). Invalidates the old one. */
@@ -119,10 +166,10 @@ export async function reissueLink(
   const token = generateToken();
   await db.update(participants).set({ tokenHash: hashToken(token) }).where(eq(participants.id, participantId));
   await emailer.send(
-    inviteEmail({
+    await buildInvite(db, baseUrl, tournament, {
       to: participant.email,
       participantName: participant.name,
-      tournamentName: tournament.name,
+      selfIsAdmin: participant.role === "admin",
       magicLink: magicLink(baseUrl, tournament.slug, token),
     })
   );
@@ -181,10 +228,10 @@ export async function updateParticipant(
 
   if (emailChanged && token) {
     await emailer.send(
-      inviteEmail({
+      await buildInvite(db, baseUrl, tournament, {
         to: updated.email,
         participantName: updated.name,
-        tournamentName: tournament.name,
+        selfIsAdmin: updated.role === "admin",
         magicLink: magicLink(baseUrl, tournament.slug, token),
       })
     );
@@ -262,7 +309,12 @@ export async function saveDraft(db: Db, participantId: string, bodyMd: string) {
  * the admin closes manually by publishing). Editable until publication —
  * extending a passed deadline reopens submissions.
  */
-export async function updateSubmissionDeadline(db: Db, tournamentId: string, deadline: Date | null) {
+export async function updateSubmissionDeadline(
+  db: Db,
+  tournamentId: string,
+  deadline: Date | null,
+  tzOffsetMin?: number
+) {
   const tournament = await requireTournament(db, tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
     throw new DomainError("the submission period has ended");
@@ -270,7 +322,10 @@ export async function updateSubmissionDeadline(db: Db, tournamentId: string, dea
   if (deadline && Number.isNaN(deadline.getTime())) throw new DomainError("invalid date");
   const [updated] = await db
     .update(tournaments)
-    .set({ submissionDeadline: deadline })
+    .set({
+      submissionDeadline: deadline,
+      ...(deadline && tzOffsetMin !== undefined ? { tzOffsetMin } : {}),
+    })
     .where(eq(tournaments.id, tournamentId))
     .returning();
   await audit(db, tournamentId, "submission_deadline_changed", {
@@ -294,8 +349,12 @@ export async function updateSettings(
     publishAt?: Date | null;
     startAt?: Date | null;
     defaultSubmission?: string;
+    /** The participant brief; editable at any phase. */
+    intro?: string;
     /** Editable at any phase — a display concern, not part of the record. */
     visibility?: "public" | "participants_only";
+    /** Persisted whenever a scheduled time is set, for event-local email formatting. */
+    tzOffsetMin?: number;
   }
 ) {
   const t = await requireTournament(db, tournamentId);
@@ -316,6 +375,9 @@ export async function updateSettings(
   if (patch.defaultSubmission !== undefined) {
     updates.defaultSubmission = patch.defaultSubmission;
   }
+  if (patch.intro !== undefined) {
+    updates.intro = patch.intro;
+  }
   if (patch.visibility !== undefined) {
     updates.visibility = patch.visibility;
   }
@@ -323,6 +385,9 @@ export async function updateSettings(
     if (!prePublish) throw new DomainError("the tournament has already started");
     if (patch.publishAt && Number.isNaN(patch.publishAt.getTime())) throw new DomainError("invalid date");
     updates.publishAt = patch.publishAt;
+  }
+  if ((patch.publishAt || patch.startAt) && patch.tzOffsetMin !== undefined) {
+    updates.tzOffsetMin = patch.tzOffsetMin;
   }
   if (patch.startAt !== undefined) {
     if (t.begunAt || t.phase === "running" || t.phase === "complete") {

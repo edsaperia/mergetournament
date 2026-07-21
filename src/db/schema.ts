@@ -93,6 +93,18 @@ export const tournaments = pgTable("tournaments", {
   totalPausedS: integer("total_paused_s").notNull().default(0),
   /** Template all submissions initialise as. */
   defaultSubmission: text("default_submission").notNull().default(""),
+  /**
+   * The admin's participant brief ("About this tournament") — shown on the
+   * tournament page and in invite emails. The generic how-it-works
+   * explainer is product-owned copy, deliberately not stored here.
+   */
+  intro: text("intro").notNull().default(""),
+  /**
+   * Minutes behind UTC of the admin's clock when they last set a scheduled
+   * time — emails (which cannot know the reader's timezone) format times
+   * event-local using this.
+   */
+  tzOffsetMin: integer("tz_offset_min").notNull().default(0),
   /** Per-tournament color overrides: token key -> { light, dark } hex (src/lib/theme.ts). */
   theme: jsonb("theme"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

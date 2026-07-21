@@ -74,6 +74,7 @@ export function Timeline({
   const begun = Boolean(t.begunAt);
   const deadlinePassed = Boolean(t.submissionDeadline && t.submissionDeadline.getTime() <= now);
   const closed = !prePublish || deadlinePassed;
+  const introDone = t.intro.trim() !== "";
   const templateDone = t.defaultSubmission.trim() !== "" || !prePublish;
   const inviteDone = invited >= 2;
 
@@ -113,11 +114,13 @@ export function Timeline({
       : t.phase === "convening"
         ? "round-1"
         : prePublish
-          ? !inviteDone
-            ? "invite"
-            : closed
-              ? "start"
-              : "close"
+          ? !introDone
+            ? "intro"
+            : !inviteDone
+              ? "invite"
+              : closed
+                ? "start"
+                : "close"
           : (() => {
               const open = allRounds.find((r) => r.state === "open" || r.state === "closing");
               if (open) return `round-${open.number}`;
@@ -222,6 +225,12 @@ export function Timeline({
           </tr>
         </thead>
         <tbody className="divide-y divide-edge-faint">
+          <Row mark={mark("intro", introDone)} stage="Write the intro" time="—">
+            <a className="underline" href="#intro">Edit the intro →</a>
+            <span className="ml-2 text-xs text-muted">
+              what this tournament is about — participants see it in their invite
+            </span>
+          </Row>
           <Row mark={templateDone ? "done" : "future"} stage="Create template" time="—">
             <a className="underline" href="#template">Edit template →</a>
             <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
