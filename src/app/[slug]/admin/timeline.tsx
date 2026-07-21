@@ -105,16 +105,19 @@ export function Timeline({
     );
   };
 
-  // Which row is "you are here".
+  // Which row is "you are here". Pre-start it is the earliest unmet step
+  // (the template is optional and never blocks); after that, the clock rules.
   const currentKey =
     t.phase === "complete"
       ? "complete"
       : t.phase === "convening"
         ? "round-1"
         : prePublish
-          ? closed
-            ? "start"
-            : "close"
+          ? !inviteDone
+            ? "invite"
+            : closed
+              ? "start"
+              : "close"
           : (() => {
               const open = allRounds.find((r) => r.state === "open" || r.state === "closing");
               if (open) return `round-${open.number}`;
@@ -220,11 +223,11 @@ export function Timeline({
         </thead>
         <tbody className="divide-y divide-edge-faint">
           <Row mark={templateDone ? "done" : "future"} stage="Create template" time="—">
-            <a className="underline" href="#template">Open the template →</a>
+            <a className="underline" href="#template">Edit template →</a>
             <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
           </Row>
-          <Row mark={inviteDone ? "done" : "future"} stage="Invite participants" time="—">
-            <a className="underline" href="#roster">Open the roster →</a>
+          <Row mark={mark("invite", inviteDone)} stage="Invite participants" time="—">
+            <a className="underline" href="#roster">Edit the roster →</a>
             <span className="ml-2 text-xs text-muted">
               {invited} invited · {submitted} draft{submitted === 1 ? "" : "s"} in
             </span>
@@ -271,7 +274,7 @@ export function Timeline({
                 <ControlButton
                   small
                   action={publishBracketAction.bind(null, slug)}
-                  label="Start now"
+                  label="Start Tournament"
                   disabled={!closed || submitted < 2}
                   disabledReason={submitted < 2 ? "needs at least 2 drafts" : "close submissions first"}
                   confirmText={`Start the tournament with ${submitted} drafts? The roster freezes, the bracket is drawn, and everything becomes readable to participants.`}

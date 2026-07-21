@@ -120,7 +120,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               </span>
             );
             // Only animate flips that just happened; cold visitors see history.
-            return m.flipSeed !== null && m.resolvedAt && Date.now() - m.resolvedAt.getTime() < 120_000 ? (
+            const flipAgeMs = m.resolvedAt ? new Date().getTime() - m.resolvedAt.getTime() : Infinity;
+            return m.flipSeed !== null && flipAgeMs < 120_000 ? (
               <FlipReveal
                 flipKey={m.id}
                 a={m.resolution === "bearer_flip" ? bearerName(m.bearerAId) : `${bearerName(m.bearerAId)}'s input`}

@@ -35,35 +35,17 @@ export async function AdminDashboard({ slug }: { slug: string }) {
   const invited = status.filter((s) => s.participant.role === "participant").length;
 
   return (
-    <Tabs labels={["Settings", "Template", "Roster", "Theme"]} ids={["settings", "template", "roster", "theme"]}>
-      <div className="flex flex-col gap-8">
-        <section>
-          <h2 className="mb-3 text-lg font-semibold">Timeline</h2>
-          <Timeline
-            slug={slug}
-            tournament={tournament}
-            allRounds={allRounds}
-            submitted={submitted}
-            invited={invited}
-          />
-        </section>
-        <section className="border-t border-edge pt-6">
-          <h2 className="mb-3 text-lg font-semibold">Settings</h2>
-          <div className="flex flex-col gap-6">
-            <VisibilityEditor slug={slug} visibility={tournament.visibility} />
-            {(tournament.phase === "setup" || tournament.phase === "submission") && (
-              <div>
-                <ControlButton
-                  action={deleteTournamentAction.bind(null, slug)}
-                  label="Delete tournament"
-                  primary={false}
-                  confirmText="Delete this tournament and all drafts? Only possible before the tournament starts. This cannot be undone."
-                />
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+    <Tabs
+      labels={["Timeline", "Template", "Roster", "Theme", "Settings"]}
+      ids={["timeline", "template", "roster", "theme", "settings"]}
+    >
+      <Timeline
+        slug={slug}
+        tournament={tournament}
+        allRounds={allRounds}
+        submitted={submitted}
+        invited={invited}
+      />
 
       <TemplateEditor
         slug={slug}
@@ -90,6 +72,20 @@ export async function AdminDashboard({ slug }: { slug: string }) {
           Colors for this tournament&apos;s pages, in light and dark mode.
         </p>
         <ThemeEditor slug={slug} current={(tournament.theme as ThemeOverrides | null) ?? null} />
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <VisibilityEditor slug={slug} visibility={tournament.visibility} />
+        {(tournament.phase === "setup" || tournament.phase === "submission") && (
+          <div>
+            <ControlButton
+              action={deleteTournamentAction.bind(null, slug)}
+              label="Delete tournament"
+              primary={false}
+              confirmText="Delete this tournament and all drafts? Only possible before the tournament starts. This cannot be undone."
+            />
+          </div>
+        )}
       </div>
     </Tabs>
   );
