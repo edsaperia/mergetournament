@@ -180,7 +180,7 @@ describe("drafts", () => {
     await publishBracket(db, emailer, BASE, t.id);
     // Post-publish: durations frozen, start still editable (not begun),
     // visibility editable at any phase.
-    await expect(updateSettings(db, t.id, { roundDurationS: 1200 })).rejects.toThrow(/published/);
+    await expect(updateSettings(db, t.id, { roundDurationS: 1200 })).rejects.toThrow(/until the tournament starts/);
     const cleared = await updateSettings(db, t.id, { startAt: null });
     expect(cleared.startAt).toBeNull();
     const hidden = await updateSettings(db, t.id, { visibility: "participants_only" });

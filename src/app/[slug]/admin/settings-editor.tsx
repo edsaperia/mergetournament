@@ -6,9 +6,10 @@ import { LocalTime } from "../../local-time";
 import { btnPrimary, btnSecondary, field, fieldLabel } from "../../ui";
 
 /**
- * Tournament settings (SPEC §4 Phase 0): durations and the submission
- * template until publication; the start datetime until the tournament
- * begins (it auto-begins at that time once convening).
+ * Schedule and visibility settings, ordered by lifecycle: when Round 1
+ * starts, how long rounds and breaks run, who can watch. Durations freeze
+ * when the tournament starts (SPEC §4 Phase 0); the Round 1 start datetime
+ * is editable until Round 1 actually opens.
  */
 export function SettingsEditor({
   slug,
@@ -17,7 +18,6 @@ export function SettingsEditor({
   roundMinutes,
   breakMinutes,
   startAtIso,
-  defaultSubmission,
   visibility,
 }: {
   slug: string;
@@ -26,14 +26,12 @@ export function SettingsEditor({
   roundMinutes: number;
   breakMinutes: number;
   startAtIso: string | null;
-  defaultSubmission: string;
   visibility: "public" | "participants_only";
 }) {
   const [round, setRound] = useState(String(roundMinutes));
   const [brk, setBrk] = useState(String(breakMinutes));
   const [startLocal, setStartLocal] = useState("");
   const [clearStart, setClearStart] = useState(false);
-  const [template, setTemplate] = useState(defaultSubmission);
   const [vis, setVis] = useState(visibility);
   const [status, setStatus] = useState<ActionState>({ ok: true, message: "" });
   const [pending, startTransition] = useTransition();
@@ -45,9 +43,7 @@ export function SettingsEditor({
           slug,
           {
             visibility: vis,
-            ...(prePublish
-              ? { roundMinutes: Number(round), breakMinutes: Number(brk), defaultSubmission: template }
-              : {}),
+            ...(prePublish ? { roundMinutes: Number(round), breakMinutes: Number(brk) } : {}),
             ...(!begun
               ? { startAtLocal: clearStart ? null : startLocal ? startLocal : undefined }
               : {}),
@@ -61,40 +57,16 @@ export function SettingsEditor({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4 sm:max-w-md">
-        <div>
-          <label className={fieldLabel} htmlFor="s-round">Round length (minutes)</label>
-          <input className={field} id="s-round" type="number" min="1" value={round} onChange={(e) => setRound(e.target.value)} disabled={!prePublish} />
-        </div>
-        <div>
-          <label className={fieldLabel} htmlFor="s-break">Break length (minutes)</label>
-          <input className={field} id="s-break" type="number" min="0" value={brk} onChange={(e) => setBrk(e.target.value)} disabled={!prePublish} />
-        </div>
-      </div>
-      {!prePublish && <p className="-mt-2 text-xs text-muted">Durations froze when the bracket was published.</p>}
-
-      <div className="sm:max-w-md">
-        <label className={fieldLabel} htmlFor="s-visibility">Visibility</label>
-        <select
-          className={field}
-          id="s-visibility"
-          value={vis}
-          onChange={(e) => setVis(e.target.value as "public" | "participants_only")}
-        >
-          <option value="public">Public — anyone with the URL can observe</option>
-          <option value="participants_only">Participants only</option>
-        </select>
-      </div>
-
       <div>
-        <label className={fieldLabel} htmlFor="s-start">Tournament start</label>
+        <label className={fieldLabel} htmlFor="s-start">Round 1 start</label>
         <p className="mb-1 text-sm text-muted">
           {startAtIso ? (
             <>
-              Currently: <LocalTime iso={startAtIso} /> — begins automatically then, once the bracket is published.
+              Currently: <LocalTime iso={startAtIso} /> — Round 1 opens automatically then, once the
+              tournament has started.
             </>
           ) : (
-            "Not set — you begin manually from Convening."
+            "Not set — you start Round 1 manually once everyone has convened."
           )}
         </p>
         {!begun ? (
@@ -123,23 +95,33 @@ export function SettingsEditor({
             )}
           </div>
         ) : (
-          <p className="text-xs text-muted">The tournament has begun.</p>
+          <p className="text-xs text-muted">Round 1 has already started.</p>
         )}
       </div>
 
-      <div>
-        <label className={fieldLabel} htmlFor="s-template">Default submission (template)</label>
-        <textarea
-          className={`${field} font-mono text-sm`}
-          id="s-template"
-          rows={4}
-          value={template}
-          onChange={(e) => setTemplate(e.target.value)}
-          disabled={!prePublish}
-        />
-        <p className="mt-1 text-xs text-muted">
-          Only affects participants who have not started their draft yet.
-        </p>
+      <div className="grid grid-cols-2 gap-4 sm:max-w-md">
+        <div>
+          <label className={fieldLabel} htmlFor="s-round">Round length (minutes)</label>
+          <input className={field} id="s-round" type="number" min="1" value={round} onChange={(e) => setRound(e.target.value)} disabled={!prePublish} />
+        </div>
+        <div>
+          <label className={fieldLabel} htmlFor="s-break">Break length (minutes)</label>
+          <input className={field} id="s-break" type="number" min="0" value={brk} onChange={(e) => setBrk(e.target.value)} disabled={!prePublish} />
+        </div>
+      </div>
+      {!prePublish && <p className="-mt-2 text-xs text-muted">Durations froze when the tournament started.</p>}
+
+      <div className="sm:max-w-md">
+        <label className={fieldLabel} htmlFor="s-visibility">Visibility</label>
+        <select
+          className={field}
+          id="s-visibility"
+          value={vis}
+          onChange={(e) => setVis(e.target.value as "public" | "participants_only")}
+        >
+          <option value="public">Public — anyone with the URL can observe</option>
+          <option value="participants_only">Participants only</option>
+        </select>
       </div>
 
       <div className="flex items-center gap-3">

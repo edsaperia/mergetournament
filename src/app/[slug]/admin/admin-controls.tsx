@@ -6,7 +6,7 @@ import { ActionStatus } from "../../action-status";
 
 const initial: ActionState = { ok: true, message: "" };
 
-/** One admin lifecycle button (Publish / Begin / Pause / Resume) with feedback. */
+/** One admin lifecycle button (Start Tournament / Start Round 1 / Pause / Resume / Delete) with feedback. */
 export function ControlButton({
   action,
   label,

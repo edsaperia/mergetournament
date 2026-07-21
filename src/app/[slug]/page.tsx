@@ -21,7 +21,7 @@ import { DraftEditor } from "./submit/draft-editor";
 const PHASE_LABEL: Record<string, string> = {
   setup: "Being set up",
   submission: "Accepting submissions",
-  convening: "Convening — the bracket is published",
+  convening: "Convening — the tournament has started",
   running: "Underway",
   complete: "Complete",
 };
@@ -85,7 +85,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
                 {tournament.submissionDeadline && new Date() > tournament.submissionDeadline ? (
                   <p className="text-soft">
                     Submissions closed at <LocalTime iso={tournament.submissionDeadline.toISOString()} />.
-                    Your draft is in — the bracket appears when the admin publishes it.
+                    Your draft is in — the bracket appears when the admin starts the tournament.
                   </p>
                 ) : (
                   <p className="text-soft">
@@ -110,7 +110,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
             ) : (
               <p className="text-soft">
                 Participants are writing their drafts. The bracket appears here
-                when the admin publishes it.
+                when the admin starts the tournament.
               </p>
             ))}
           {tournament.phase !== "submission" && tournament.phase !== "setup" && (
@@ -274,8 +274,8 @@ async function ConveningPanel({
         <p className="font-semibold">Convening</p>
         <p className="text-sm text-muted">
           Read the drafts, find your first partner, sit next to them.{" "}
-          {readyCount} of {roster.length} ready — the tournament begins when
-          everyone is (or when the admin presses Begin).
+          {readyCount} of {roster.length} ready — Round 1 opens when everyone
+          is (or when the admin starts it).
         </p>
       </div>
       {me && me.role === "participant" && !me.ready && (

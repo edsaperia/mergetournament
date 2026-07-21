@@ -91,7 +91,7 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
     expect(byeSlots[0].outState).toBe("filled");
 
     expect(emailer.sent).toHaveLength(6); // admin + 5 participants
-    expect(emailer.sent[0].subject).toContain("bracket is published");
+    expect(emailer.sent[0].subject).toContain("tournament has started");
   });
 
   it("runs to completion through agreement, backstop abandonment, and an ad-hoc merge", async () => {

@@ -81,7 +81,7 @@ export async function addParticipant(
 ) {
   const tournament = await requireTournament(db, tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
-    throw new DomainError("roster is frozen after publication");
+    throw new DomainError("the roster is frozen once the tournament has started");
   }
   const token = generateToken();
   const [participant] = await db
@@ -200,7 +200,7 @@ export async function removeParticipant(db: Db, tournamentId: string, participan
   const participant = await requireParticipant(db, participantId, tournamentId);
   const tournament = await requireTournament(db, participant.tournamentId);
   if (tournament.phase !== "setup" && tournament.phase !== "submission") {
-    throw new DomainError("roster is frozen after publication");
+    throw new DomainError("the roster is frozen once the tournament has started");
   }
   await db.delete(participants).where(eq(participants.id, participantId));
   await audit(db, tournament.id, "participant_removed", { participantId, email: participant.email });
@@ -301,7 +301,7 @@ export async function updateSettings(
   const updates: Partial<typeof tournaments.$inferInsert> = {};
 
   if (patch.roundDurationS !== undefined || patch.breakDurationS !== undefined || patch.defaultSubmission !== undefined) {
-    if (!prePublish) throw new DomainError("durations and the template are editable until the bracket is published");
+    if (!prePublish) throw new DomainError("durations and the template are editable until the tournament starts");
   }
   if (patch.roundDurationS !== undefined) {
     if (!Number.isInteger(patch.roundDurationS) || patch.roundDurationS <= 0) throw new DomainError("round duration must be positive");

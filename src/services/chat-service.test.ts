@@ -75,7 +75,7 @@ describe("posting rules", () => {
     const pre = await createTournament(db, { slug: "chat-pre", name: "Pre", roundDurationS: 600, breakDurationS: 60 });
     const p = await addParticipant(db, emailer, "http://x", pre.id, { name: "Q", email: "q@pre.org" });
     const room = await globalRoom(db, pre.id);
-    await expect(postMessage(db, room!.id, p.id, "too early")).rejects.toThrow(/bracket is published/);
+    await expect(postMessage(db, room!.id, p.id, "too early")).rejects.toThrow(/when the tournament starts/);
   });
 
   it("participants post anywhere; the admin only in global; attribution by name", async () => {

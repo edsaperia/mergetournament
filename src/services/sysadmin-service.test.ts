@@ -57,7 +57,7 @@ describe("deletion rules", () => {
 
     const { t: pub, admin: pubAdmin, people } = await make("del-b", 2, 2);
     await publishBracket(db, emailer, "http://x", pub.id);
-    await expect(deleteOwnTournament(db, pubAdmin.id)).rejects.toThrow(/published/);
+    await expect(deleteOwnTournament(db, pubAdmin.id)).rejects.toThrow(/started/);
     await expect(deleteOwnTournament(db, people[0].id)).rejects.toThrow(/admin/);
     await deleteTournament(db, pub.id);
     expect(await db.select().from(tournaments).where(eq(tournaments.id, pub.id))).toHaveLength(0);

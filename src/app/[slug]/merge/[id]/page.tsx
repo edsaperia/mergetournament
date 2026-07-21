@@ -15,10 +15,10 @@ import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
 import { FlipReveal } from "../../flip-reveal";
 import { NumberedText } from "../../../numbered-text";
+import { Tabs } from "../../tabs";
 import { CollabEditor } from "./collab-editor";
 import { WindowControls } from "./window-controls";
 import { WorkspaceControls } from "./workspace-controls";
-import { WorkspaceTabs } from "./workspace-tabs";
 
 export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) {
   const { slug, id } = await props.params;
@@ -145,7 +145,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </div>
       )}
 
-      <WorkspaceTabs
+      <Tabs
+        defaultIndex={2}
         labels={[
           `Input A · ${bearerName(m.bearerAId)}`,
           `Input B · ${bearerName(m.bearerBId)}`,
@@ -219,7 +220,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           </div>
           <aside className="min-w-0">{await chatFor(mergeRoom, "This merge's chat")}</aside>
         </section>
-      </WorkspaceTabs>
+      </Tabs>
     </main>
   );
 }

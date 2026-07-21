@@ -3,13 +3,13 @@
 import { useState } from "react";
 
 /**
- * The merge workspace's three tabs (SPEC §4): Input A, Input B, Merge
- * candidate. Inactive tabs stay mounted (hidden) so the collaborative
- * editor keeps its connection and chats keep their state.
+ * Tab strip used by the merge workspace and the admin page. Inactive tabs
+ * stay mounted (hidden) so stateful children — the collaborative editor,
+ * chats, half-edited forms — keep their state across switches.
  */
-export function WorkspaceTabs({
+export function Tabs({
   labels,
-  defaultIndex = 2,
+  defaultIndex = 0,
   children,
 }: {
   labels: string[];

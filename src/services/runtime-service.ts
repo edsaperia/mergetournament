@@ -86,7 +86,7 @@ export function effectiveT(t: Tournament, now: Date): number {
 
 export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, tournamentId: string) {
   const t = await requireTournament(db, tournamentId);
-  if (t.phase !== "submission") throw new DomainError("bracket can only be published from the submission phase");
+  if (t.phase !== "submission") throw new DomainError("the tournament can only start from the submission phase");
 
   const drafts = await db
     .select()
@@ -169,7 +169,7 @@ export async function publishBracket(db: Db, emailer: Emailer, baseUrl: string, 
   for (const p of roster) {
     await emailer.send({
       to: p.email,
-      subject: `${t.name}: the bracket is published`,
+      subject: `${t.name}: the tournament has started`,
       text: `The tournament is convening. See the bracket, read the drafts, and find your first partner:\n\n${baseUrl}/${t.slug}`,
     });
   }

@@ -25,7 +25,7 @@ export function DeadlineEditor({ slug, deadlineIso }: { slug: string; deadlineIs
         {deadlineIso ? (
           <LocalTime iso={deadlineIso} />
         ) : (
-          <span className="text-muted">none — you close submissions by publishing the bracket</span>
+          <span className="text-muted">none — submissions close when you press Start Tournament</span>
         )}
       </p>
       <div className="flex flex-wrap items-center gap-2">

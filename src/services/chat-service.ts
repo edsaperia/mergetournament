@@ -94,7 +94,7 @@ export async function postMessage(db: Db, roomId: string, participantId: string,
   // Chat opens when the bracket is published; before that, heads-down writing.
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, room.tournamentId));
   if (t?.phase === "setup" || t?.phase === "submission") {
-    throw new DomainError("chat opens when the bracket is published");
+    throw new DomainError("chat opens when the tournament starts");
   }
   const [row] = await db
     .insert(messages)
@@ -147,7 +147,7 @@ export async function addComment(
   if (text.kind === "draft") {
     const [t] = await db.select().from(tournaments).where(eq(tournaments.id, text.tournamentId));
     if (t?.phase === "setup" || t?.phase === "submission") {
-      throw new DomainError("drafts take comments once the bracket is published");
+      throw new DomainError("drafts take comments once the tournament starts");
     }
   }
   const lineCount = text.bodyMd.split("\n").length;

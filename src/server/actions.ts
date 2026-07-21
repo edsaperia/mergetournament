@@ -222,7 +222,7 @@ export async function readyAction(slug: string): Promise<ActionState> {
       .where(and(eq(participants.tournamentId, me.tournamentId), eq(participants.role, "participant")));
     if (roster.every((p) => p.ready)) {
       await beginTournament(db, me.tournamentId, new Date());
-      return { message: "Everyone is ready — Begin! Round 1 is open." };
+      return { message: "Everyone is ready — Round 1 is open." };
     }
     return { message: "You're ready." };
   });
@@ -261,7 +261,7 @@ export async function setDeadlineAction(
   return withAdmin(slug, { revalidate: [`/${slug}`, `/${slug}/admin`] }, async (db, admin) => {
     const deadline = local ? parseLocalDatetime(local, tzOffsetMin) : null;
     await updateSubmissionDeadline(db, admin.tournamentId, deadline);
-    return { message: deadline ? "Deadline set." : "Deadline cleared — you close submissions by publishing." };
+    return { message: deadline ? "Deadline set." : "Deadline cleared — submissions close when you start the tournament." };
   });
 }
 
@@ -304,14 +304,14 @@ export async function updateThemeAction(slug: string, theme: ThemeOverrides | nu
 export async function publishBracketAction(slug: string): Promise<ActionState> {
   return withAdmin(slug, { revalidate: [`/${slug}`, `/${slug}/admin`] }, async (db, admin) => {
     const { n, numRounds } = await publishBracket(db, getEmailer(), baseUrl(), admin.tournamentId);
-    return { message: `Bracket published: ${n} drafts, ${numRounds} rounds. Convening.` };
+    return { message: `Tournament started: ${n} drafts, ${numRounds} rounds. Now convening.` };
   });
 }
 
 export async function beginAction(slug: string): Promise<ActionState> {
   return withAdmin(slug, { revalidate: [`/${slug}`] }, async (db, admin) => {
     await beginTournament(db, admin.tournamentId, new Date());
-    return { message: "Begin! Round 1 is open." };
+    return { message: "Round 1 is open." };
   });
 }
 
