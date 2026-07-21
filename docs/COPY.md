@@ -1,5 +1,8 @@
 # Merge Tournament
 
+<!-- This prose is rendered on the homepage's "Tell me more" fold via
+     src/app/full-story.tsx — keep the two in sync when editing. -->
+
 **A fair method for combining many draft documents into one by knockout tournament of pairwise negotiations**
 
 ## What it is

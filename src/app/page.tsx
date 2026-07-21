@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FullStory } from "./full-story";
 import { Logo } from "./logo";
 
 export default function Home() {
@@ -18,6 +19,7 @@ export default function Home() {
         Rounds halve the field until one canonical text remains — with full
         provenance back to every original draft.
       </p>
+      <FullStory />
       <div>
         <Link
           href="/new"
