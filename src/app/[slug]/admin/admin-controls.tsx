@@ -12,27 +12,36 @@ export function ControlButton({
   label,
   confirmText,
   primary = true,
+  small = false,
+  disabled = false,
+  disabledReason,
 }: {
   action: () => Promise<ActionState>;
   label: string;
   confirmText?: string;
   primary?: boolean;
+  small?: boolean;
+  disabled?: boolean;
+  /** Tooltip explaining a disabled button (e.g. "close submissions first"). */
+  disabledReason?: string;
 }) {
   const [state, dispatch, pending] = useActionState(async () => action(), initial);
+  const pad = small ? "rounded-md px-2.5 py-1.5 text-sm" : "rounded-lg px-5 py-3";
   return (
     <form
       action={dispatch}
       onSubmit={(e) => {
         if (confirmText && !window.confirm(confirmText)) e.preventDefault();
       }}
-      className="inline-flex flex-col gap-2"
+      className="inline-flex flex-col gap-1"
     >
       <button
-        disabled={pending}
+        disabled={pending || disabled}
+        title={disabled ? disabledReason : undefined}
         className={
           primary
-            ? "rounded-lg bg-accent px-5 py-3 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
-            : "rounded-lg border border-line px-5 py-3 font-medium disabled:opacity-50"
+            ? `${pad} bg-accent font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-40`
+            : `${pad} border border-line font-medium disabled:opacity-40`
         }
       >
         {pending ? "…" : label}

@@ -42,6 +42,29 @@ beforeAll(async () => {
 });
 
 describe("tickOnce ordering", () => {
+  it("auto-starts a scheduled tournament, then Round 1, in one pass", async () => {
+    const emailer2 = new ConsoleEmailer();
+    const t = await createTournament(db, { slug: "tick-auto", name: "Auto", roundDurationS: 600, breakDurationS: 60 });
+    await addParticipant(db, emailer2, "http://x", t.id, { name: "Admin", email: "a@auto.org", role: "admin" });
+    // publishAt due but only one draft: the ticker waits, quietly.
+    const p0 = await addParticipant(db, emailer2, "http://x", t.id, { name: "P0", email: "p0@auto.org" });
+    await saveDraft(db, p0.id, "P0 draft");
+    await db.update(tournaments).set({ publishAt: at(-60), startAt: at(-5) }).where(eq(tournaments.id, t.id));
+    await tickOnce(makeDeps(), T0);
+    expect((await db.select().from(tournaments).where(eq(tournaments.id, t.id)))[0].phase).toBe("submission");
+
+    // Second draft arrives: one pass takes it submission -> convening -> running.
+    const p1 = await addParticipant(db, emailer2, "http://x", t.id, { name: "P1", email: "p1@auto.org" });
+    await saveDraft(db, p1.id, "P1 draft");
+    const deps = makeDeps();
+    await tickOnce(deps, T0);
+    const [row] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
+    expect(row.phase).toBe("running");
+    const [r1] = await db.select().from(rounds).where(eq(rounds.tournamentId, t.id)).orderBy(asc(rounds.number));
+    expect(r1.state).toBe("open");
+    expect(deps.bumped).toContain(t.id);
+  });
+
   it("auto-begins a due tournament and gives it its first tick in the same pass", async () => {
     const t = await publishTwoDrafts("tick-begin");
     await db.update(tournaments).set({ startAt: at(-5) }).where(eq(tournaments.id, t.id));

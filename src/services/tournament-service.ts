@@ -290,6 +290,8 @@ export async function updateSettings(
   patch: {
     roundDurationS?: number;
     breakDurationS?: number;
+    /** Scheduled Start Tournament; editable until the tournament starts. */
+    publishAt?: Date | null;
     startAt?: Date | null;
     defaultSubmission?: string;
     /** Editable at any phase — a display concern, not part of the record. */
@@ -316,6 +318,11 @@ export async function updateSettings(
   }
   if (patch.visibility !== undefined) {
     updates.visibility = patch.visibility;
+  }
+  if (patch.publishAt !== undefined) {
+    if (!prePublish) throw new DomainError("the tournament has already started");
+    if (patch.publishAt && Number.isNaN(patch.publishAt.getTime())) throw new DomainError("invalid date");
+    updates.publishAt = patch.publishAt;
   }
   if (patch.startAt !== undefined) {
     if (t.begunAt || t.phase === "running" || t.phase === "complete") {

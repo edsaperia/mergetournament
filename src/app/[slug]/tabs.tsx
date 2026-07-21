@@ -1,22 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Tab strip used by the merge workspace and the admin page. Inactive tabs
  * stay mounted (hidden) so stateful children — the collaborative editor,
  * chats, half-edited forms — keep their state across switches.
+ *
+ * Pass `ids` to make tabs hash-addressable: `#roster` selects that tab, and
+ * in-page links (`<a href="#roster">`) switch tabs from anywhere.
  */
 export function Tabs({
   labels,
+  ids,
   defaultIndex = 0,
   children,
 }: {
   labels: string[];
+  ids?: string[];
   defaultIndex?: number;
   children: React.ReactNode[];
 }) {
   const [active, setActive] = useState(Math.min(defaultIndex, labels.length - 1));
+
+  useEffect(() => {
+    if (!ids) return;
+    const fromHash = () => {
+      const i = ids.indexOf(window.location.hash.slice(1));
+      if (i >= 0) setActive(i);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, [ids]);
+
+  const select = (i: number) => {
+    setActive(i);
+    // No element carries these ids, so setting the hash never scroll-jumps.
+    if (ids) window.history.replaceState(null, "", `#${ids[i]}`);
+  };
+
   return (
     <div>
       <div className="mb-3 flex gap-1 border-b border-edge" role="tablist">
@@ -25,7 +48,7 @@ export function Tabs({
             key={i}
             role="tab"
             aria-selected={active === i}
-            onClick={() => setActive(i)}
+            onClick={() => select(i)}
             className={`rounded-t-md px-4 py-2 text-sm font-medium ${
               active === i
                 ? "border border-b-0 border-edge bg-background"

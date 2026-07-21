@@ -270,27 +270,34 @@ export async function updateSettingsAction(
   payload: {
     roundMinutes?: number;
     breakMinutes?: number;
-    /** datetime-local value, null to clear, undefined to leave unchanged. */
+    /** datetime-local values, null to clear, undefined to leave unchanged. */
+    publishAtLocal?: string | null;
     startAtLocal?: string | null;
     defaultSubmission?: string;
     visibility?: "public" | "participants_only";
   },
   tzOffsetMin: number
 ): Promise<ActionState> {
+  const fromLocal = (local: string | null | undefined) =>
+    local === undefined ? undefined : local === null ? null : parseLocalDatetime(local, tzOffsetMin);
   return withAdmin(slug, { revalidate: [`/${slug}`, `/${slug}/admin`] }, async (db, admin) => {
     await updateSettings(db, admin.tournamentId, {
       roundDurationS: payload.roundMinutes !== undefined ? Math.round(payload.roundMinutes * 60) : undefined,
       breakDurationS: payload.breakMinutes !== undefined ? Math.round(payload.breakMinutes * 60) : undefined,
-      startAt:
-        payload.startAtLocal === undefined
-          ? undefined
-          : payload.startAtLocal === null
-            ? null
-            : parseLocalDatetime(payload.startAtLocal, tzOffsetMin),
+      publishAt: fromLocal(payload.publishAtLocal),
+      startAt: fromLocal(payload.startAtLocal),
       defaultSubmission: payload.defaultSubmission,
       visibility: payload.visibility,
     });
-    return { message: "Settings saved." };
+    return { message: "Saved." };
+  });
+}
+
+/** Close submissions immediately (sets the deadline to now). */
+export async function closeSubmissionsAction(slug: string): Promise<ActionState> {
+  return withAdmin(slug, { revalidate: [`/${slug}`, `/${slug}/admin`] }, async (db, admin) => {
+    await updateSubmissionDeadline(db, admin.tournamentId, new Date());
+    return { message: "Submissions closed." };
   });
 }
 

@@ -4,17 +4,20 @@
  *
  *   1. flush live CRDT texts — backstop resolutions must never act on a
  *      stale debounced row;
- *   2. auto-begin convening tournaments whose start time has arrived — a
- *      tournament that begins this second takes its first tick in the same
- *      pass;
- *   3. advance every running tournament — one failure is logged and skipped
+ *   2. auto-start tournaments whose scheduled Start Tournament time
+ *      (publishAt) has arrived — skipped quietly until at least 2 drafts
+ *      exist, since a bracket needs a pair;
+ *   3. auto-begin convening tournaments whose Round 1 start time has
+ *      arrived — a tournament that starts and is due to begin takes both
+ *      steps and its first tick in the same pass;
+ *   4. advance every running tournament — one failure is logged and skipped
  *      so it cannot stall the rest.
  */
 
-import { eq } from "drizzle-orm";
-import { tournaments } from "../db/schema";
+import { and, count, eq } from "drizzle-orm";
+import { textVersions, tournaments } from "../db/schema";
 import type { Emailer } from "../lib/email";
-import { beginTournament, tick } from "../services/runtime-service";
+import { beginTournament, publishBracket, tick } from "../services/runtime-service";
 import type { Db } from "../services/tournament-service";
 
 export interface TickerDeps {
@@ -34,6 +37,22 @@ export async function tickOnce(deps: TickerDeps, now: Date): Promise<void> {
 
   for (const mergeId of deps.liveMergeIds()) {
     await deps.syncMergeText(mergeId);
+  }
+
+  const submissionPhase = await db.select().from(tournaments).where(eq(tournaments.phase, "submission"));
+  for (const t of submissionPhase) {
+    if (!t.publishAt || t.publishAt.getTime() > now.getTime()) continue;
+    const [{ drafts }] = await db
+      .select({ drafts: count() })
+      .from(textVersions)
+      .where(and(eq(textVersions.tournamentId, t.id), eq(textVersions.kind, "draft")));
+    if (drafts < 2) continue; // waits until a bracket is possible
+    try {
+      await publishBracket(db, deps.emailer, deps.baseUrl, t.id);
+      deps.bump(t.id);
+    } catch (e) {
+      console.error(`[ticker] auto-start ${t.slug}:`, e);
+    }
   }
 
   const convening = await db.select().from(tournaments).where(eq(tournaments.phase, "convening"));

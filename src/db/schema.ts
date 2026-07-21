@@ -76,7 +76,9 @@ export const tournaments = pgTable("tournaments", {
   breakDurationS: integer("break_duration_s").notNull(),
   /** Optional; if unset the admin closes submissions manually. */
   submissionDeadline: timestamp("submission_deadline", { withTimezone: true }),
-  /** Optional; if unset the admin starts manually. */
+  /** Scheduled Start Tournament (bracket draw). Optional; if unset the admin starts manually. */
+  publishAt: timestamp("publish_at", { withTimezone: true }),
+  /** Scheduled Round 1 start. Optional; if unset the admin starts Round 1 manually. */
   startAt: timestamp("start_at", { withTimezone: true }),
   /** Wall-clock instant of the admin pressing Begin. */
   begunAt: timestamp("begun_at", { withTimezone: true }),
