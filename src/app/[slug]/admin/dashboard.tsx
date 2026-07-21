@@ -32,6 +32,7 @@ export async function AdminDashboard({ slug }: { slug: string }) {
   const delivery = await latestEmailEvents(db, status.map((s) => s.participant.email));
   const allRounds = await roundsFor(tournament.id);
   const submitted = status.filter((s) => s.draft !== null).length;
+  const invited = status.filter((s) => s.participant.role === "participant").length;
 
   return (
     <Tabs labels={["Settings", "Template", "Roster", "Theme"]} ids={["settings", "template", "roster", "theme"]}>
@@ -43,7 +44,7 @@ export async function AdminDashboard({ slug }: { slug: string }) {
             tournament={tournament}
             allRounds={allRounds}
             submitted={submitted}
-            rosterCount={status.length}
+            invited={invited}
           />
         </section>
         <section className="border-t border-edge pt-6">

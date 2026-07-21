@@ -74,40 +74,29 @@ export function TimeControl({
   );
 }
 
-/** Round and break lengths, editable until the tournament starts. */
-export function DurationsEditor({
+/** One duration (round or break length) in minutes, editable until the tournament starts. */
+export function DurationEditor({
   slug,
-  roundMinutes,
-  breakMinutes,
+  field,
+  minutes,
 }: {
   slug: string;
-  roundMinutes: number;
-  breakMinutes: number;
+  field: "round" | "break";
+  minutes: number;
 }) {
-  const [round, setRound] = useState(String(roundMinutes));
-  const [brk, setBrk] = useState(String(breakMinutes));
+  const [value, setValue] = useState(String(minutes));
   const { status, pending, run } = useStatus();
-  const dirty = Number(round) !== roundMinutes || Number(brk) !== breakMinutes;
+  const dirty = Number(value) !== minutes;
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 text-sm">
-      rounds
       <input
         type="number"
-        min="1"
-        value={round}
-        onChange={(e) => setRound(e.target.value)}
+        min={field === "round" ? 1 : 0}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
         className="w-16 rounded-md border border-line px-2 py-1"
-        aria-label="Round length in minutes"
-      />
-      min · breaks
-      <input
-        type="number"
-        min="0"
-        value={brk}
-        onChange={(e) => setBrk(e.target.value)}
-        className="w-16 rounded-md border border-line px-2 py-1"
-        aria-label="Break length in minutes"
+        aria-label={field === "round" ? "Round length in minutes" : "Break length in minutes"}
       />
       min
       <button
@@ -118,7 +107,7 @@ export function DurationsEditor({
           run(() =>
             updateSettingsAction(
               slug,
-              { roundMinutes: Number(round), breakMinutes: Number(brk) },
+              field === "round" ? { roundMinutes: Number(value) } : { breakMinutes: Number(value) },
               new Date().getTimezoneOffset()
             )
           )
