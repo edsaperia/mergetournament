@@ -18,9 +18,6 @@ export function FullStory() {
     <details className="group rounded-lg border border-edge px-5 py-4">
       <summary className="cursor-pointer font-semibold">
         Tell me more
-        <span className="ml-2 text-sm font-normal text-muted group-open:hidden">
-          — the whole idea in four short sections
-        </span>
       </summary>
 
       <H>What it is</H>
