@@ -6,6 +6,31 @@ import type { MessageView } from "../../services/chat-service";
 
 const initial: ActionState = { ok: true, message: "" };
 
+/**
+ * A message timestamp in the viewer's clock: time alone for today, date +
+ * time for older messages (+ year once it differs). Chats are perpetual, so
+ * "14:32" alone stops meaning much after the first day.
+ */
+function MessageTime({ at }: { at: string | Date }) {
+  const date = new Date(at);
+  const now = new Date();
+  const time: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
+  const text =
+    date.toDateString() === now.toDateString()
+      ? date.toLocaleTimeString([], time)
+      : date.toLocaleString([], {
+          day: "numeric",
+          month: "short",
+          ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+          ...time,
+        });
+  return (
+    <time dateTime={date.toISOString()} suppressHydrationWarning>
+      {text}
+    </time>
+  );
+}
+
 /** A collapsible chat room: message log + composer (SPEC §5). */
 export function ChatPanel({
   slug,
@@ -61,7 +86,7 @@ export function ChatPanel({
               m.kind === "system" ? (
                 <p key={m.id} className="text-xs italic text-muted [overflow-wrap:anywhere]">
                   <span className="not-italic text-faint">
-                    {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    <MessageTime at={m.at} />
                   </span>{" "}
                   ⚙ {m.body}
                 </p>
@@ -69,7 +94,7 @@ export function ChatPanel({
                 <p key={m.id} className="text-sm [overflow-wrap:anywhere]">
                   <span className="font-semibold">{m.author}</span>{" "}
                   <span className="text-xs text-faint">
-                    {new Date(m.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    <MessageTime at={m.at} />
                   </span>
                   <br />
                   {m.body}

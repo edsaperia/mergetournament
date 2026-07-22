@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { textVersions } from "../../../db/schema";
 import { currentParticipant, tournamentBySlug } from "../../../server/session";
+import { LocalTime } from "../../local-time";
 import { DraftEditor } from "./draft-editor";
 
 export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
@@ -49,7 +50,7 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
         </h1>
         {tournament.submissionDeadline && (
           <span className="text-sm text-muted">
-            due {tournament.submissionDeadline.toLocaleString()}
+            due <LocalTime iso={tournament.submissionDeadline.toISOString()} />
           </span>
         )}
       </div>
