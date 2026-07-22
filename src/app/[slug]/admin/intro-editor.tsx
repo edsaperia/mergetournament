@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateSettingsAction, type ActionState } from "../../../server/actions";
 import { btnPrimary, btnSecondary, fieldLabel } from "../../ui";
+import { TestInviteButton } from "./test-invite-button";
 
 /**
  * The participant brief ("About this tournament") — the one piece of
@@ -74,6 +75,7 @@ export function IntroEditor({
           <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
         )}
       </div>
+      <TestInviteButton slug={slug} />
     </div>
   );
 }

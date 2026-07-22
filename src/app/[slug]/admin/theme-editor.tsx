@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateThemeAction, type ActionState } from "../../../server/actions";
 import { THEME_PRESETS, THEME_TOKENS, type ThemeOverrides } from "../../../lib/theme";
-import { btnPrimary, btnSecondary } from "../../ui";
+import { btnPrimary } from "../../ui";
 
 /**
  * Per-tournament colors: every design token, light and dark, defaulting to
@@ -24,16 +24,6 @@ export function ThemeEditor({ slug, current }: { slug: string; current: ThemeOve
     setValues((v) => ({ ...v, [key]: { ...v[key], [mode]: color } }));
 
   const save = () => startTransition(async () => setStatus(await updateThemeAction(slug, values)));
-  const reset = () =>
-    startTransition(async () => {
-      const result = await updateThemeAction(slug, null);
-      if (result.ok) {
-        const out: ThemeOverrides = {};
-        for (const t of THEME_TOKENS) out[t.key] = { light: t.light, dark: t.dark };
-        setValues(out);
-      }
-      setStatus(result);
-    });
 
   const applyPreset = (overrides: ThemeOverrides) => {
     setValues((v) => ({ ...v, ...overrides }));
@@ -69,6 +59,14 @@ export function ThemeEditor({ slug, current }: { slug: string; current: ThemeOve
         <p className="mt-1 text-xs text-muted">
           Loads the palette into the pickers below — tweak anything, then save.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" className={btnPrimary} disabled={pending} onClick={save}>
+            Save theme
+          </button>
+          {status.message && (
+            <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
+          )}
+        </div>
       </div>
       {groups.map((group) => (
         <div key={group}>
@@ -102,17 +100,6 @@ export function ThemeEditor({ slug, current }: { slug: string; current: ThemeOve
           </div>
         </div>
       ))}
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={btnPrimary} disabled={pending} onClick={save}>
-          Save theme
-        </button>
-        <button type="button" className={btnSecondary} disabled={pending} onClick={reset}>
-          Reset to defaults
-        </button>
-        {status.message && (
-          <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,18 +1,17 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
-  addParticipantAction,
+  bulkInviteAction,
   reissueLinkAction,
   removeParticipantAction,
-  sendTestInviteAction,
   updateParticipantAction,
   type ActionState,
 } from "../../../server/actions";
 import Link from "next/link";
 import { ActionStatus } from "../../action-status";
 import { NumberedText } from "../../numbered-text";
-import { field } from "../../ui";
+import { TestInviteButton } from "./test-invite-button";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -89,6 +88,102 @@ const EMAIL_STATUS_STYLE: Record<string, string> = {
   delivery_delayed: "text-amber-600",
 };
 
+interface InviteLine {
+  line: number;
+  text: string;
+  name?: string;
+  email?: string;
+  error?: string;
+}
+
+/** One "name, email" per line; the last comma splits, so names may contain commas. */
+function parseInviteLines(raw: string): InviteLine[] {
+  return raw
+    .split("\n")
+    .map((text, i) => ({ line: i + 1, text }))
+    .filter((l) => l.text.trim() !== "")
+    .map((l) => {
+      const idx = l.text.lastIndexOf(",");
+      if (idx < 0) return { ...l, error: "expected: name, email" };
+      const name = l.text.slice(0, idx).trim();
+      const email = l.text.slice(idx + 1).trim();
+      if (!name) return { ...l, error: "missing a name before the comma" };
+      if (!/^\S+@\S+\.\S+$/.test(email)) return { ...l, error: `"${email}" does not look like an email address` };
+      return { ...l, name, email };
+    });
+}
+
+/** The bulk invite box: validate every line first, then invite; failed lines stay in the box. */
+function BulkInvite({ slug, disabled }: { slug: string; disabled: boolean }) {
+  const [raw, setRaw] = useState("");
+  const [feedback, setFeedback] = useState<{ ok: boolean; lines: string[] }>({ ok: true, lines: [] });
+  const [pending, startTransition] = useTransition();
+
+  const invite = () => {
+    const lines = parseInviteLines(raw);
+    if (lines.length === 0) {
+      setFeedback({ ok: false, lines: ["Nothing to invite — one participant per line, as: name, email"] });
+      return;
+    }
+    const bad = lines.filter((l) => l.error);
+    if (bad.length > 0) {
+      setFeedback({ ok: false, lines: bad.map((l) => `Line ${l.line}: ${l.error}`) });
+      return;
+    }
+    startTransition(async () => {
+      const result = await bulkInviteAction(slug, lines.map((l) => ({ name: l.name!, email: l.email! })));
+      if (result.ok) {
+        setRaw("");
+        setFeedback({ ok: true, lines: [result.message] });
+      } else {
+        // Successes are already invited; keep only the failed lines for another go.
+        setRaw(lines.filter((_, i) => result.errors[i]).map((l) => l.text).join("\n"));
+        setFeedback({
+          ok: false,
+          lines: [
+            result.message,
+            ...lines.flatMap((l, i) => (result.errors[i] ? [`${l.name} <${l.email}>: ${result.errors[i]}`] : [])),
+          ],
+        });
+      }
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-medium" htmlFor="bulk-invite">Invite participants</label>
+      <textarea
+        id="bulk-invite"
+        value={raw}
+        onChange={(e) => setRaw(e.target.value)}
+        disabled={disabled}
+        rows={4}
+        placeholder={"Ada Lovelace, ada@example.org\nBo Brown, bo@example.org"}
+        className="w-full max-w-xl rounded-md border border-line bg-background px-3 py-2 font-mono text-sm disabled:opacity-50"
+      />
+      <p className="text-xs text-muted">One per line: name, email. Each gets their personal magic link by email.</p>
+      <div>
+        <button
+          type="button"
+          onClick={invite}
+          disabled={pending || disabled || raw.trim() === ""}
+          title={disabled ? "write the intro first" : undefined}
+          className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
+        >
+          {pending ? "Inviting…" : "Invite"}
+        </button>
+      </div>
+      {feedback.lines.length > 0 && (
+        <ul className={`text-sm ${feedback.ok ? "text-muted" : "text-red-600"}`}>
+          {feedback.lines.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function Roster({
   slug,
   rows,
@@ -101,8 +196,6 @@ export function Roster({
 }) {
   const [viewing, setViewing] = useState<RosterRow | null>(null);
   const [editStatus, setEditStatus] = useState<ActionState>(initial);
-  const [state, addAction, adding] = useActionState(addParticipantAction.bind(null, slug), initial);
-  const [testState, testAction, testing] = useActionState(async () => sendTestInviteAction(slug), initial);
 
   const patchParticipant = (id: string, patch: { name?: string; email?: string }) => {
     setEditStatus({ ok: true, message: "Saving…" });
@@ -193,43 +286,15 @@ export function Roster({
       <ActionStatus state={rowState} />
       <ActionStatus state={editStatus} />
 
-      <form action={addAction} className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="p-name">Name</label>
-          <input className={field} id="p-name" name="name" required disabled={!introDone} />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="p-email">Email</label>
-          <input className={field} id="p-email" name="email" type="email" required disabled={!introDone} />
-        </div>
-        <button
-          disabled={adding || !introDone}
-          title={introDone ? undefined : "write the intro first"}
-          className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-50"
-        >
-          {adding ? "Inviting…" : "Invite participant"}
-        </button>
-      </form>
+      <BulkInvite slug={slug} disabled={!introDone} />
       {!introDone && (
         <p className="-mt-4 text-sm text-muted">
           Invites include your intro, so participants arrive knowing what this is —{" "}
           <a className="underline" href="#intro">write the intro first →</a>
         </p>
       )}
-      <ActionStatus state={state} />
 
-      <form action={testAction} className="flex flex-wrap items-center gap-3 border-t border-edge-faint pt-4">
-        <button
-          disabled={testing}
-          className="rounded-md border border-line px-3 py-1.5 text-sm font-medium hover:border-strong disabled:opacity-50"
-        >
-          {testing ? "Sending…" : "Email me a test invite"}
-        </button>
-        <span className="text-xs text-muted">
-          see exactly what participants will receive, before you send the real ones
-        </span>
-        <ActionStatus state={testState} />
-      </form>
+      <TestInviteButton slug={slug} />
 
       {viewing && (
         <div

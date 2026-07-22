@@ -146,14 +146,48 @@ export async function saveDraftAction(slug: string, body: string): Promise<Actio
   });
 }
 
-export async function addParticipantAction(slug: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
-  return withAdmin(slug, { revalidate: [`/${slug}/admin`], notify: false }, async (db, admin) => {
-    const p = await addParticipant(db, getEmailer(), baseUrl(), admin.tournamentId, {
-      name: String(formData.get("name") ?? "").trim(),
-      email: String(formData.get("email") ?? "").trim(),
-    });
-    return { message: `Invited ${p.name} <${p.email}>.`, devLink: lastDevLink() };
-  });
+export interface BulkInviteResult {
+  ok: boolean;
+  message: string;
+  /** Per-entry outcome, same order as submitted; null means invited. */
+  errors: (string | null)[];
+}
+
+/** Invite many participants; failures are per-entry, successes stick. */
+export async function bulkInviteAction(
+  slug: string,
+  entries: { name: string; email: string }[]
+): Promise<BulkInviteResult> {
+  try {
+    const admin = await requireAdmin(slug);
+    const db = await getDb();
+    if (entries.length > 200) throw new DomainError("at most 200 invites at a time");
+    const errors: (string | null)[] = [];
+    for (const entry of entries) {
+      try {
+        await addParticipant(db, getEmailer(), baseUrl(), admin.tournamentId, entry);
+        errors.push(null);
+      } catch (e) {
+        unstable_rethrow(e);
+        if (e instanceof DomainError) errors.push(e.message);
+        else {
+          console.error("[action]", e);
+          errors.push("something went wrong");
+        }
+      }
+    }
+    revalidatePath(`/${slug}/admin`);
+    const invited = errors.filter((e) => e === null).length;
+    const failed = errors.length - invited;
+    return {
+      ok: failed === 0,
+      message: failed === 0 ? `Invited ${invited}.` : `Invited ${invited} · ${failed} failed:`,
+      errors,
+    };
+  } catch (e) {
+    const f = fail(e);
+    return { ok: false, message: f.message, errors: entries.map(() => f.message) };
+  }
 }
 
 export async function reissueLinkAction(slug: string, participantId: string): Promise<ActionState> {

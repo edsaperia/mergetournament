@@ -151,18 +151,12 @@ function IntroSection({ tournament, viewerRole }: { tournament: Tournament; view
   if (!intro && !preStart) return null;
   return (
     <section className="mb-6 flex flex-col gap-3">
-      {intro &&
-        (preStart ? (
-          <div className="rounded-lg border border-edge bg-panel p-4">
-            <h2 className="mb-2 font-semibold">About this tournament</h2>
-            <p className="whitespace-pre-wrap text-sm text-soft">{intro}</p>
-          </div>
-        ) : (
-          <details className="rounded-md border border-edge px-4 py-3 text-sm">
-            <summary className="cursor-pointer font-semibold">About this tournament</summary>
-            <p className="mt-2 whitespace-pre-wrap text-soft">{intro}</p>
-          </details>
-        ))}
+      {intro && (
+        <details open={preStart} className="rounded-md border border-edge px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-semibold">About this tournament</summary>
+          <p className="mt-2 whitespace-pre-wrap text-soft">{intro}</p>
+        </details>
+      )}
       {preStart && (
         <>
           <HowItWorks open={viewerRole === "participant"} />

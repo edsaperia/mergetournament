@@ -60,6 +60,7 @@ export function Timeline({
   allRounds,
   submitted,
   invited,
+  readOnly = false,
 }: {
   slug: string;
   tournament: Tournament;
@@ -67,6 +68,8 @@ export function Timeline({
   submitted: number;
   /** Non-admin participants on the roster. */
   invited: number;
+  /** Participant/observer view: stages and times only — no admin to-dos or controls. */
+  readOnly?: boolean;
 }) {
   const t = tournament;
   const now = Date.now();
@@ -107,16 +110,17 @@ export function Timeline({
   };
 
   // Which row is "you are here". Pre-start it is the earliest unmet step
-  // (the template is optional and never blocks); after that, the clock rules.
+  // (the template is optional and never blocks; read-only views have no
+  // to-do rows, so they start at the clock stages); after that, the clock rules.
   const currentKey =
     t.phase === "complete"
       ? "complete"
       : t.phase === "convening"
         ? "round-1"
         : prePublish
-          ? !introDone
+          ? !readOnly && !introDone
             ? "intro"
-            : !inviteDone
+            : !readOnly && !inviteDone
               ? "invite"
               : closed
                 ? "start"
@@ -144,14 +148,14 @@ export function Timeline({
         mark={mark(`round-${k}`, state === "closed")}
         stage={`Round ${k}`}
         time={
-          k === 1 && prePublish ? (
+          k === 1 && prePublish && !readOnly ? (
             <DurationEditor slug={slug} field="round" minutes={Math.round(t.roundDurationS / 60)} />
           ) : (
             <Span fromS={starts[k - 1]} toS={roundEnd(k)} />
           )
         }
       >
-        {k === 1 && !begun && (
+        {k === 1 && !begun && !readOnly && (
           <span className="inline-flex flex-wrap items-center gap-2">
             <ControlButton
               small
@@ -175,12 +179,14 @@ export function Timeline({
             <span className={t.pausedAt ? "text-amber-600" : "text-live-ink"}>
               {t.pausedAt ? "paused" : "open now"}
             </span>
-            <ControlButton
-              small
-              primary={false}
-              action={pauseAction.bind(null, slug, Boolean(t.pausedAt))}
-              label={t.pausedAt ? "Resume" : "Pause"}
-            />
+            {!readOnly && (
+              <ControlButton
+                small
+                primary={false}
+                action={pauseAction.bind(null, slug, Boolean(t.pausedAt))}
+                label={t.pausedAt ? "Resume" : "Pause"}
+              />
+            )}
           </span>
         )}
         {state === "closing" && <span className="text-sm text-amber-600">backstop window — are you still here?</span>}
@@ -200,7 +206,7 @@ export function Timeline({
         mark={mark(`break-${n}`, nextStarted)}
         stage={<span className="font-normal text-muted">Break {n}</span>}
         time={
-          n === 1 && prePublish ? (
+          n === 1 && prePublish && !readOnly ? (
             <DurationEditor slug={slug} field="break" minutes={Math.round(t.breakDurationS / 60)} />
           ) : (
             <Span fromS={roundEnd(n)} toS={starts[n] ?? roundEnd(n) + t.breakDurationS} />
@@ -225,28 +231,32 @@ export function Timeline({
           </tr>
         </thead>
         <tbody className="divide-y divide-edge-faint">
-          <Row mark={mark("intro", introDone)} stage="Write the intro" time="—">
-            <a className="underline" href="#intro">Edit the intro →</a>
-            <span className="ml-2 text-xs text-muted">
-              what this tournament is about — participants see it in their invite
-            </span>
-          </Row>
-          <Row mark={templateDone ? "done" : "future"} stage="Create template" time="—">
-            <a className="underline" href="#template">Edit template →</a>
-            <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
-          </Row>
-          <Row mark={mark("invite", inviteDone)} stage="Invite participants" time="—">
-            <a className="underline" href="#roster">Edit the roster →</a>
-            <span className="ml-2 text-xs text-muted">
-              {invited} invited · {submitted} draft{submitted === 1 ? "" : "s"} in
-            </span>
-          </Row>
+          {!readOnly && (
+            <>
+              <Row mark={mark("intro", introDone)} stage="Write the intro" time="—">
+                <a className="underline" href="#intro">Edit the intro →</a>
+                <span className="ml-2 text-xs text-muted">
+                  what this tournament is about — participants see it in their invite
+                </span>
+              </Row>
+              <Row mark={templateDone ? "done" : "future"} stage="Create template" time="—">
+                <a className="underline" href="#template">Edit template →</a>
+                <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
+              </Row>
+              <Row mark={mark("invite", inviteDone)} stage="Invite participants" time="—">
+                <a className="underline" href="#roster">Edit the roster →</a>
+                <span className="ml-2 text-xs text-muted">
+                  {invited} invited · {submitted} draft{submitted === 1 ? "" : "s"} in
+                </span>
+              </Row>
+            </>
+          )}
           <Row
             mark={mark("close", closed)}
             stage="Close submissions"
             time={t.submissionDeadline ? <LocalTime iso={t.submissionDeadline.toISOString()} /> : "—"}
           >
-            {prePublish && !closed && (
+            {prePublish && !closed && !readOnly && (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <ControlButton
                   small
@@ -259,7 +269,7 @@ export function Timeline({
                 <TimeControl slug={slug} field="deadline" hasValue={Boolean(t.submissionDeadline)} />
               </span>
             )}
-            {prePublish && closed && (
+            {prePublish && closed && !readOnly && (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <span className="text-sm">closed — drafts are frozen</span>
                 <ControlButton
@@ -272,13 +282,14 @@ export function Timeline({
                 <TimeControl slug={slug} field="deadline" hasValue={false} />
               </span>
             )}
+            {prePublish && closed && readOnly && <span className="text-sm">closed — drafts are frozen</span>}
           </Row>
           <Row
             mark={mark("start", !prePublish)}
             stage="Start Tournament"
             time={!prePublish ? "" : t.publishAt ? <LocalTime iso={t.publishAt.toISOString()} /> : "—"}
           >
-            {prePublish ? (
+            {prePublish && !readOnly && (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <ControlButton
                   small
@@ -291,9 +302,8 @@ export function Timeline({
                 <Or />
                 <TimeControl slug={slug} field="publishAt" hasValue={Boolean(t.publishAt)} />
               </span>
-            ) : (
-              <span className="text-sm">started — the bracket is drawn</span>
             )}
+            {!prePublish && <span className="text-sm">started — the bracket is drawn</span>}
           </Row>
           {roundRows}
           {prePublish && (
@@ -323,7 +333,7 @@ export function Timeline({
           </Row>
         </tbody>
       </table>
-      {(t.phase === "convening" || t.phase === "running") && (
+      {!readOnly && (t.phase === "convening" || t.phase === "running") && (
         <p className="mt-2 text-xs text-muted">
           There is deliberately no other live control: no extending a round, no reassigning a pairing, no overriding a flip.
         </p>
