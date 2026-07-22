@@ -31,11 +31,14 @@ function Row({
   mark,
   stage,
   time,
+  slim = false,
   children,
 }: {
   mark: Mark;
   stage: React.ReactNode;
   time: React.ReactNode;
+  /** Two-column (read-only) layout: any children render under the stage label. */
+  slim?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -45,9 +48,10 @@ function Row({
           {mark === "done" ? "✓" : mark === "current" ? "▶" : ""}
         </span>
         {stage}
+        {slim && children && <div className="ml-5.5 mt-0.5 font-normal">{children}</div>}
       </td>
       <td className="w-56 py-2.5 pr-3 align-top text-muted">{time}</td>
-      <td className="py-2.5 align-top">{children}</td>
+      {!slim && <td className="py-2.5 align-top">{children}</td>}
     </tr>
   );
 }
@@ -145,6 +149,7 @@ export function Timeline({
     roundRows.push(
       <Row
         key={`round-${k}`}
+        slim={readOnly}
         mark={mark(`round-${k}`, state === "closed")}
         stage={`Round ${k}`}
         time={
@@ -203,6 +208,7 @@ export function Timeline({
     const nextStarted = Boolean(progress[n]?.actualStart);
     return (
       <Row
+        slim={readOnly}
         mark={mark(`break-${n}`, nextStarted)}
         stage={<span className="font-normal text-muted">Break {n}</span>}
         time={
@@ -227,7 +233,7 @@ export function Timeline({
           <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-muted">
             <th className="py-2 pr-3 font-medium">Stage</th>
             <th className="py-2 pr-3 font-medium">Time</th>
-            <th className="py-2 font-medium">Actions</th>
+            {!readOnly && <th className="py-2 font-medium">Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-edge-faint">
@@ -252,6 +258,7 @@ export function Timeline({
             </>
           )}
           <Row
+            slim={readOnly}
             mark={mark("close", closed)}
             stage="Close submissions"
             time={t.submissionDeadline ? <LocalTime iso={t.submissionDeadline.toISOString()} /> : "—"}
@@ -285,6 +292,7 @@ export function Timeline({
             {prePublish && closed && readOnly && <span className="text-sm">closed — drafts are frozen</span>}
           </Row>
           <Row
+            slim={readOnly}
             mark={mark("start", !prePublish)}
             stage="Start Tournament"
             time={!prePublish ? "" : t.publishAt ? <LocalTime iso={t.publishAt.toISOString()} /> : "—"}
@@ -308,12 +316,13 @@ export function Timeline({
           {roundRows}
           {prePublish && (
             <tr>
-              <td colSpan={3} className="py-2.5 pl-6 text-sm italic text-muted">
+              <td colSpan={readOnly ? 2 : 3} className="py-2.5 pl-6 text-sm italic text-muted">
                 more rounds will be added as the roster grows
               </td>
             </tr>
           )}
           <Row
+            slim={readOnly}
             mark={mark("complete", false)}
             stage="Tournament complete"
             time={

@@ -134,3 +134,34 @@ export function inviteEmail(opts: {
 export function magicLink(baseUrl: string, slug: string, token: string): string {
   return `${baseUrl}/${slug}/auth/${token}`;
 }
+
+/**
+ * Operator heads-up when a tournament is created (sent when SYSADMIN_EMAIL
+ * is set). Links the dashboard PAGE, never the operator auth token — the
+ * page is inert without the operator's cookie, so nothing here is secret.
+ */
+export function tournamentCreatedEmail(opts: {
+  to: string;
+  tournamentName: string;
+  tournamentUrl: string;
+  creatorName: string;
+  creatorEmail: string;
+  sysadminUrl: string;
+}): Email {
+  return {
+    to: opts.to,
+    subject: `New tournament: ${opts.tournamentName}`,
+    text: [
+      `A tournament was just created on this instance.`,
+      ``,
+      `${opts.tournamentName}`,
+      opts.tournamentUrl,
+      ``,
+      `Created by ${opts.creatorName} <${opts.creatorEmail}>.`,
+      ``,
+      `Operator dashboard: ${opts.sysadminUrl}`,
+      `(Needs your operator session — if it has expired, sign in with your`,
+      `operator link. That link is deliberately never included in email.)`,
+    ].join("\n"),
+  };
+}

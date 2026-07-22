@@ -5,7 +5,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { participants, tournaments } from "../db/schema";
-import { ConsoleEmailer } from "../lib/email";
+import { ConsoleEmailer, tournamentCreatedEmail } from "../lib/email";
 import { DomainError } from "../lib/errors";
 import type { ThemeOverrides } from "../lib/theme";
 import { addComment, postMessage } from "../services/chat-service";
@@ -31,7 +31,7 @@ import {
   type WorkspaceAction,
 } from "../services/runtime-service";
 import { deleteOwnTournament, deleteTournament } from "../services/sysadmin-service";
-import { baseUrl, getEmailer, isProd } from "./config";
+import { baseUrl, getEmailer, isProd, sysadminEmail } from "./config";
 import { bump } from "./events";
 import { requireAdmin, requireParticipant, requireSysadmin } from "./session";
 
@@ -123,11 +123,26 @@ export async function createTournamentAction(_prev: ActionState, formData: FormD
       slug,
       name: String(formData.get("name") ?? "").trim() || slug,
     });
+    const adminName = String(formData.get("adminName") ?? "").trim() || "Admin";
+    const adminEmail = String(formData.get("adminEmail") ?? "").trim();
     await addParticipant(db, getEmailer(), baseUrl(), tournament.id, {
-      name: String(formData.get("adminName") ?? "").trim() || "Admin",
-      email: String(formData.get("adminEmail") ?? "").trim(),
+      name: adminName,
+      email: adminEmail,
       role: "admin",
     });
+    const operator = sysadminEmail();
+    if (operator) {
+      await getEmailer().send(
+        tournamentCreatedEmail({
+          to: operator,
+          tournamentName: tournament.name,
+          tournamentUrl: `${baseUrl()}/${tournament.slug}`,
+          creatorName: adminName,
+          creatorEmail: adminEmail,
+          sysadminUrl: `${baseUrl()}/sysadmin`,
+        })
+      );
+    }
     return {
       ok: true,
       message: `Created "${tournament.name}". Your admin magic link has been emailed.`,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtEventLocal, inviteEmail, scheduleLine } from "./email";
+import { fmtEventLocal, inviteEmail, scheduleLine, tournamentCreatedEmail } from "./email";
 
 const base = {
   submissionDeadline: null,
@@ -66,6 +66,23 @@ describe("inviteEmail", () => {
     // The magic link is the FIRST /auth/ URL (dev-link extraction depends on it).
     expect(t.match(/https?:\S+\/auth\/\S+/)?.[0]).toBe("http://x/club/auth/tok123");
     expect(t).toContain("New to merge tournaments?");
+  });
+
+  it("the operator notification names the creator and links pages, never tokens", () => {
+    const email = tournamentCreatedEmail({
+      to: "op@x.org",
+      tournamentName: "Club Constitution",
+      tournamentUrl: "http://x/club",
+      creatorName: "Ada",
+      creatorEmail: "ada@example.org",
+      sysadminUrl: "http://x/sysadmin",
+    });
+    expect(email.subject).toBe("New tournament: Club Constitution");
+    expect(email.text).toContain("Ada <ada@example.org>");
+    expect(email.text).toContain("http://x/club");
+    expect(email.text).toContain("http://x/sysadmin");
+    // The operator auth link must never appear in email.
+    expect(email.text).not.toMatch(/\/sysadmin\/auth/);
   });
 
   it("the admin's own invite has no invited-by line and empty parts collapse", () => {

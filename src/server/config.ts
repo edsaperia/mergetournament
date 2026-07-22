@@ -64,6 +64,11 @@ export function sysadminToken(): string | null {
   return process.env.SYSADMIN_TOKEN || null;
 }
 
+/** Where operator notifications (new tournaments) go; disabled when unset. */
+export function sysadminEmail(): string | null {
+  return process.env.SYSADMIN_EMAIL || null;
+}
+
 /** Webhook signing secret from the Resend dashboard; webhook 503s when unset. */
 export function resendWebhookSecret(): string | null {
   return process.env.RESEND_WEBHOOK_SECRET || null;
