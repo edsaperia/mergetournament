@@ -1,6 +1,7 @@
 "use client";
 
 import { AutoRefresh, Countdown } from "../live";
+import { Modal } from "../modal";
 
 /**
  * The pause modal (SPEC §4 Pausing): while the admin has the clock stopped,
@@ -22,32 +23,25 @@ export function PauseOverlay({
   roundRemainingS?: number;
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Tournament paused"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-md"
-    >
+    <Modal label="Tournament paused" blur className="flex max-w-md flex-col items-center gap-4 p-8 text-center">
       <AutoRefresh slug={slug} />
-      <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border border-edge bg-background p-8 text-center shadow-2xl">
-        <span className="text-4xl" aria-hidden>
-          ⏸
-        </span>
-        <p className="text-xl font-bold">Tournament paused by the admin</p>
-        {roundNo !== undefined && roundRemainingS !== undefined && (
-          <p className="text-sm text-muted">
-            Round {roundNo}: <Countdown remainingS={roundRemainingS} paused />
-          </p>
-        )}
+      <span className="text-4xl" aria-hidden>
+        ⏸
+      </span>
+      <p className="text-xl font-bold">Tournament paused by the admin</p>
+      {roundNo !== undefined && roundRemainingS !== undefined && (
         <p className="text-sm text-muted">
-          Total remaining: <Countdown remainingS={globalRemainingS} paused />
+          Round {roundNo}: <Countdown remainingS={roundRemainingS} paused />
         </p>
-        <p className="text-xs text-faint">
-          Everything is frozen exactly where it stood — editing, lock-ins,
-          chat. It all comes back the moment the admin resumes.
-        </p>
-      </div>
-    </div>
+      )}
+      <p className="text-sm text-muted">
+        Total remaining: <Countdown remainingS={globalRemainingS} paused />
+      </p>
+      <p className="text-xs text-faint">
+        Everything is frozen exactly where it stood — editing, lock-ins,
+        chat. It all comes back the moment the admin resumes.
+      </p>
+    </Modal>
   );
 }
 

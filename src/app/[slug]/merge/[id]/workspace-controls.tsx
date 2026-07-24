@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
 import { ActionStatus } from "../../../action-status";
-import { btnPrimary as btn, btnSecondary } from "../../../ui";
+import { Button } from "../../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -52,8 +52,8 @@ export function WorkspaceControls({
       <fieldset className="rounded-md border border-edge p-3 text-sm">
         <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
         <div className="flex flex-wrap gap-2">
-          <button
-            className={myPref === mySide ? btn : btnSecondary}
+          <Button
+            variant={myPref === mySide ? "primary" : "secondary"}
             name="intent"
             value="selectBearer"
             onClick={(e) => {
@@ -62,9 +62,9 @@ export function WorkspaceControls({
             disabled={pending}
           >
             Me
-          </button>
-          <button
-            className={myPref !== null && myPref !== mySide ? btn : btnSecondary}
+          </Button>
+          <Button
+            variant={myPref !== null && myPref !== mySide ? "primary" : "secondary"}
             name="intent"
             value="selectBearer"
             onClick={(e) => {
@@ -73,7 +73,7 @@ export function WorkspaceControls({
             disabled={pending}
           >
             {partnerName}
-          </button>
+          </Button>
           <input type="hidden" name="pref" defaultValue="me" />
         </div>
       </fieldset>
@@ -85,18 +85,18 @@ export function WorkspaceControls({
       )}
       <div className="flex flex-wrap gap-2">
         {lock === "editing" && (
-          <button className={btn} name="intent" value="propose" disabled={pending}>
+          <Button name="intent" value="propose" disabled={pending}>
             Propose lock-in
-          </button>
+          </Button>
         )}
         {theyProposed && (
           <>
-            <button className={btn} name="intent" value="confirm" disabled={pending}>
+            <Button name="intent" value="confirm" disabled={pending}>
               Confirm lock-in
-            </button>
-            <button className={btnSecondary} name="intent" value="keepEditing" disabled={pending}>
+            </Button>
+            <Button variant="secondary" name="intent" value="keepEditing" disabled={pending}>
               Keep editing
-            </button>
+            </Button>
           </>
         )}
       </div>

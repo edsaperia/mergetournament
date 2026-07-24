@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import type { ActionState } from "../../../server/actions";
 import { ActionStatus } from "../../action-status";
+import { Button } from "../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -26,7 +27,6 @@ export function ControlButton({
   disabledReason?: string;
 }) {
   const [state, dispatch, pending] = useActionState(async () => action(), initial);
-  const pad = small ? "rounded-md px-2.5 py-1.5 text-sm" : "rounded-lg px-5 py-3";
   return (
     <form
       action={dispatch}
@@ -35,17 +35,14 @@ export function ControlButton({
       }}
       className="inline-flex flex-col gap-1"
     >
-      <button
+      <Button
+        variant={primary ? "primary" : "secondary"}
+        size={small ? "sm" : "lg"}
         disabled={pending || disabled}
         title={disabled ? disabledReason : undefined}
-        className={
-          primary
-            ? `${pad} bg-accent font-medium text-accent-ink hover:bg-accent-soft disabled:opacity-40`
-            : `${pad} border border-line font-medium disabled:opacity-40`
-        }
       >
         {pending ? "…" : label}
-      </button>
+      </Button>
       <ActionStatus state={state} />
     </form>
   );

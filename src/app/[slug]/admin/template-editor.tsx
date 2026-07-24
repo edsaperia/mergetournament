@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateSettingsAction, type ActionState } from "../../../server/actions";
-import { btnPrimary, fieldLabel } from "../../ui";
+import { Button, fieldLabel } from "../../ui";
 
 /**
  * The default submission every participant's draft starts from. The box
@@ -48,9 +48,9 @@ export function TemplateEditor({
       </div>
       {prePublish && (
         <div className="flex items-center gap-3">
-          <button type="button" className={btnPrimary} disabled={pending} onClick={save}>
+          <Button type="button" disabled={pending} onClick={save}>
             Save template
-          </button>
+          </Button>
           {status.message && (
             <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
           )}

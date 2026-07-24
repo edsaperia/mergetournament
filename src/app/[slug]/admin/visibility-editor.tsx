@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateSettingsAction, type ActionState } from "../../../server/actions";
-import { btnPrimary, field, fieldLabel } from "../../ui";
+import { Button, field, fieldLabel } from "../../ui";
 
 /** Who can watch — editable at any phase. Lives in the Settings section under the timeline. */
 export function VisibilityEditor({
@@ -29,9 +29,8 @@ export function VisibilityEditor({
         <option value="participants_only">Participants only</option>
       </select>
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
-          className={btnPrimary}
           disabled={pending || vis === visibility}
           onClick={() =>
             startTransition(async () =>
@@ -40,7 +39,7 @@ export function VisibilityEditor({
           }
         >
           Save
-        </button>
+        </Button>
         {status.message && (
           <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
         )}

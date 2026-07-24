@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { postMessageAction, type ActionState } from "../../server/actions";
 import type { MessageView } from "../../services/chat-service";
+import { Button } from "../ui";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -112,9 +113,9 @@ export function ChatPanel({
                 autoComplete="off"
                 className="min-w-0 flex-1 rounded-md border border-line px-2 py-1.5 text-base sm:text-sm"
               />
-              <button disabled={pending} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink disabled:opacity-50">
+              <Button size="sm" disabled={pending}>
                 Send
-              </button>
+              </Button>
             </form>
           )}
           {!canPost && readOnlyNote && (

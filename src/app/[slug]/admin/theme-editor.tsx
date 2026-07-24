@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateThemeAction, type ActionState } from "../../../server/actions";
 import { THEME_PRESETS, THEME_TOKENS, type ThemeOverrides } from "../../../lib/theme";
-import { btnPrimary } from "../../ui";
+import { Button } from "../../ui";
 
 /**
  * Per-tournament colors: every design token, light and dark, defaulting to
@@ -60,9 +60,9 @@ export function ThemeEditor({ slug, current }: { slug: string; current: ThemeOve
           Loads the palette into the pickers below — tweak anything, then save.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="button" className={btnPrimary} disabled={pending} onClick={save}>
+          <Button type="button" disabled={pending} onClick={save}>
             Save theme
-          </button>
+          </Button>
           {status.message && (
             <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
           )}

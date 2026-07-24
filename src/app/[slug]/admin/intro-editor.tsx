@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateSettingsAction, type ActionState } from "../../../server/actions";
-import { btnPrimary, btnSecondary, fieldLabel } from "../../ui";
+import { Button, fieldLabel } from "../../ui";
 import { TestInviteButton } from "./test-invite-button";
 
 /**
@@ -63,13 +63,13 @@ export function IntroEditor({
         />
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className={btnPrimary} disabled={pending || value === intro} onClick={save}>
+        <Button type="button" disabled={pending || value === intro} onClick={save}>
           Save intro
-        </button>
+        </Button>
         {value.trim() === "" && (
-          <button type="button" className={btnSecondary} onClick={() => setValue(example)}>
+          <Button type="button" variant="secondary" onClick={() => setValue(example)}>
             Start from the example
-          </button>
+          </Button>
         )}
         {status.message && (
           <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>

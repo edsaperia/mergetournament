@@ -10,6 +10,7 @@ import {
 } from "../../../server/actions";
 import Link from "next/link";
 import { ActionStatus } from "../../action-status";
+import { Modal } from "../../modal";
 import { NumberedText } from "../../numbered-text";
 import { TestInviteButton } from "./test-invite-button";
 
@@ -299,14 +300,7 @@ export function Roster({
       <TestInviteButton slug={slug} />
 
       {viewing && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setViewing(null)}
-        >
-          <div
-            className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-edge bg-background shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <Modal label={`${viewing.name}'s draft`} onDismiss={() => setViewing(null)} className="flex max-w-3xl flex-col">
             <div className="flex items-baseline justify-between border-b border-edge px-4 py-3">
               <p className="font-semibold">
                 {viewing.name}&apos;s draft
@@ -326,8 +320,7 @@ export function Roster({
             <div className="overflow-y-auto p-2">
               <NumberedText body={viewing.draftBody ?? ""} />
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

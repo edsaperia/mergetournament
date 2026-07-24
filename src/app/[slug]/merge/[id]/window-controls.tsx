@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import { ActionStatus } from "../../../action-status";
-import { btnPrimary as btn, btnSecondary } from "../../../ui";
+import { Button } from "../../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -40,9 +40,9 @@ export function WindowControls({
       {!iAmActive ? (
         <>
           <p className="font-semibold">Time is up — are you still here?</p>
-          <button className={`${btn} text-lg`} name="intent" value="stillHere" disabled={pending}>
+          <Button className="text-lg" name="intent" value="stillHere" disabled={pending}>
             YES!
-          </button>
+          </Button>
         </>
       ) : (
         <>
@@ -51,12 +51,17 @@ export function WindowControls({
             closes, what should advance?
           </p>
           <div className="flex flex-wrap gap-2">
-            <button className={myChoice === "working" ? btn : btnSecondary} name="intent" value="working" disabled={pending}>
+            <Button variant={myChoice === "working" ? "primary" : "secondary"} name="intent" value="working" disabled={pending}>
               The working text
-            </button>
-            <button className={myChoice === "input" || myChoice === null ? btn : btnSecondary} name="intent" value="input" disabled={pending}>
+            </Button>
+            <Button
+              variant={myChoice === "input" || myChoice === null ? "primary" : "secondary"}
+              name="intent"
+              value="input"
+              disabled={pending}
+            >
               Your own input{myChoice === null && " (default)"}
-            </button>
+            </Button>
           </div>
           <p className="text-xs text-muted">
             If {partnerName} returns and presses YES, a coin flip between the

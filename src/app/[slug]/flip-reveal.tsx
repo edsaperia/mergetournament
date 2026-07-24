@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Modal } from "../modal";
 
 /**
  * The performed coin flip (SPEC §4): a centered modal saying what is being
@@ -67,30 +68,24 @@ export function FlipReveal({
   if (phase === "pending") return null;
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-        onClick={() => {
-          if (phase === "revealed") setPhase("done");
-        }}
+      <Modal
+        label="Coin flip"
+        onDismiss={phase === "revealed" ? () => setPhase("done") : undefined}
+        className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
       >
-        <div
-          className="flex w-full max-w-md flex-col items-center gap-4 rounded-xl border border-edge bg-background p-8 text-center shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="text-4xl" aria-hidden>
-            🪙
-          </span>
-          <p className="text-sm text-muted">{title}</p>
-          {phase === "animating" ? (
-            <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
-          ) : (
-            <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
-          )}
-          <p className="text-xs text-faint">
-            {phase === "animating" ? "the coin is in the air…" : "decided — click outside to dismiss"}
-          </p>
-        </div>
-      </div>
+        <span className="text-4xl" aria-hidden>
+          🪙
+        </span>
+        <p className="text-sm text-muted">{title}</p>
+        {phase === "animating" ? (
+          <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
+        ) : (
+          <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
+        )}
+        <p className="text-xs text-faint">
+          {phase === "animating" ? "the coin is in the air…" : "decided — click outside to dismiss"}
+        </p>
+      </Modal>
       {children}
     </>
   );
