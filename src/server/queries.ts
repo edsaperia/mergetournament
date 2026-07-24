@@ -44,6 +44,19 @@ export const rosterFor = cache(async (tournamentId: string) => {
   return db.select().from(participants).where(eq(participants.tournamentId, tournamentId));
 });
 
+/** participant id → display name, for labelling bracket cards and merges. */
+export const nameMapFor = cache(async (tournamentId: string): Promise<Map<string, string>> => {
+  return new Map((await rosterFor(tournamentId)).map((p) => [p.id, p.name]));
+});
+
+/** One round's merges, resolved through its slots. */
+export async function roundMerges(tournamentId: string, roundNo: number) {
+  const slotIds = new Set(
+    (await slotsFor(tournamentId)).filter((s) => s.roundNo === roundNo).map((s) => s.id)
+  );
+  return (await mergesFor(tournamentId)).filter((m) => slotIds.has(m.slotId));
+}
+
 export interface ScheduleContext {
   allRounds: Round[];
   config: ScheduleConfig;

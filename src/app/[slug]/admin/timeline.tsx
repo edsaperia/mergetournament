@@ -1,6 +1,6 @@
 import type { Round, Tournament } from "../../../db/schema";
 import { numRounds } from "../../../lib/bracket";
-import { projectedStarts, scheduledStarts, type RoundProgress } from "../../../lib/schedule";
+import { projectedStarts, scheduledStarts, wallClockIso, type RoundProgress } from "../../../lib/schedule";
 import {
   beginAction,
   closeSubmissionsAction,
@@ -93,13 +93,9 @@ export function Timeline({
   const starts = prePublish ? scheduledStarts(config) : projectedStarts(config, progress);
   const roundEnd = (k: number) => progress[k - 1]?.actualClose ?? starts[k - 1] + t.roundDurationS;
 
-  /** Wall-clock instant for an effective offset, when an anchor exists. */
+  // Pre-begin, the planned startAt anchors the projection instead.
   const wallIso = (s: number): string | null =>
-    t.begunAt
-      ? new Date(t.begunAt.getTime() + (t.totalPausedS + s) * 1000).toISOString()
-      : t.startAt
-        ? new Date(t.startAt.getTime() + s * 1000).toISOString()
-        : null;
+    wallClockIso(t, s) ?? (t.startAt ? new Date(t.startAt.getTime() + s * 1000).toISOString() : null);
 
   const Span = ({ fromS, toS }: { fromS: number; toS: number }) => {
     const from = wallIso(fromS);

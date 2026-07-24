@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
 import { warnThresholds } from "../../../../lib/schedule";
-import { rosterFor, scheduleContext } from "../../../../server/queries";
+import { nameMapFor, scheduleContext } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
 import { collabWsUrl } from "../../../../server/collab";
@@ -39,8 +39,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
 
   const [textA] = m.textAId ? await db.select().from(textVersions).where(eq(textVersions.id, m.textAId)) : [];
   const [textB] = m.textBId ? await db.select().from(textVersions).where(eq(textVersions.id, m.textBId)) : [];
-  const roster = await rosterFor(tournament.id);
-  const nameOf = new Map(roster.map((p) => [p.id, p.name]));
+  const nameOf = await nameMapFor(tournament.id);
 
   const mySide = me && m.bearerAId === me.id ? "A" : me && m.bearerBId === me.id ? "B" : null;
   const paused = ctx.paused;

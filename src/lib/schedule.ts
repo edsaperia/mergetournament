@@ -33,6 +33,18 @@ function checkConfig(c: ScheduleConfig): void {
   }
 }
 
+/**
+ * The inverse of `effectiveNow`: the wall-clock instant of an
+ * effective-seconds offset, or null before Begin. Pauses that happen later
+ * shift these — printed times are a ceiling, like the schedule itself.
+ */
+export function wallClockIso(
+  t: { begunAt: Date | null; totalPausedS: number },
+  s: number
+): string | null {
+  return t.begunAt ? new Date(t.begunAt.getTime() + (t.totalPausedS + s) * 1000).toISOString() : null;
+}
+
 /** Convert a wall-clock instant to effective seconds since Begin. */
 export function effectiveNow(
   nowMs: number,

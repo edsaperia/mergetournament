@@ -2,8 +2,8 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { textVersions, type Tournament } from "../../db/schema";
-import { projectedStarts, warnThresholds } from "../../lib/schedule";
-import { mergesFor, rosterFor, scheduleContext, slotsFor } from "../../server/queries";
+import { projectedStarts, wallClockIso, warnThresholds } from "../../lib/schedule";
+import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../server/queries";
 import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
 import { LocalTime } from "../local-time";
@@ -29,13 +29,12 @@ export async function BracketView({
   const { allRounds, config, progress, running, paused, te } = ctx;
   const allSlots = await slotsFor(tournament.id);
   const allMerges = await mergesFor(tournament.id);
-  const roster = await rosterFor(tournament.id);
+  const nameOf = await nameMapFor(tournament.id);
   const texts = await db
     .select({ id: textVersions.id, kind: textVersions.kind, wordCount: textVersions.wordCount, authorId: textVersions.authorId })
     .from(textVersions)
     .where(eq(textVersions.tournamentId, tournament.id));
 
-  const nameOf = new Map(roster.map((p) => [p.id, p.name]));
   const textById = new Map(texts.map((t) => [t.id, t]));
   const mergeBySlot = new Map(allMerges.map((m) => [m.slotId, m]));
 
@@ -48,11 +47,7 @@ export async function BracketView({
 
   const starts = allRounds.length > 0 ? projectedStarts(config, progress) : [];
 
-  /** Wall-clock instant for an effective-seconds offset, once Begin exists. */
-  const wallIso = (s: number): string | null =>
-    tournament.begunAt
-      ? new Date(tournament.begunAt.getTime() + (tournament.totalPausedS + s) * 1000).toISOString()
-      : null;
+  const wallIso = (s: number) => wallClockIso(tournament, s);
 
   const TimeSpan = ({ fromS, toS }: { fromS: number; toS: number }) => {
     const dur = `${Math.round((toS - fromS) / 60)}m`;
