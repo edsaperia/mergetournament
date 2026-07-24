@@ -177,7 +177,7 @@ export function Timeline({
         )}
         {state === "open" && (
           <span className="inline-flex items-center gap-2 text-sm">
-            <span className={t.pausedAt ? "text-amber-600" : "text-live-ink"}>
+            <span className={t.pausedAt ? "text-warn" : "text-live-ink"}>
               {t.pausedAt ? "paused" : "open now"}
             </span>
             {!readOnly && (
@@ -190,7 +190,7 @@ export function Timeline({
             )}
           </span>
         )}
-        {state === "closing" && <span className="text-sm text-amber-600">backstop window — are you still here?</span>}
+        {state === "closing" && <span className="text-sm text-warn">backstop window — are you still here?</span>}
       </Row>
     );
   }

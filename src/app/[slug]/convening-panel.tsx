@@ -28,7 +28,7 @@ export async function ConveningPanel({
         <ControlButton action={readyAction.bind(null, slug)} label="I'm ready" />
       )}
       {me && me.role === "participant" && me.ready && (
-        <span className="text-sm font-medium text-green-600">You&apos;re ready ✓</span>
+        <span className="text-sm font-medium text-ok">You&apos;re ready ✓</span>
       )}
     </div>
   );

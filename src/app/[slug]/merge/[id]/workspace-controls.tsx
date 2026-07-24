@@ -79,7 +79,7 @@ export function WorkspaceControls({
       </fieldset>
 
       {lock === "proposed" && (
-        <p className="text-sm text-amber-600">
+        <p className="text-sm text-warn">
           {iProposed ? `You proposed to lock in — waiting for ${partnerName}` : `${partnerName} proposed to lock in`}
         </p>
       )}

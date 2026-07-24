@@ -29,10 +29,16 @@ describe("theme validation", () => {
 });
 
 describe("theme presets", () => {
-  it("every preset covers every token and passes validation", () => {
-    const keys = THEME_TOKENS.map((t) => t.key).sort();
+  it("every preset covers every core token and passes validation", () => {
+    // Status and comment tokens are deliberately stock in presets — warnings
+    // must read the same in every palette. The default preset covers all.
+    const core = THEME_TOKENS.filter((t) => t.group !== "Status" && t.group !== "Comments")
+      .map((t) => t.key)
+      .sort();
+    const all = THEME_TOKENS.map((t) => t.key).sort();
     for (const p of THEME_PRESETS) {
-      expect(Object.keys(p.overrides).sort(), p.name).toEqual(keys);
+      const covered = Object.keys(p.overrides).sort();
+      expect(covered, p.name).toEqual(p.key === "default" ? all : core);
       expect(() => validateTheme(p.overrides), p.name).not.toThrow();
       expect(themeCss(p.overrides)).toContain("--color-accent:");
     }

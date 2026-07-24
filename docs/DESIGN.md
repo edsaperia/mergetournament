@@ -21,27 +21,32 @@ palette shades. **Rebranding starts and mostly ends in that file.**
 | `edge` / `edge-faint` / `line` / `strong` | section borders / hairlines / control borders / hovered borders |
 | `accent` / `accent-ink` / `accent-soft` | primary actions (currently near-black ⇄ white; make it cornflower blue here) |
 | `live` / `live-ink` | "you are here", presence highlights |
+| `ok` / `ok-surface` | success, readiness ticks, the canonical-text banner |
+| `warn` / `warn-surface` | time pressure: backstop window, pause, proposed-freeze |
+| `danger` / `danger-surface` | expiring countdowns, errors, unsaved-draft banner |
+| `note` / `note-soft` / `note-surface` | line-comment threads and composer |
+
+Per-tournament theme overrides ([`src/lib/theme.ts`](../src/lib/theme.ts))
+cover every token; the ready-made presets deliberately leave status and
+comment tokens stock so warnings read the same in every palette.
 
 Typography: Geist Sans (body) and Geist Mono (documents, code, countdowns),
 loaded in `src/app/layout.tsx`, exposed as `--font-sans` / `--font-mono`.
 Spacing and radii are Tailwind defaults (`rounded-lg` cards/buttons,
 `rounded-md` inputs); not yet tokenized.
 
-## Shared control styles
+## Shared controls
 
-[`src/app/ui.ts`](../src/app/ui.ts): `btnPrimary`, `btnSecondary`, `field`,
-`fieldLabel` as class strings. Deliberately not yet a `<Button>` component —
-if design iteration gets serious, promote these to components first so
-variants stop being string concatenation.
+[`src/app/ui.tsx`](../src/app/ui.tsx): the `<Button>` component
+(variant × size) plus `field`/`fieldLabel` class strings for form inputs.
+[`src/app/modal.tsx`](../src/app/modal.tsx): the one `<Modal>` — Escape and
+click-outside dismissal, focus handling, aria-modal — used by the flip
+reveal, the roster draft viewer, and the pause overlay.
 
 ## Not yet tokenized (known debt)
 
-- **Status colors** are raw Tailwind hues used consistently by meaning:
-  amber = time pressure (backstop window, pause, proposed-freeze),
-  green = success/agreement, red = errors/destructive, blue = comment
-  annotations. Tokenize as `warn`/`ok`/`danger`/`note` when the palette lands.
 - **Spacing/radius/type scale**: Tailwind defaults, un-aliased.
-- **No logo, favicon is the Next.js default**, no brand typography.
+- **Form fields** are still class strings, not components.
 
 ## Component inventory
 
@@ -68,7 +73,5 @@ variants stop being string concatenation.
 - **Observer view is projector-first**: large type, high contrast, passive.
   Currently it's just the normal bracket — a dedicated projector mode
   (bigger countdowns, no chrome) is future work.
-- **Mobile one-handed**: layouts are responsive but unpolished; the merge
-  workspace's three panes stack vertically and need real mobile design.
-- The pause state should be a full-screen blurred modal per SPEC §4;
-  currently it's a banner.
+- **Mobile one-handed**: a first mobile pass is in (16px inputs, wrapping
+  tabs, truncating header); still owed a real-device shakedown.

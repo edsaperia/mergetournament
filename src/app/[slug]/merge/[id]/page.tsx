@@ -90,7 +90,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           />
         )}
         {ctx.running && round.state === "closing" && (
-          <span className="text-lg text-amber-600">
+          <span className="text-lg text-warn">
             backstop <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
           </span>
         )}

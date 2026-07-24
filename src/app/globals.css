@@ -40,6 +40,19 @@
   --color-live: light-dark(#3b82f6, #60a5fa);
   --color-live-ink: light-dark(#2563eb, #93c5fd);
 
+  /* Status: outcomes and urgency (ready ticks, countdown warnings, backstop) */
+  --color-ok: light-dark(#16a34a, #4ade80);
+  --color-ok-surface: light-dark(#f0fdf4, #052e16);
+  --color-warn: light-dark(#d97706, #fbbf24);
+  --color-warn-surface: light-dark(#fffbeb, #451a03);
+  --color-danger: light-dark(#dc2626, #f87171);
+  --color-danger-surface: light-dark(#fef2f2, #450a0a);
+
+  /* Comment threads */
+  --color-note: light-dark(#60a5fa, #3b82f6);
+  --color-note-soft: light-dark(#bfdbfe, #1e3a8a);
+  --color-note-surface: light-dark(#eff6ff, #172033);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

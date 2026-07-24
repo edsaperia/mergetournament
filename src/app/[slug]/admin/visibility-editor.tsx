@@ -41,7 +41,7 @@ export function VisibilityEditor({
           Save
         </Button>
         {status.message && (
-          <span className={status.ok ? "text-sm text-muted" : "text-sm text-red-600"}>{status.message}</span>
+          <span className={status.ok ? "text-sm text-muted" : "text-sm text-danger"}>{status.message}</span>
         )}
       </div>
     </div>

@@ -31,6 +31,15 @@ export const THEME_TOKENS: ThemeToken[] = [
   { key: "accent-soft", label: "Primary button hover", group: "Accent", light: "#404040", dark: "#e5e5e5" },
   { key: "live", label: "You-are-here highlight", group: "Live", light: "#3b82f6", dark: "#60a5fa" },
   { key: "live-ink", label: "You-are-here text", group: "Live", light: "#2563eb", dark: "#93c5fd" },
+  { key: "ok", label: "Positive / ready", group: "Status", light: "#16a34a", dark: "#4ade80" },
+  { key: "ok-surface", label: "Positive surface", group: "Status", light: "#f0fdf4", dark: "#052e16" },
+  { key: "warn", label: "Warning / backstop", group: "Status", light: "#d97706", dark: "#fbbf24" },
+  { key: "warn-surface", label: "Warning surface", group: "Status", light: "#fffbeb", dark: "#451a03" },
+  { key: "danger", label: "Danger / expiring", group: "Status", light: "#dc2626", dark: "#f87171" },
+  { key: "danger-surface", label: "Danger surface", group: "Status", light: "#fef2f2", dark: "#450a0a" },
+  { key: "note", label: "Comment accent", group: "Comments", light: "#60a5fa", dark: "#3b82f6" },
+  { key: "note-soft", label: "Comment thread edge", group: "Comments", light: "#bfdbfe", dark: "#1e3a8a" },
+  { key: "note-surface", label: "Comment surface", group: "Comments", light: "#eff6ff", dark: "#172033" },
 ];
 
 /** token key -> { light, dark } hex overrides. */
@@ -49,9 +58,12 @@ function preset(pairs: Record<string, [string, string]>): ThemeOverrides {
 }
 
 /**
- * Ready-made palettes covering every token, applied via the theme editor
+ * Ready-made palettes covering the core tokens, applied via the theme editor
  * (they load into the pickers; saving is still explicit). Each is tuned for
  * both modes: dark accents flip to lighter hues so button text stays legible.
+ * Status and comment tokens are deliberately left stock — amber warnings and
+ * green ticks should read the same in every palette (still overridable
+ * per-token in the editor).
  */
 export const THEME_PRESETS: ThemePreset[] = [
   {

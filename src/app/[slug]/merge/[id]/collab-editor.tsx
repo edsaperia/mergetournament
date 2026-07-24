@@ -86,7 +86,7 @@ export function CollabEditor({
       <div
         ref={host}
         className={`overflow-hidden rounded-md border ${
-          readOnly ? "border-amber-400" : "border-line"
+          readOnly ? "border-warn" : "border-line"
         }`}
       />
       <p className="mt-1 flex justify-between text-xs text-muted">

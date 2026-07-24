@@ -51,7 +51,7 @@ export async function BreakPanel({
           label={`I'm ready for round ${next.number}`}
         />
       )}
-      {mine && iAmReady && <span className="text-sm font-medium text-green-600">You&apos;re ready ✓</span>}
+      {mine && iAmReady && <span className="text-sm font-medium text-ok">You&apos;re ready ✓</span>}
     </div>
   );
 }

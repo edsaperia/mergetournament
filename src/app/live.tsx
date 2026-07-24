@@ -84,9 +84,9 @@ export function Countdown({
   }, [remainingS, paused]);
   const urgency =
     !paused && dangerAtS !== undefined && display <= dangerAtS
-      ? "text-red-600 animate-pulse"
+      ? "text-danger animate-pulse"
       : !paused && warnAtS !== undefined && display <= warnAtS
-        ? "text-amber-600"
+        ? "text-warn"
         : "";
   return (
     <span className={`tabular-nums font-mono ${paused ? "opacity-50" : ""} ${urgency} ${className}`}>

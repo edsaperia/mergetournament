@@ -122,7 +122,7 @@ export async function BracketView({
                     />
                   )}
                   {round.state === "closing" && running && (
-                    <span className="text-amber-600">
+                    <span className="text-warn">
                       backstop <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
                     </span>
                   )}
@@ -212,7 +212,7 @@ export async function BracketView({
                             <span className="text-muted">{RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}</span>
                           )
                         ) : m.state === "open" ? (
-                          <span className="text-green-600">negotiating</span>
+                          <span className="text-ok">negotiating</span>
                         ) : (
                           <span className="text-faint">{m.state}</span>
                         )}
@@ -245,7 +245,7 @@ async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tourna
   return (
     <div className="mt-6">
       <h2 className="mb-2 text-2xl font-bold">Merge Tournament Over!</h2>
-      <p className="rounded-lg border-2 border-green-600 p-4 text-lg">
+      <p className="rounded-lg border-2 border-ok p-4 text-lg">
         🏆 The canonical text has emerged:{" "}
         <Link className="font-semibold underline" href={`/${tournament.slug}/text`}>
           read it

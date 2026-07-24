@@ -80,13 +80,13 @@ function EditableCell({
 }
 
 const EMAIL_STATUS_STYLE: Record<string, string> = {
-  delivered: "text-green-600",
-  opened: "text-green-600",
-  clicked: "text-green-600",
+  delivered: "text-ok",
+  opened: "text-ok",
+  clicked: "text-ok",
   sent: "text-muted",
-  bounced: "text-red-600 font-semibold",
-  complained: "text-red-600 font-semibold",
-  delivery_delayed: "text-amber-600",
+  bounced: "text-danger font-semibold",
+  complained: "text-danger font-semibold",
+  delivery_delayed: "text-warn",
 };
 
 interface InviteLine {
@@ -175,7 +175,7 @@ function BulkInvite({ slug, disabled }: { slug: string; disabled: boolean }) {
         </button>
       </div>
       {feedback.lines.length > 0 && (
-        <ul className={`text-sm ${feedback.ok ? "text-muted" : "text-red-600"}`}>
+        <ul className={`text-sm ${feedback.ok ? "text-muted" : "text-danger"}`}>
           {feedback.lines.map((line, i) => (
             <li key={i}>{line}</li>
           ))}
@@ -274,7 +274,7 @@ export function Roster({
                       name="intent"
                       value="remove"
                       disabled={rowPending}
-                      className="text-xs text-red-600 underline hover:no-underline disabled:opacity-50"
+                      className="text-xs text-danger underline hover:no-underline disabled:opacity-50"
                     >
                       remove
                     </button>

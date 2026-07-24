@@ -51,7 +51,7 @@ export function PauseOverlay({
  */
 export function AdminPauseBar({ slug, children }: { slug: string; children: React.ReactNode }) {
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-amber-400 bg-amber-50 py-1.5 pl-4 pr-2 text-sm font-medium text-amber-800 shadow-lg dark:bg-amber-950 dark:text-amber-200">
+    <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-warn bg-warn-surface py-1.5 pl-4 pr-2 text-sm font-medium text-warn shadow-lg">
       <AutoRefresh slug={slug} />
       <span>⏸ Tournament paused</span>
       {children}

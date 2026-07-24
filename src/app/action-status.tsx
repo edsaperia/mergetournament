@@ -6,9 +6,7 @@ export function ActionStatus({ state }: { state: ActionState }) {
   return (
     <div
       className={`rounded-md px-3 py-2 text-sm ${
-        state.ok
-          ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-          : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
+        state.ok ? "bg-ok-surface text-ok" : "bg-danger-surface text-danger"
       }`}
     >
       <p>{state.message}</p>

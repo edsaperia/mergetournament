@@ -92,7 +92,7 @@ export function CommentableText({
           </div>
           {!collapsed.has(i) &&
             (byLine.get(i) ?? []).map((c) => (
-            <div key={c.id} className="ml-12 border-l-2 border-blue-200 bg-blue-50/50 px-3 py-1 font-sans text-xs dark:border-blue-900 dark:bg-blue-950/30">
+            <div key={c.id} className="ml-12 border-l-2 border-note-soft bg-note-surface px-3 py-1 font-sans text-xs">
               <span className="font-semibold">{c.author}</span>{" "}
               <span className="text-faint">
                 {new Date(c.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
@@ -101,7 +101,7 @@ export function CommentableText({
             </div>
           ))}
           {target === i && canComment && (
-            <form action={dispatch} className="ml-12 flex gap-2 border-l-2 border-blue-400 bg-blue-50 px-3 py-2 font-sans dark:bg-blue-950/50">
+            <form action={dispatch} className="ml-12 flex gap-2 border-l-2 border-note bg-note-surface px-3 py-2 font-sans">
               <input type="hidden" name="line" value={i} />
               <input
                 name="body"
@@ -118,7 +118,7 @@ export function CommentableText({
           )}
         </div>
       ))}
-      {!state.ok && <p className="px-3 py-1 font-sans text-xs text-red-600">{state.message}</p>}
+      {!state.ok && <p className="px-3 py-1 font-sans text-xs text-danger">{state.message}</p>}
     </div>
   );
 }

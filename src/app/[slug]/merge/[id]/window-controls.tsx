@@ -36,7 +36,7 @@ export function WindowControls({
   );
 
   return (
-    <form action={dispatch} className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-amber-500 bg-amber-50 p-4 dark:bg-amber-950/30">
+    <form action={dispatch} className="mt-3 flex flex-col gap-3 rounded-lg border-2 border-warn bg-warn-surface p-4">
       {!iAmActive ? (
         <>
           <p className="font-semibold">Time is up — are you still here?</p>

@@ -69,7 +69,7 @@ export function DraftEditor({ slug, initialBody }: { slug: string; initialBody: 
         <span className="text-muted">{status.ok ? status.text || "Autosaves as you type" : ""}</span>
       </div>
       {!status.ok && (
-        <p className="rounded-md border border-red-400 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300">
+        <p className="rounded-md border border-danger bg-danger-surface px-3 py-2 text-sm font-medium text-danger">
           ⚠ Not saved: {status.text}
         </p>
       )}

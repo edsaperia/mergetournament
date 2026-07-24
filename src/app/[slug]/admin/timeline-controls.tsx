@@ -23,7 +23,7 @@ function useStatus() {
 
 function StatusNote({ status }: { status: ActionState }) {
   if (!status.message) return null;
-  return <span className={status.ok ? "text-xs text-muted" : "text-xs text-red-600"}>{status.message}</span>;
+  return <span className={status.ok ? "text-xs text-muted" : "text-xs text-danger"}>{status.message}</span>;
 }
 
 /** Set / change / clear one scheduled instant (deadline, Start Tournament, Round 1). */
