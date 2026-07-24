@@ -34,7 +34,8 @@ export default async function SysadminPage() {
     <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
       <h1 className="text-2xl font-bold">All tournaments</h1>
       <p className="mt-1 text-sm text-muted">{rows.length} on this instance</p>
-      <table className="mt-6 w-full text-left text-sm">
+      <div className="mt-6 overflow-x-auto">
+      <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-edge text-muted">
             <th className="py-2 pr-4 font-medium">Slug</th>
@@ -72,6 +73,7 @@ export default async function SysadminPage() {
           ))}
         </tbody>
       </table>
+      </div>
     </main>
   );
 }

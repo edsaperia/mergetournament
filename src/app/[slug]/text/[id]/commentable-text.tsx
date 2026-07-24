@@ -80,7 +80,10 @@ export function CommentableText({
                 title={byLine.has(i) ? "Show or hide this line's comments" : "Comment on this line"}
                 aria-label={`Comments on line ${i + 1}`}
                 className={`w-8 shrink-0 select-none text-center text-xs leading-6 text-muted hover:text-foreground ${
-                  target === i || byLine.has(i) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  target === i || byLine.has(i)
+                    ? "opacity-100"
+                    : // Hover reveal needs a hover: touch screens keep a faint icon.
+                      "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-50"
                 }`}
               >
                 💬{byLine.has(i) ? byLine.get(i)!.length : ""}
@@ -106,7 +109,7 @@ export function CommentableText({
                 maxLength={4000}
                 autoFocus
                 placeholder={`Comment on line ${i + 1}…`}
-                className="min-w-0 flex-1 rounded-md border border-line px-2 py-1 text-xs"
+                className="min-w-0 flex-1 rounded-md border border-line px-2 py-1 text-base sm:text-xs"
               />
               <button disabled={pending} className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-accent-ink disabled:opacity-50">
                 Comment

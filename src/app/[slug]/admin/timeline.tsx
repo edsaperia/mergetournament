@@ -227,7 +227,7 @@ export function Timeline({
   }
 
   return (
-    <div>
+    <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-muted">

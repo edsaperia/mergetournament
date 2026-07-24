@@ -77,11 +77,6 @@ export async function BracketView({
           <Countdown remainingS={ctx.globalRemaining()} paused={paused} className="text-base" />
         </p>
       )}
-      {paused && (
-        <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Tournament paused by the admin.
-        </p>
-      )}
       <div className="flex flex-col gap-3 pb-4">
         {allRounds.map((round) => {
           const roundSlots = allSlots.filter((s) => s.roundNo === round.number);

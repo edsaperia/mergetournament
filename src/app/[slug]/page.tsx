@@ -9,6 +9,7 @@ import { mergesFor, rosterFor, scheduleContext, slotsFor } from "../../server/qu
 import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { AutoRefresh, RefreshAt } from "../live";
 import { HowItWorks } from "./how-it-works";
+import { IntroFold } from "./intro-fold";
 import { LocalTime } from "../local-time";
 import { NumberedText } from "../numbered-text";
 import { ControlButton } from "./admin/admin-controls";
@@ -48,7 +49,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
   const live = tournament.phase === "convening" || tournament.phase === "running";
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
       {live && <AutoRefresh slug={slug} />}
       {tournament.phase === "submission" && tournament.submissionDeadline && (
         <RefreshAt iso={tournament.submissionDeadline.toISOString()} />
@@ -151,12 +152,7 @@ function IntroSection({ tournament, viewerRole }: { tournament: Tournament; view
   if (!intro && !preStart) return null;
   return (
     <section className="mb-6 flex flex-col gap-3">
-      {intro && (
-        <details open={preStart} className="rounded-md border border-edge px-4 py-3 text-sm">
-          <summary className="cursor-pointer font-semibold">About this tournament</summary>
-          <p className="mt-2 whitespace-pre-wrap text-soft">{intro}</p>
-        </details>
-      )}
+      {intro && <IntroFold slug={tournament.slug}>{intro}</IntroFold>}
       {preStart && (
         <>
           <HowItWorks open={viewerRole === "participant"} />

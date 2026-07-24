@@ -75,7 +75,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
     ) : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
       {live && <AutoRefresh slug={slug} />}
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">
@@ -97,11 +97,6 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         )}
       </div>
 
-      {paused && (
-        <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Tournament paused by the admin.
-        </p>
-      )}
       {m.state === "resolved" && (
         <div className="mb-4 rounded-md bg-panel px-3 py-2 text-sm">
           {(() => {

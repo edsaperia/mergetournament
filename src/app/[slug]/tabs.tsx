@@ -57,14 +57,14 @@ export function Tabs({
 
   return (
     <div>
-      <div className="mb-3 flex gap-1 border-b border-edge" role="tablist">
+      <div className="mb-3 flex flex-wrap gap-1 border-b border-edge" role="tablist">
         {labels.map((label, i) => (
           <button
             key={i}
             role="tab"
             aria-selected={active === i}
             onClick={() => select(i)}
-            className={`rounded-t-md px-4 py-2 text-sm font-medium ${
+            className={`rounded-t-md px-3 py-2 text-sm font-medium sm:px-4 ${
               active === i
                 ? "border border-b-0 border-edge bg-background"
                 : "text-muted hover:bg-wash hover:text-foreground"

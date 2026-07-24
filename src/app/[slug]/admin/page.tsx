@@ -8,7 +8,7 @@ export default async function AdminPage(props: PageProps<"/[slug]/admin">) {
   if (!tournament) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
       <h1 className="mb-4 text-xl font-bold">Admin</h1>
       <AdminDashboard slug={slug} />
     </main>

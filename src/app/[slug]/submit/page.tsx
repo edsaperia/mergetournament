@@ -42,7 +42,7 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
     .where(and(eq(textVersions.authorId, me.id), eq(textVersions.kind, "draft")));
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-8">
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:px-6">
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="text-xl font-bold">
           <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>

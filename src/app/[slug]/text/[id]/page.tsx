@@ -59,7 +59,7 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
   const live = tournament.phase === "convening" || tournament.phase === "running";
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">
       {live && <AutoRefresh slug={slug} />}
       <p className="mb-2 text-sm text-muted">
         <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>

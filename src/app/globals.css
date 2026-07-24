@@ -49,3 +49,14 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* CodeMirror text size: 16px on small screens — anything smaller makes iOS
+   Safari zoom the whole page every time an editor is focused. */
+:root {
+  --editor-font-size: 13px;
+}
+@media (max-width: 640px) {
+  :root {
+    --editor-font-size: 16px;
+  }
+}

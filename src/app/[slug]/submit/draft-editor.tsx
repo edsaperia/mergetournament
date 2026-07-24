@@ -37,7 +37,7 @@ export function DraftEditor({ slug, initialBody }: { slug: string; initialBody: 
           markdown(),
           EditorView.lineWrapping,
           EditorView.theme({
-            "&": { fontSize: "13px", minHeight: "24rem" },
+            "&": { fontSize: "var(--editor-font-size)", minHeight: "24rem" },
             ".cm-content": { fontFamily: "var(--font-geist-mono), monospace" },
           }),
           EditorView.updateListener.of((update) => {

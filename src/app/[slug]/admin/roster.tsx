@@ -213,6 +213,7 @@ export function Roster({
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-edge text-muted">
@@ -283,6 +284,7 @@ export function Roster({
           ))}
         </tbody>
       </table>
+      </div>
       <ActionStatus state={rowState} />
       <ActionStatus state={editStatus} />
 

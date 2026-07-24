@@ -51,7 +51,7 @@ export function WorkspaceControls({
           choice is what triggers a coin flip at confirmation. */}
       <fieldset className="rounded-md border border-edge p-3 text-sm">
         <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             className={myPref === mySide ? btn : btnSecondary}
             name="intent"
