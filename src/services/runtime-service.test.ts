@@ -11,7 +11,7 @@ import {
   tick,
   unpauseTournament,
 } from "./runtime-service";
-import { addParticipant, createTournament, saveDraft } from "./tournament-service";
+import { makeTournament } from "./test-fixture";
 
 class CaptureEmailer implements Emailer {
   sent: Email[] = [];
@@ -30,14 +30,13 @@ beforeAll(async () => {
 });
 
 async function setup(slug: string, n: number, emailer: Emailer) {
-  const t = await createTournament(db, { slug, name: slug, roundDurationS: 600, breakDurationS: 300 });
-  await addParticipant(db, emailer, BASE, t.id, { name: "Admin", email: `admin@${slug}.org`, role: "admin" });
-  const people = [];
-  for (let i = 0; i < n; i++) {
-    const p = await addParticipant(db, emailer, BASE, t.id, { name: `P${i}`, email: `p${i}@${slug}.org` });
-    await saveDraft(db, p.id, `Draft ${i} from P${i}.`);
-    people.push(p);
-  }
+  const { t, people } = await makeTournament(db, {
+    slug,
+    participants: n,
+    breakDurationS: 300,
+    emailer,
+    baseUrl: BASE,
+  });
   return { t, people };
 }
 

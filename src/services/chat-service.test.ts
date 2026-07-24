@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
 import { merges } from "../db/schema";
-import { ConsoleEmailer } from "../lib/email";
 import {
   addComment,
   commentsFor,
@@ -12,8 +11,8 @@ import {
   roomForMerge,
   roomForText,
 } from "./chat-service";
-import { beginTournament, mergeAction, publishBracket } from "./runtime-service";
-import { addParticipant, createTournament, saveDraft } from "./tournament-service";
+import { mergeAction } from "./runtime-service";
+import { makeTournament } from "./test-fixture";
 
 let db: TestDb;
 let tournamentId: string;
@@ -23,19 +22,17 @@ let draftId: string;
 
 beforeAll(async () => {
   ({ db } = await createTestDb());
-  const emailer = new ConsoleEmailer();
-  const t = await createTournament(db, { slug: "chat", name: "Chat", roundDurationS: 3600, breakDurationS: 60 });
+  const { t, admin, people, drafts } = await makeTournament(db, {
+    slug: "chat",
+    name: "Chat",
+    roundDurationS: 3600,
+    draftBody: (i) => (i === 0 ? "Line zero.\nLine one.\nLine two." : "Other draft."),
+    beginAt: new Date(),
+  });
   tournamentId = t.id;
-  const admin = await addParticipant(db, emailer, "http://x", t.id, { name: "Admin", email: "a@chat.org", role: "admin" });
   adminId = admin.id;
-  const p0 = await addParticipant(db, emailer, "http://x", t.id, { name: "P0", email: "p0@chat.org" });
-  const p1 = await addParticipant(db, emailer, "http://x", t.id, { name: "P1", email: "p1@chat.org" });
-  p0Id = p0.id;
-  const d0 = await saveDraft(db, p0.id, "Line zero.\nLine one.\nLine two.");
-  draftId = d0.id;
-  await saveDraft(db, p1.id, "Other draft.");
-  await publishBracket(db, emailer, "http://x", t.id);
-  await beginTournament(db, t.id, new Date());
+  p0Id = people[0].id;
+  draftId = drafts[0].id;
 });
 
 describe("rooms", () => {
@@ -71,11 +68,9 @@ describe("rooms", () => {
 
 describe("posting rules", () => {
   it("chat opens only when the bracket is published", async () => {
-    const emailer = new ConsoleEmailer();
-    const pre = await createTournament(db, { slug: "chat-pre", name: "Pre", roundDurationS: 600, breakDurationS: 60 });
-    const p = await addParticipant(db, emailer, "http://x", pre.id, { name: "Q", email: "q@pre.org" });
+    const { t: pre, people } = await makeTournament(db, { slug: "chat-pre", name: "Pre", participants: 1 });
     const room = await globalRoom(db, pre.id);
-    await expect(postMessage(db, room!.id, p.id, "too early")).rejects.toThrow(/when the tournament starts/);
+    await expect(postMessage(db, room!.id, people[0].id, "too early")).rejects.toThrow(/when the tournament starts/);
   });
 
   it("participants post anywhere; the admin only in global; attribution by name", async () => {

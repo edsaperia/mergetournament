@@ -7,7 +7,7 @@ import { verifySvixSignature } from "../lib/svix";
 import { warnThresholds } from "../lib/schedule";
 import { deleteOwnTournament, deleteTournament, latestEmailEvents, overview } from "./sysadmin-service";
 import { publishBracket } from "./runtime-service";
-import { addParticipant, createTournament, saveDraft } from "./tournament-service";
+import { makeTournament } from "./test-fixture";
 import { createHmac } from "node:crypto";
 
 let db: TestDb;
@@ -17,21 +17,14 @@ beforeAll(async () => {
   ({ db } = await createTestDb());
 });
 
-async function make(slug: string, participantCount: number, drafts: number) {
-  const t = await createTournament(db, { slug, name: `T ${slug}`, roundDurationS: 600, breakDurationS: 60 });
-  const admin = await addParticipant(db, emailer, "http://x", t.id, {
-    name: "Admin",
-    email: `admin@${slug}.org`,
-    role: "admin",
+const make = (slug: string, participantCount: number, drafts: number) =>
+  makeTournament(db, {
+    slug,
+    name: `T ${slug}`,
+    participants: participantCount,
+    emailer,
+    draftBody: (i) => (i < drafts ? `Draft ${i}` : null),
   });
-  const people = [];
-  for (let i = 0; i < participantCount; i++) {
-    const p = await addParticipant(db, emailer, "http://x", t.id, { name: `P${i}`, email: `p${i}@${slug}.org` });
-    if (i < drafts) await saveDraft(db, p.id, `Draft ${i}`);
-    people.push(p);
-  }
-  return { t, admin, people };
-}
 
 describe("sysadmin overview", () => {
   it("reports slug, status, creator email, and counts per tournament", async () => {

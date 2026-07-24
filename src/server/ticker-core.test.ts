@@ -3,7 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
 import { merges, rounds, textVersions, tournaments } from "../db/schema";
 import { ConsoleEmailer } from "../lib/email";
-import { beginTournament, mergeAction, publishBracket, tick } from "../services/runtime-service";
+import { beginTournament, mergeAction, tick } from "../services/runtime-service";
+import { makeTournament } from "../services/test-fixture";
 import { addParticipant, createTournament, saveDraft } from "../services/tournament-service";
 import { tickOnce, type TickerDeps } from "./ticker-core";
 
@@ -27,13 +28,12 @@ function makeDeps(overrides: Partial<TickerDeps> = {}): TickerDeps & { bumped: s
 }
 
 async function publishTwoDrafts(slug: string) {
-  const t = await createTournament(db, { slug, name: slug, roundDurationS: 600, breakDurationS: 60 });
-  await addParticipant(db, emailer, "http://x", t.id, { name: "Admin", email: `a@${slug}.org`, role: "admin" });
-  for (const name of ["P0", "P1"]) {
-    const p = await addParticipant(db, emailer, "http://x", t.id, { name, email: `${name}@${slug}.org` });
-    await saveDraft(db, p.id, `${name} draft`);
-  }
-  await publishBracket(db, emailer, "http://x", t.id);
+  const { t } = await makeTournament(db, {
+    slug,
+    emailer,
+    draftBody: (_i, name) => `${name} draft`,
+    publish: true,
+  });
   return t;
 }
 

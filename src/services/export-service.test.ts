@@ -3,8 +3,8 @@ import { createTestDb, TestDb } from "../db/test-db";
 import { merges } from "../db/schema";
 import { ConsoleEmailer } from "../lib/email";
 import { auditJsonl, canonicalText, draftsBundle, provenance, provenanceMermaid, provenanceMarkdown } from "./export-service";
-import { beginTournament, mergeAction, publishBracket, tick } from "./runtime-service";
-import { addParticipant, createTournament, saveDraft } from "./tournament-service";
+import { mergeAction, tick } from "./runtime-service";
+import { makeTournament } from "./test-fixture";
 
 let db: TestDb;
 let tournamentId: string;
@@ -13,15 +13,15 @@ const T0 = new Date("2026-07-18T10:00:00Z");
 beforeAll(async () => {
   ({ db } = await createTestDb());
   const emailer = new ConsoleEmailer();
-  const t = await createTournament(db, { slug: "exp", name: "Export Test", roundDurationS: 600, breakDurationS: 60 });
+  const { t } = await makeTournament(db, {
+    slug: "exp",
+    name: "Export Test",
+    names: ["Ada", "Bo"],
+    emailer,
+    draftBody: (_i, name) => `${name}'s draft text.`,
+    beginAt: T0,
+  });
   tournamentId = t.id;
-  await addParticipant(db, emailer, "http://x", t.id, { name: "Admin", email: "a@exp.org", role: "admin" });
-  for (const name of ["Ada", "Bo"]) {
-    const p = await addParticipant(db, emailer, "http://x", t.id, { name, email: `${name}@exp.org` });
-    await saveDraft(db, p.id, `${name}'s draft text.`);
-  }
-  await publishBracket(db, emailer, "http://x", t.id);
-  await beginTournament(db, t.id, T0);
   const [m] = await db.select().from(merges);
   const now = new Date(T0.getTime() + 60_000);
   await mergeAction(db, m.id, m.bearerAId!, { type: "edit", text: "The merged constitution." }, now);
