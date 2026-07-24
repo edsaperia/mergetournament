@@ -7,7 +7,7 @@ import { currentParticipant, tournamentBySlug } from "../../server/session";
 import { SiteLogo } from "../site-logo";
 import { ThemeToggle } from "../theme-toggle";
 import { ControlButton } from "./admin/admin-controls";
-import { PauseOverlay } from "./pause-overlay";
+import { AdminPauseBar, PauseOverlay } from "./pause-overlay";
 
 /**
  * Tournament chrome: logo left, tournament name centred (links home for
@@ -60,10 +60,11 @@ export default async function TournamentLayout(props: LayoutProps<"/[slug]">) {
 }
 
 /**
- * SPEC §4 Pausing: while paused, every screen in the tournament blurs behind
- * the modal — rendered from the layout so text pages, admin, everything is
- * covered. The admin alone gets Resume inside it (the timeline's pause
- * controls are behind the blur like everything else).
+ * SPEC §4 Pausing: while paused, every participant and observer screen blurs
+ * behind the modal — rendered from the layout so text pages, merge
+ * workspaces, everything is covered. The admin is exempt (pausing must not
+ * lock the admin out of their own dashboard) and instead gets a floating
+ * reminder with Resume on every page.
  */
 async function PauseGate({
   tournament,
@@ -73,6 +74,13 @@ async function PauseGate({
   isAdmin: boolean;
 }) {
   if (tournament.phase !== "running" || !tournament.pausedAt) return null;
+  if (isAdmin) {
+    return (
+      <AdminPauseBar slug={tournament.slug}>
+        <ControlButton action={pauseAction.bind(null, tournament.slug, true)} label="Resume" small />
+      </AdminPauseBar>
+    );
+  }
   const ctx = await scheduleContext(tournament);
   const open = ctx.allRounds.find((r) => r.state === "open" || r.state === "closing");
   return (
@@ -83,8 +91,6 @@ async function PauseGate({
       roundRemainingS={
         open ? (open.state === "closing" ? ctx.backstopRemaining(open) : ctx.remainingFor(open.number)) : undefined
       }
-    >
-      {isAdmin && <ControlButton action={pauseAction.bind(null, tournament.slug, true)} label="Resume" />}
-    </PauseOverlay>
+    />
   );
 }
