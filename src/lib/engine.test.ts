@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { buildBracket } from "./bracket";
 import {
   applyAction,
+  applyWindowAction,
   completeRound,
   MergeInput,
   MergeSession,
@@ -53,6 +54,48 @@ describe("lock-in state machine", () => {
     s = applyAction(s, { type: "confirm", side: "B" });
     s = applyAction(s, { type: "selectBearer", side: "B", pref: "B" });
     expect(s.bearerPref).toEqual({ A: "B", B: "B" });
+  });
+});
+
+describe("decision window", () => {
+  it("locks on the second accept, whoever votes first", () => {
+    let s = applyWindowAction(newSession(), { type: "accept", side: "B" });
+    expect(s.lock).toBe("proposed");
+    expect(s.proposedBy).toBe("B");
+    s = applyWindowAction(s, { type: "accept", side: "A" });
+    expect(s.lock).toBe("locked");
+    expect(s.active).toEqual({ A: true, B: true });
+  });
+
+  it("counts a proposal made before the clock as an accept", () => {
+    const proposed = applyAction(newSession(), { type: "propose", side: "A" });
+    expect(applyWindowAction(proposed, { type: "accept", side: "B" }).lock).toBe("locked");
+  });
+
+  it("repeat accept by the same bearer does not lock", () => {
+    let s = applyWindowAction(newSession(), { type: "accept", side: "A" });
+    s = applyWindowAction(s, { type: "accept", side: "A" });
+    expect(s.lock).toBe("proposed");
+  });
+
+  it("reject records presence and withdraws only the rejecter's own vote", () => {
+    const idle = applyWindowAction(newSession(), { type: "reject", side: "B" });
+    expect(idle.active).toEqual({ A: false, B: true });
+    expect(idle.lock).toBe("editing");
+
+    const aVoted = applyWindowAction(newSession(), { type: "accept", side: "A" });
+    expect(applyWindowAction(aVoted, { type: "reject", side: "B" }).proposedBy).toBe("A");
+    const withdrawn = applyWindowAction(aVoted, { type: "reject", side: "A" });
+    expect(withdrawn.proposedBy).toBeNull();
+    expect(withdrawn.lock).toBe("editing");
+  });
+
+  it("takes bearer choice as presence, and refuses anything once locked", () => {
+    const s = applyWindowAction(newSession(), { type: "selectBearer", side: "A", pref: "B" });
+    expect(s.bearerPref.A).toBe("B");
+    expect(s.active.A).toBe(true);
+    const locked = session({ lock: "locked" });
+    expect(() => applyWindowAction(locked, { type: "accept", side: "A" })).toThrow();
   });
 });
 

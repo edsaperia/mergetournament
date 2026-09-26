@@ -17,7 +17,7 @@ import { FlipReveal } from "../../flip-reveal";
 import { NumberedText } from "../../../numbered-text";
 import { Tabs } from "../../tabs";
 import { CollabEditor } from "./collab-editor";
-import { WindowControls } from "./window-controls";
+import { DecisionModal } from "./decision-modal";
 import { WorkspaceControls } from "./workspace-controls";
 
 export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) {
@@ -93,7 +93,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         )}
         {ctx.running && round.state === "closing" && (
           <span className="text-lg text-warn">
-            backstop <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
+            decision window <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
           </span>
         )}
       </div>
@@ -190,12 +190,18 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             />
           )}
           {round.state === "closing" && m.state === "open" && mySide && !paused && (
-            <WindowControls
+            <DecisionModal
               slug={slug}
               mergeId={m.id}
+              mySide={mySide}
+              names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
+              proposedBy={m.proposedBy}
+              myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
               iAmActive={mySide === "A" ? m.activeA : m.activeB}
-              myChoice={mySide === "A" ? m.activeChoiceA : m.activeChoiceB}
-              partnerName={bearerName(mySide === "A" ? m.bearerBId : m.bearerAId)}
+              partnerActive={mySide === "A" ? m.activeB : m.activeA}
+              finalRound={isFinal}
+              workingText={m.workingText}
+              remainingS={ctx.backstopRemaining(round)}
             />
           )}
           {canAct && mySide && (

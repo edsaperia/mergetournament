@@ -68,7 +68,7 @@ export interface ScheduleContext {
   te: number;
   /** Seconds left on an open round's clock. */
   remainingFor(roundNo: number): number;
-  /** Seconds left in a closing round's are-you-still-here window. */
+  /** Seconds left in a closing round's decision window. */
   backstopRemaining(round: Round): number;
   /** Seconds until the whole schedule completes. */
   globalRemaining(): number;

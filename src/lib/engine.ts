@@ -73,6 +73,35 @@ export function applyAction(s: MergeSession, a: MergeAction): MergeSession {
   }
 }
 
+/**
+ * Actions in the decision window (the 60s after the clock, text frozen).
+ * Lock-in becomes two symmetric votes: `proposedBy` holds the one vote cast
+ * so far (a proposal made before the clock counts), and the second accept
+ * locks. Reject records presence and withdraws the rejecter's own vote.
+ */
+export type WindowAction =
+  | { type: "accept"; side: Side }
+  | { type: "reject"; side: Side }
+  | { type: "selectBearer"; side: Side; pref: Side };
+
+export function applyWindowAction(s: MergeSession, a: WindowAction): MergeSession {
+  if (s.lock === "locked") throw new DomainError("this merge is already locked");
+  const touched = (next: Partial<MergeSession>): MergeSession => ({
+    ...s,
+    ...next,
+    active: { ...s.active, [a.side]: true },
+  });
+  switch (a.type) {
+    case "accept":
+      if (s.proposedBy !== null && s.proposedBy !== a.side) return touched({ lock: "locked", proposedBy: null });
+      return touched({ lock: "proposed", proposedBy: a.side });
+    case "reject":
+      return s.proposedBy === a.side ? touched({ lock: "editing", proposedBy: null }) : touched({});
+    case "selectBearer":
+      return touched({ bearerPref: { ...s.bearerPref, [a.side]: a.pref } });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Round-close resolution (the backstop)
 // ---------------------------------------------------------------------------
@@ -109,9 +138,10 @@ export interface ResolvedMerge {
 
 /**
  * Resolve a merge with both inputs present, at round close (after the 60s
- * are-you-still-here window). `activeChoice` is the sole active bearer's pick
- * in the one-active case — null means they made no choice, which defaults to
- * their own input (SPEC §4: only consented texts or original inputs advance).
+ * decision window). `activeChoice` is the sole active bearer's pick in the
+ * one-active case (their accept vote) — null means they did not accept, which
+ * defaults to their own input (SPEC §4: only consented texts or original
+ * inputs advance).
  */
 export function resolveMerge(
   a: MergeInput,

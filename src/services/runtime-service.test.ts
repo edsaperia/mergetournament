@@ -124,7 +124,7 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
     // …editing is frozen during the window…
     await expect(
       mergeAction(db, r1[1].merge.id, r1[1].merge.bearerAId!, { type: "edit", text: "late!" }, at(610))
-    ).rejects.toThrow(/not open/);
+    ).rejects.toThrow(/time is up/);
     // …then the untouched merge is abandoned and the round closes at expiry + 60.
     await tick(db, emailer, BASE, t.id, at(660));
     r1 = await mergesOfRound(t.id, 1);
@@ -219,8 +219,8 @@ describe("the final round", () => {
   });
 });
 
-describe("the are-you-still-here window", () => {
-  it("lets a sole active bearer advance the working text by choice", async () => {
+describe("the decision window", () => {
+  it("lets a sole active bearer advance the working text by accepting", async () => {
     const emailer = new CaptureEmailer();
     const { t } = await setup("grace1", 2, emailer);
     await publishBracket(db, emailer, BASE, t.id);
@@ -230,11 +230,11 @@ describe("the are-you-still-here window", () => {
     // A works alone; B never shows up.
     await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "A's compromise draft" }, at(100));
     await expect(
-      mergeAction(db, merge.id, merge.bearerAId!, { type: "stillHere" }, at(200))
+      mergeAction(db, merge.id, merge.bearerAId!, { type: "accept" }, at(200))
     ).rejects.toThrow(/window is not open/);
 
     await tick(db, emailer, BASE, t.id, at(600));
-    await mergeAction(db, merge.id, merge.bearerAId!, { type: "chooseAdvance", choice: "working" }, at(620));
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "accept" }, at(620));
     await tick(db, emailer, BASE, t.id, at(660));
 
     const [{ merge: resolved, slot }] = await mergesOfRound(t.id, 1);
@@ -246,7 +246,7 @@ describe("the are-you-still-here window", () => {
     expect(text.parentAId).toBe(merge.textAId);
   });
 
-  it("a returning bearer pressing YES restores the two-active coin flip", async () => {
+  it("a returning bearer pressing Reject restores the two-active coin flip", async () => {
     const emailer = new CaptureEmailer();
     const { t } = await setup("grace2", 2, emailer);
     await publishBracket(db, emailer, BASE, t.id);
@@ -255,8 +255,8 @@ describe("the are-you-still-here window", () => {
 
     await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "half-finished" }, at(100));
     await tick(db, emailer, BASE, t.id, at(600));
-    // B was idle but is still in the room and presses YES.
-    await mergeAction(db, merge.id, merge.bearerBId!, { type: "stillHere" }, at(630));
+    // B was idle but is still in the room and rejects the merge.
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "reject" }, at(630));
     await tick(db, emailer, BASE, t.id, at(660));
 
     const [{ merge: resolved }] = await mergesOfRound(t.id, 1);
@@ -264,6 +264,53 @@ describe("the are-you-still-here window", () => {
     // An input advances intact — never the half-finished working text.
     expect([merge.textAId, merge.textBId]).toContain(resolved.resultTextId);
     expect(resolved.flipSeed).not.toBeNull();
+  });
+
+  it("accepts a pre-clock proposal and a bearer choice after the clock, resolving at once", async () => {
+    const emailer = new CaptureEmailer();
+    // Four drafts, so round 1 is not the final and has a bearer to choose.
+    const { t } = await setup("grace3", 4, emailer);
+    await publishBracket(db, emailer, BASE, t.id);
+    await beginTournament(db, t.id, T0);
+    const [{ merge }] = await mergesOfRound(t.id, 1);
+
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "agreed text" }, at(100));
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "propose" }, at(590));
+    await tick(db, emailer, BASE, t.id, at(600));
+    // Too late to write, not too late to decide.
+    await expect(
+      mergeAction(db, merge.id, merge.bearerBId!, { type: "edit", text: "sneaky" }, at(610))
+    ).rejects.toThrow(/time is up/);
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "selectBearer", pref: "B" }, at(612));
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "selectBearer", pref: "B" }, at(614));
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "accept" }, at(616));
+
+    // Resolved on the second accept, before the window ends.
+    const [{ merge: resolved }] = await mergesOfRound(t.id, 1);
+    expect(resolved.resolution).toBe("agreed");
+    expect(resolved.advancingBearerId).toBe(merge.bearerBId);
+    const [text] = await db.select().from(textVersions).where(eq(textVersions.id, resolved.resultTextId!));
+    expect(text.bodyMd).toBe("agreed text");
+  });
+
+  it("a sole active bearer who rejects advances their own input", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await setup("grace4", 2, emailer);
+    await publishBracket(db, emailer, BASE, t.id);
+    await beginTournament(db, t.id, T0);
+    const [{ merge }] = await mergesOfRound(t.id, 1);
+
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "A's attempt" }, at(100));
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "propose" }, at(500));
+    await tick(db, emailer, BASE, t.id, at(600));
+    // A's pre-clock proposal was an accept; rejecting withdraws it.
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "reject" }, at(620));
+    await tick(db, emailer, BASE, t.id, at(660));
+
+    const [{ merge: resolved }] = await mergesOfRound(t.id, 1);
+    expect(resolved.resolution).toBe("active_advance");
+    expect(resolved.resultTextId).toBe(merge.textAId);
+    expect(resolved.advancingBearerId).toBe(merge.bearerAId);
   });
 });
 
@@ -282,12 +329,12 @@ describe("commit-reveal randomness", () => {
     const commitment = (published.payload as { seedCommitment: string }).seedCommitment;
     expect(commitment).toBe(commitmentOf(pub.masterSecret!));
 
-    // One bearer works, the other presses YES in the window: a backstop flip.
+    // One bearer works, the other rejects in the window: a backstop flip.
     await beginTournament(db, t.id, T0);
     const [{ merge }] = await mergesOfRound(t.id, 1);
     await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "solo work" }, at(100));
     await tick(db, emailer, BASE, t.id, at(600));
-    await mergeAction(db, merge.id, merge.bearerBId!, { type: "stillHere" }, at(620));
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "reject" }, at(620));
     await tick(db, emailer, BASE, t.id, at(660));
 
     const [resolved] = await db.select().from(merges).where(eq(merges.id, merge.id));

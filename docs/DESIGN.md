@@ -22,7 +22,7 @@ palette shades. **Rebranding starts and mostly ends in that file.**
 | `accent` / `accent-ink` / `accent-soft` | primary actions (currently near-black ⇄ white; make it cornflower blue here) |
 | `live` / `live-ink` | "you are here", presence highlights |
 | `ok` / `ok-surface` | success, readiness ticks, the canonical-text banner |
-| `warn` / `warn-surface` | time pressure: backstop window, pause, proposed-freeze |
+| `warn` / `warn-surface` | time pressure: decision window, pause, proposed-freeze |
 | `danger` / `danger-surface` | expiring countdowns, errors, unsaved-draft banner |
 | `note` / `note-soft` / `note-surface` | line-comment threads and composer |
 
@@ -59,7 +59,7 @@ reveal, the roster draft viewer, and the pause overlay.
 | Merge workspace (3 panes) | `src/app/[slug]/merge/[id]/page.tsx` |
 | Collaborative editor | `.../merge/[id]/collab-editor.tsx` (CodeMirror theme inside) |
 | Lock-in / bearer controls | `.../merge/[id]/workspace-controls.tsx` |
-| Backstop window controls | `.../merge/[id]/window-controls.tsx` |
+| Decision modal (window after the clock) | `.../merge/[id]/decision-modal.tsx` |
 | Coin-flip reveal | `src/app/[slug]/flip-reveal.tsx` |
 | Chat panel | `src/app/[slug]/chat-panel.tsx` |
 | Text + line comments | `src/app/[slug]/text/[id]/commentable-text.tsx` |

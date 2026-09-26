@@ -190,7 +190,7 @@ export function Timeline({
             )}
           </span>
         )}
-        {state === "closing" && <span className="text-sm text-warn">backstop window — are you still here?</span>}
+        {state === "closing" && <span className="text-sm text-warn">decision window — pairs accept or reject</span>}
       </Row>
     );
   }

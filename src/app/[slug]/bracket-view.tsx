@@ -123,7 +123,7 @@ export async function BracketView({
                   )}
                   {round.state === "closing" && running && (
                     <span className="text-warn">
-                      backstop <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
+                      decision window <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
                     </span>
                   )}
                   {round.state === "closed" && "closed"}

@@ -88,10 +88,10 @@ describe("tickOnce ordering", () => {
       .innerJoin(textVersions, eq(textVersions.id, merges.textAId))
       .where(eq(textVersions.tournamentId, t.id));
 
-    // A works alone, then picks "advance the working text" in the window.
+    // A works alone, then accepts the merge in the window.
     await mergeAction(db, m.id, m.bearerAId!, { type: "edit", text: "stale snapshot" }, at(100));
     await tick(db, emailer, "http://x", t.id, at(600)); // clock expires -> closing
-    await mergeAction(db, m.id, m.bearerAId!, { type: "chooseAdvance", choice: "working" }, at(620));
+    await mergeAction(db, m.id, m.bearerAId!, { type: "accept" }, at(620));
 
     // The live document is ahead of the debounced row; the pass must flush
     // it before the backstop resolves, or "stale snapshot" would advance.

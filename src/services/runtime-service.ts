@@ -26,9 +26,11 @@ import {
 import { buildBracket, seedBracket, type Bracket } from "../lib/bracket";
 import {
   applyAction,
+  applyWindowAction,
   planRound,
   resolveMerge,
   type MergeAction,
+  type WindowAction,
   type MergeInput,
   type MergeSession,
   type ResolvedMerge,
@@ -43,7 +45,10 @@ import type { Email, Emailer } from "../lib/email";
 import { DomainError } from "../lib/errors";
 import type { Db } from "./tournament-service";
 
-/** The are-you-still-here window after a round's clock expires (SPEC §4). */
+/**
+ * The decision window after a round's clock expires (SPEC §4): text frozen,
+ * bearers may still accept or reject the merge and choose who carries it.
+ */
 export const GRACE_S = 60;
 
 async function audit(db: Db, tournamentId: string, action: string, payload: unknown): Promise<void> {
@@ -231,9 +236,9 @@ export type WorkspaceAction =
   | { type: "confirm" }
   | { type: "keepEditing" }
   | { type: "selectBearer"; pref: Side }
-  // During the are-you-still-here window only:
-  | { type: "stillHere" }
-  | { type: "chooseAdvance"; choice: "working" | "input" }
+  // During the decision window only (selectBearer works there too):
+  | { type: "accept" }
+  | { type: "reject" }
   // During the break before the merge's round opens:
   | { type: "readyForRound" };
 
@@ -272,22 +277,21 @@ export async function mergeAction(
 
   if (m.state !== "open") throw new DomainError("this merge is no longer editable");
 
-  // Window actions: presence and advance-choice, only while the round is closing.
-  if (action.type === "stillHere" || action.type === "chooseAdvance") {
-    if (round.state !== "closing") throw new DomainError("the backstop window is not open");
-    const patch: Partial<typeof merges.$inferInsert> =
-      side === "A" ? { activeA: true } : { activeB: true };
-    if (action.type === "chooseAdvance") {
-      if (side === "A") patch.activeChoiceA = action.choice;
-      else patch.activeChoiceB = action.choice;
+  // The decision window (after the clock, text frozen): only accept, reject
+  // and bearer choice; every press also counts as presence.
+  let session: MergeSession;
+  if (round.state === "closing") {
+    if (action.type !== "accept" && action.type !== "reject" && action.type !== "selectBearer") {
+      throw new DomainError("time is up: the text is frozen");
     }
-    await db.update(merges).set(patch).where(eq(merges.id, mergeId));
-    return;
+    session = applyWindowAction(rowToSession(m), { ...action, side } as WindowAction);
+  } else {
+    if (action.type === "accept" || action.type === "reject") {
+      throw new DomainError("the decision window is not open");
+    }
+    if (round.state !== "open") throw new DomainError("this round is not open");
+    session = applyAction(rowToSession(m), { ...action, side } as MergeAction);
   }
-
-  if (round.state !== "open") throw new DomainError("this round is not open");
-
-  const session = applyAction(rowToSession(m), { ...action, side } as MergeAction);
   await db.transaction(async (tx) => {
     await tx
       .update(merges)
@@ -344,13 +348,11 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
   if (!m.textAId || !m.textBId || !m.bearerAId || !m.bearerBId) throw new Error("merge is missing inputs");
   const a: MergeInput = { text: m.textAId, bearer: m.bearerAId };
   const b: MergeInput = { text: m.textBId, bearer: m.bearerBId };
-  // The sole active bearer's window pick, if this resolves as ACTIVE_ADVANCE.
-  const activeChoice =
-    session.active.A && !session.active.B
-      ? (m.activeChoiceA ?? null)
-      : session.active.B && !session.active.A
-        ? (m.activeChoiceB ?? null)
-        : null;
+  // If this resolves as ACTIVE_ADVANCE, the sole active bearer's accept vote
+  // is their choice: accepted advances the working text, else their input.
+  const soleActive: Side | null =
+    session.active.A && !session.active.B ? "A" : session.active.B && !session.active.A ? "B" : null;
+  const activeChoice = soleActive && session.proposedBy === soleActive ? "working" : null;
   const flipSeed = deriveSeed(requireMasterSecret(t), `flip:${m.id}`);
   const resolved: ResolvedMerge = resolveMerge(a, b, session, activeChoice, mulberry32(flipSeed), { finalRound });
 
@@ -499,7 +501,7 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
         if (current.state === "open") {
           if (te < expiry) return changed;
           // Clock expired with merges unresolved: freeze editing and open the
-          // are-you-still-here window (SPEC §4).
+          // decision window (SPEC §4).
           await tx.update(rounds).set({ state: "closing" }).where(eq(rounds.id, current.id));
           current.state = "closing";
           changed = true;
@@ -507,7 +509,7 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
           await postSystem(
             tx,
             tournamentId,
-            `Round ${current.number}: time is up. Unresolved merges have ${GRACE_S} seconds — are you still here?`
+            `Round ${current.number}: time is up — texts are frozen. Unfinished pairs have ${GRACE_S} seconds to accept or reject their merge and choose a bearer.`
           );
           continue;
         }

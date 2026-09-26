@@ -51,7 +51,7 @@ export const mergeResolution = pgEnum("merge_resolution", [
   "walkover",
 ]);
 
-/** "closing" is the 60s are-you-still-here window after the clock expires. */
+/** "closing" is the 60s decision window after the clock expires. */
 export const roundState = pgEnum("round_state", ["scheduled", "open", "closing", "closed"]);
 
 export const mergeSide = pgEnum("merge_side", ["A", "B"]);

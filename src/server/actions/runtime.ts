@@ -41,7 +41,7 @@ export async function workspaceAction(
   return withParticipant(slug, { revalidate: [`/${slug}/merge/${mergeId}`, `/${slug}`] }, async (db, me) => {
     const { collab, syncMergeText } = await import("../collab");
     // Lock-in must act on the live CRDT text, not the debounced snapshot.
-    if (action.type === "propose" || action.type === "confirm") {
+    if (action.type === "propose" || action.type === "confirm" || action.type === "accept") {
       await syncMergeText(mergeId);
     }
     await mergeAction(db, mergeId, me.id, action, new Date());
