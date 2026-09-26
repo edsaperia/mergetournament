@@ -53,5 +53,10 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.0"
     }
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
+    "unrs-resolver@1.12.2": true
   }
 }
