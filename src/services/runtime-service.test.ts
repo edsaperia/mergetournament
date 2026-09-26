@@ -239,6 +239,7 @@ describe("the decision window", () => {
 
     const [{ merge: resolved, slot }] = await mergesOfRound(t.id, 1);
     expect(resolved.resolution).toBe("active_advance");
+    expect(resolved.activeChoiceA).toBe("working");
     expect(slot.outState).toBe("filled");
     const [text] = await db.select().from(textVersions).where(eq(textVersions.id, resolved.resultTextId!));
     expect(text.bodyMd).toBe("A's compromise draft");
@@ -311,6 +312,8 @@ describe("the decision window", () => {
     expect(resolved.resolution).toBe("active_advance");
     expect(resolved.resultTextId).toBe(merge.textAId);
     expect(resolved.advancingBearerId).toBe(merge.bearerAId);
+    // The press is recorded, so the modal can show Reject as chosen.
+    expect(resolved.activeChoiceA).toBe("input");
   });
 });
 

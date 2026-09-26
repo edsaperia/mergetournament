@@ -292,10 +292,18 @@ export async function mergeAction(
     if (round.state !== "open") throw new DomainError("this round is not open");
     session = applyAction(rowToSession(m), { ...action, side } as MergeAction);
   }
+  // A pressed Accept/Reject is recorded so the modal highlights only real
+  // presses (an untouched Reject is the default, not a choice). Display only:
+  // resolution reads the accept vote from `proposedBy`.
+  const windowVote =
+    action.type === "accept" || action.type === "reject"
+      ? { [side === "A" ? "activeChoiceA" : "activeChoiceB"]: action.type === "accept" ? "working" : "input" }
+      : {};
   await db.transaction(async (tx) => {
     await tx
       .update(merges)
       .set({
+        ...windowVote,
         workingText: session.workingText,
         proposedBy: session.proposedBy,
         bearerPrefA: session.bearerPref.A,

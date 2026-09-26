@@ -209,6 +209,7 @@ export const merges = pgTable(
     bearerPrefB: mergeSide("bearer_pref_b"),
     activeA: boolean("active_a").notNull().default(false),
     activeB: boolean("active_b").notNull().default(false),
+    /** Each bearer's last pressed decision-window vote: working = Accept, input = Reject. Display only. */
     activeChoiceA: advanceChoice("active_choice_a"),
     activeChoiceB: advanceChoice("active_choice_b"),
     /** Break-time readiness for a pending merge: gates early round starts. */

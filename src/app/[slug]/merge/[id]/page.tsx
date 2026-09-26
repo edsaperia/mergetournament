@@ -196,6 +196,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               mySide={mySide}
               names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
               proposedBy={m.proposedBy}
+              myVote={mySide === "A" ? m.activeChoiceA : m.activeChoiceB}
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
               iAmActive={mySide === "A" ? m.activeA : m.activeB}
               partnerActive={mySide === "A" ? m.activeB : m.activeA}

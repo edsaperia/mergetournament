@@ -29,6 +29,7 @@ export function DecisionModal({
   mySide,
   names,
   proposedBy,
+  myVote,
   myPref,
   iAmActive,
   partnerActive,
@@ -42,6 +43,8 @@ export function DecisionModal({
   names: { A: string; B: string };
   /** The one accept vote cast so far, if any. */
   proposedBy: "A" | "B" | null;
+  /** My last pressed window vote (working = Accept, input = Reject), if any. */
+  myVote: "working" | "input" | null;
   myPref: "A" | "B" | null;
   iAmActive: boolean;
   partnerActive: boolean;
@@ -71,6 +74,11 @@ export function DecisionModal({
   const lines = workingText.split("\n");
   // Confirmation strip: the modal confirms which text, it isn't for rereading.
   const excerpt = !showAll && lines.length > STRIP_HEAD + STRIP_TAIL + 2;
+  const rules = partnerActive
+    ? `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}. Either rejects: a coin flip ` +
+      "picks one input text to advance unchanged. No choice counts as rejecting."
+    : `If ${partner} doesn't respond, Accept advances this merge and Reject advances your own input. ` +
+      "No choice counts as rejecting.";
 
   return (
     // Header and footer stay put; only the middle scrolls, so the buttons
@@ -105,19 +113,6 @@ export function DecisionModal({
             <NumberedText body={workingText} />
           )}
         </div>
-        <div className="flex flex-col gap-1 text-xs text-muted">
-          <p>
-            If you both accept, the merge locks in{finalRound ? " and becomes the canonical text" : ""}. If
-            one of you rejects, a coin flip picks one of the two input texts to advance unchanged.
-          </p>
-          {!partnerActive && (
-            <p>
-              {`${partner} hasn't been active this round. If they don't respond, your choice decides alone: ` +
-                "accepting advances the merge, rejecting advances your own input."}
-            </p>
-          )}
-          <p>Not deciding counts as rejecting.</p>
-        </div>
       </div>
 
       <form action={dispatch} className="flex shrink-0 flex-col gap-3 border-t border-edge bg-panel px-5 py-4">
@@ -140,6 +135,8 @@ export function DecisionModal({
           </fieldset>
         )}
 
+        {/* The rules sit with the buttons so they are never below the fold. */}
+        <p className="text-xs text-muted">{rules}</p>
         {iAccepted && <p className="text-sm text-warn">You accepted — waiting for {partner}.</p>}
         {partnerAccepted && (
           <p className="text-sm text-warn">{`${partner} has accepted. Accept too and the merge locks in.`}</p>
@@ -149,7 +146,7 @@ export function DecisionModal({
           <Button size="lg" variant={iAccepted ? "primary" : "secondary"} name="intent" value="accept" disabled={pending}>
             Accept the Merge
           </Button>
-          <Button size="lg" variant={iAmActive && !iAccepted ? "primary" : "secondary"} name="intent" value="reject" disabled={pending}>
+          <Button size="lg" variant={myVote === "input" && !iAccepted ? "primary" : "secondary"} name="intent" value="reject" disabled={pending}>
             Reject the Merge
           </Button>
         </div>
