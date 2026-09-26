@@ -18,5 +18,5 @@ Stable names for parts of the product, so instructions can refer to them precise
 ## Builders and deploys
 
 - This repo is wired for the shared Claude builder in `edsaperia/dev-ops` (`.github/workflows/claude.yml`): `@claude` in an issue or PR comment starts one on GitHub Actions. Follow dev-ops `CONVENTIONS.md` (draft PR as the conversation, `COORDINATOR:` / `QUESTION:` / `REPORT:` / `FINAL:` prefixes; Ed merges).
-- **Merging to `main` does not deploy.** Production (mergetournament.org, a DigitalOcean droplet) is updated only by running `bash /opt/mergetournament/deploy/update.sh` on the server (`docs/DEPLOY.md`); that is Ed's call.
+- **Every push to `main` deploys** production (mergetournament.org, a DigitalOcean droplet) via `.github/workflows/deploy.yml`, except pushes touching only markdown or `docs/`. So merging is the deploy decision and is Ed's tap; agents never push code to `main` directly. A restart during a live round switches players to the new code. Setup and fallback: `docs/DEPLOY.md`.
 - Builders on Actions have no browser: UI changes need a human or local-session click-through before deploy.
