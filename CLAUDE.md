@@ -11,3 +11,9 @@ Stable names for parts of the product, so instructions can refer to them precise
 - **accept-vote** — one bearer's Accept in the decision-window; two lock the merge. A lock-in proposed before expiry counts as one. A sole active bearer's accept-vote advances the working text; otherwise their own input advances.
 
 Deferred work lives in `docs/outstanding-issues.md`.
+
+## Builders and deploys
+
+- This repo is wired for the shared Claude builder in `edsaperia/dev-ops` (`.github/workflows/claude.yml`): `@claude` in an issue or PR comment starts one on GitHub Actions. Follow dev-ops `CONVENTIONS.md` (draft PR as the conversation, `COORDINATOR:` / `QUESTION:` / `REPORT:` / `FINAL:` prefixes; Ed merges).
+- **Merging to `main` does not deploy.** Production (mergetournament.org, a DigitalOcean droplet) is updated only by running `bash /opt/mergetournament/deploy/update.sh` on the server (`docs/DEPLOY.md`); that is Ed's call.
+- Builders on Actions have no browser: UI changes need a human or local-session click-through before deploy.
