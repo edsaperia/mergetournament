@@ -13,7 +13,7 @@ export function WorkspaceControls({
   slug,
   mergeId,
   mySide,
-  partnerName,
+  names,
   lock,
   proposedBy,
   myPref,
@@ -22,7 +22,7 @@ export function WorkspaceControls({
   slug: string;
   mergeId: string;
   mySide: "A" | "B";
-  partnerName: string;
+  names: { A: string; B: string };
   lock: "editing" | "proposed";
   proposedBy: "A" | "B" | null;
   myPref: "A" | "B" | null;
@@ -38,12 +38,13 @@ export function WorkspaceControls({
             ? { type: "confirm" }
             : intent === "keepEditing"
               ? { type: "keepEditing" }
-              : { type: "selectBearer", pref: formData.get("pref") === "me" ? mySide : mySide === "A" ? "B" : "A" };
+              : { type: "selectBearer", pref: intent === "bearerA" ? "A" : "B" };
       return workspaceAction(slug, mergeId, action);
     },
     initial
   );
 
+  const partnerName = names[mySide === "A" ? "B" : "A"];
   const iProposed = lock === "proposed" && proposedBy === mySide;
   const theyProposed = lock === "proposed" && proposedBy !== mySide;
 
@@ -61,29 +62,17 @@ export function WorkspaceControls({
         <fieldset className="rounded-md border border-edge p-3 text-sm">
           <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={myPref === mySide ? "primary" : "secondary"}
-              name="intent"
-              value="selectBearer"
-              onClick={(e) => {
-                ((e.currentTarget.form!).elements.namedItem("pref") as HTMLInputElement).value = "me";
-              }}
-              disabled={pending}
-            >
-              Me
-            </Button>
-            <Button
-              variant={myPref !== null && myPref !== mySide ? "primary" : "secondary"}
-              name="intent"
-              value="selectBearer"
-              onClick={(e) => {
-                ((e.currentTarget.form!).elements.namedItem("pref") as HTMLInputElement).value = "partner";
-              }}
-              disabled={pending}
-            >
-              {partnerName}
-            </Button>
-            <input type="hidden" name="pref" defaultValue="me" />
+            {(["A", "B"] as const).map((s) => (
+              <Button
+                key={s}
+                variant={myPref === s ? "primary" : "secondary"}
+                name="intent"
+                value={`bearer${s}`}
+                disabled={pending}
+              >
+                {names[s]}
+              </Button>
+            ))}
           </div>
         </fieldset>
       )}

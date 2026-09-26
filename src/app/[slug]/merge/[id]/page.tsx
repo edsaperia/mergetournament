@@ -209,7 +209,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               slug={slug}
               mergeId={m.id}
               mySide={mySide}
-              partnerName={bearerName(mySide === "A" ? m.bearerBId : m.bearerAId)}
+              names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
               lock={lock === "locked" ? "editing" : (lock as "editing" | "proposed")}
               proposedBy={m.proposedBy}
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}

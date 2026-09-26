@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { countWords } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
 import { ActionStatus } from "../../../action-status";
@@ -10,6 +11,10 @@ import { NumberedText } from "../../../numbered-text";
 import { Button } from "../../../ui";
 
 const initial: ActionState = { ok: true, message: "" };
+
+/** Lines of the frozen text the confirmation strip shows from each end. */
+const STRIP_HEAD = 3;
+const STRIP_TAIL = 3;
 
 /**
  * The decision modal (SPEC §4, the decision window): once the clock expires
@@ -58,24 +63,64 @@ export function DecisionModal({
     initial
   );
 
+  const [showAll, setShowAll] = useState(false);
   const partner = names[mySide === "A" ? "B" : "A"];
   const iAccepted = proposedBy === mySide;
   const partnerAccepted = proposedBy !== null && proposedBy !== mySide;
   const blank = workingText.trim() === "";
+  const lines = workingText.split("\n");
+  // Confirmation strip: the modal confirms which text, it isn't for rereading.
+  const excerpt = !showAll && lines.length > STRIP_HEAD + STRIP_TAIL + 2;
 
   return (
-    <Modal label="Time is up — decide on the merge" className="flex max-w-2xl flex-col gap-4 p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
+    // Header and footer stay put; only the middle scrolls, so the buttons
+    // are always in reach however long the text or small the screen.
+    <Modal label="Time is up — decide on the merge" className="flex max-w-2xl flex-col">
+      <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-2 border-b border-edge px-5 py-4">
         <p className="text-xl font-bold">Time is up — the text is frozen</p>
         <Countdown remainingS={remainingS} className="text-2xl font-bold text-warn" dangerAtS={15} />
       </div>
-      {!iAmActive && <p className="font-semibold text-warn">Are you still here? Any button below counts.</p>}
 
-      <div className="max-h-[30vh] overflow-y-auto rounded-md border border-edge p-3">
-        {blank ? <p className="text-faint">(blank)</p> : <NumberedText body={workingText} />}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+        {!iAmActive && <p className="font-semibold text-warn">Are you still here? Any button below counts.</p>}
+        <p className="text-sm text-muted">
+          The merge you would accept · {countWords(workingText)} words · {lines.length} lines
+        </p>
+        <div className="rounded-md border border-edge p-3">
+          {blank ? (
+            <p className="text-faint">(blank)</p>
+          ) : excerpt ? (
+            <>
+              <NumberedText body={lines.slice(0, STRIP_HEAD).join("\n")} />
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="my-1 w-full rounded-md py-1 text-center text-xs text-muted hover:bg-panel"
+              >
+                ⋯ show all {lines.length} lines ⋯
+              </button>
+              <NumberedText body={lines.slice(-STRIP_TAIL).join("\n")} firstLine={lines.length - STRIP_TAIL + 1} />
+            </>
+          ) : (
+            <NumberedText body={workingText} />
+          )}
+        </div>
+        <div className="flex flex-col gap-1 text-xs text-muted">
+          <p>
+            If you both accept, the merge locks in{finalRound ? " and becomes the canonical text" : ""}. If
+            one of you rejects, a coin flip picks one of the two input texts to advance unchanged.
+          </p>
+          {!partnerActive && (
+            <p>
+              {`${partner} hasn't been active this round. If they don't respond, your choice decides alone: ` +
+                "accepting advances the merge, rejecting advances your own input."}
+            </p>
+          )}
+          <p>Not deciding counts as rejecting.</p>
+        </div>
       </div>
 
-      <form action={dispatch} className="flex flex-col gap-4">
+      <form action={dispatch} className="flex shrink-0 flex-col gap-3 border-t border-edge bg-panel px-5 py-4">
         {!finalRound && (
           <fieldset className="rounded-md border border-edge p-3 text-sm">
             <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
@@ -97,9 +142,10 @@ export function DecisionModal({
 
         {iAccepted && <p className="text-sm text-warn">You accepted — waiting for {partner}.</p>}
         {partnerAccepted && (
-          <p className="text-sm text-warn">{partner} has accepted. Accept too and the merge locks in.</p>
+          <p className="text-sm text-warn">{`${partner} has accepted. Accept too and the merge locks in.`}</p>
         )}
-        <div className="flex flex-wrap gap-2">
+        {/* Side by side at every width: a wrapped pair doubles the footer on a phone. */}
+        <div className="grid grid-cols-2 gap-2 sm:flex">
           <Button size="lg" variant={iAccepted ? "primary" : "secondary"} name="intent" value="accept" disabled={pending}>
             Accept the Merge
           </Button>
@@ -109,20 +155,6 @@ export function DecisionModal({
         </div>
         <ActionStatus state={state} />
       </form>
-
-      <div className="flex flex-col gap-1 text-xs text-muted">
-        <p>
-          If you both accept, the merge locks in{finalRound ? " and becomes the canonical text" : ""}. If
-          one of you rejects, a coin flip picks one of the two input texts to advance unchanged.
-        </p>
-        {!partnerActive && (
-          <p>
-            {partner} hasn&apos;t been active this round. If they don&apos;t respond, your choice decides
-            alone: accepting advances the merge, rejecting advances your own input.
-          </p>
-        )}
-        <p>Not deciding counts as rejecting.</p>
-      </div>
     </Modal>
   );
 }
