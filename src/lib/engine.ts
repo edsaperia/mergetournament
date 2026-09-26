@@ -99,9 +99,11 @@ export interface ResolvedMerge {
   /**
    * What advances, or null if the slot empties (ABANDONED). `source` says
    * whether `text` is the session's working text (new content) or one of the
-   * inputs advancing intact — callers persist accordingly.
+   * inputs advancing intact — callers persist accordingly. `bearer` is null
+   * only for a locked final-round merge: there is no next round to carry the
+   * result into, so nobody is chosen.
    */
-  advancing: { source: "working" | "input"; text: string; bearer: string } | null;
+  advancing: { source: "working" | "input"; text: string; bearer: string | null } | null;
   flips: FlipRecord[];
 }
 
@@ -116,11 +118,17 @@ export function resolveMerge(
   b: MergeInput,
   session: MergeSession,
   activeChoice: "working" | "input" | null,
-  rng: Rng
+  rng: Rng,
+  opts: { finalRound?: boolean } = {}
 ): ResolvedMerge {
   const flips: FlipRecord[] = [];
 
   if (session.lock === "locked") {
+    // Bearer selection exists only to pick who carries the result into the
+    // next round; in the final round preferences are moot and nothing flips.
+    if (opts.finalRound) {
+      return { kind: "AGREED", advancing: { source: "working", text: session.workingText, bearer: null }, flips };
+    }
     const { A: pA, B: pB } = session.bearerPref;
     let side: Side;
     let kind: ResolutionKind = "AGREED";
@@ -265,7 +273,11 @@ export function completeRound(
     if (plan.merges.has(i) || adHocResults.has(i)) {
       const r = resolutions.get(i);
       if (!r) throw new Error(`missing resolution for slot ${slot.round}:${i}`);
-      return r.advancing ? { text: r.advancing.text, bearer: r.advancing.bearer } : null;
+      if (!r.advancing) return null;
+      if (r.advancing.bearer === null) {
+        throw new Error(`slot ${slot.round}:${i}: a final-round resolution has no bearer to carry it onward`);
+      }
+      return { text: r.advancing.text, bearer: r.advancing.bearer };
     }
     const stand = plan.standOver.get(i);
     return stand ? { ...stand } : null;

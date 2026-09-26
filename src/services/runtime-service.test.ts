@@ -192,6 +192,33 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
   });
 });
 
+describe("the final round", () => {
+  it("locks in without bearer selection: no flip, no advancing bearer, canonical text emerges", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await setup("final2", 2, emailer);
+    await publishBracket(db, emailer, BASE, t.id);
+    await beginTournament(db, t.id, T0);
+    const [{ merge }] = await mergesOfRound(t.id, 1); // 2 drafts: round 1 is the final
+
+    // Neither bearer states a preference — outside the final this would coin-flip.
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "edit", text: "The canonical text." }, at(50));
+    await mergeAction(db, merge.id, merge.bearerAId!, { type: "propose" }, at(60));
+    await mergeAction(db, merge.id, merge.bearerBId!, { type: "confirm" }, at(70));
+
+    const [{ merge: resolved, slot }] = await mergesOfRound(t.id, 1);
+    expect(resolved.resolution).toBe("agreed");
+    expect(resolved.advancingBearerId).toBeNull();
+    expect(resolved.flipSeed).toBeNull();
+    expect(slot.outState).toBe("filled");
+
+    await tick(db, emailer, BASE, t.id, at(80));
+    const [done] = await db.select().from(tournaments).where(eq(tournaments.id, t.id));
+    expect(done.phase).toBe("complete");
+    const [canonical] = await db.select().from(textVersions).where(eq(textVersions.id, resolved.resultTextId!));
+    expect(canonical.bodyMd).toBe("The canonical text.");
+  });
+});
+
 describe("the are-you-still-here window", () => {
   it("lets a sole active bearer advance the working text by choice", async () => {
     const emailer = new CaptureEmailer();

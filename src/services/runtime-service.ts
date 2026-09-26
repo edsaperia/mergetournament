@@ -304,7 +304,8 @@ export async function mergeAction(
       .where(eq(merges.id, mergeId));
 
     if (session.lock === "locked") {
-      await finalizeMerge(tx, t, { ...m, ...sessionColumns(session), state: "locked" }, session);
+      const roundCount = (await tx.select().from(rounds).where(eq(rounds.tournamentId, t.id))).length;
+      await finalizeMerge(tx, t, { ...m, ...sessionColumns(session), state: "locked" }, session, slot.roundNo === roundCount);
     }
   });
 }
@@ -336,8 +337,10 @@ const KIND_TO_DB = {
  * Resolve a merge whose session state is final (locked, or at backstop).
  * Inputs are passed to the engine as opaque text-version ids; a new
  * TextVersion is only created when the working text itself advances.
+ * `finalRound` merges resolve without a bearer choice — there is no next
+ * round to carry the result into.
  */
-async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSession): Promise<void> {
+async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSession, finalRound: boolean): Promise<void> {
   if (!m.textAId || !m.textBId || !m.bearerAId || !m.bearerBId) throw new Error("merge is missing inputs");
   const a: MergeInput = { text: m.textAId, bearer: m.bearerAId };
   const b: MergeInput = { text: m.textBId, bearer: m.bearerBId };
@@ -349,7 +352,7 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
         ? (m.activeChoiceB ?? null)
         : null;
   const flipSeed = deriveSeed(requireMasterSecret(t), `flip:${m.id}`);
-  const resolved: ResolvedMerge = resolveMerge(a, b, session, activeChoice, mulberry32(flipSeed));
+  const resolved: ResolvedMerge = resolveMerge(a, b, session, activeChoice, mulberry32(flipSeed), { finalRound });
 
   let resultTextId: string | null = null;
   if (resolved.advancing) {
@@ -512,7 +515,7 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
         if (te < graceEnd) return changed;
         // Window over: the backstop resolves everything still open.
         for (const m of unresolved) {
-          await finalizeMerge(tx, t, m, rowToSession(m));
+          await finalizeMerge(tx, t, m, rowToSession(m), current.number === allRounds.length);
         }
       }
       // Integer column: effective time is fractional, schedule points are whole seconds.

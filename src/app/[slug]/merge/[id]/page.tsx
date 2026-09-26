@@ -36,6 +36,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const ctx = await scheduleContext(tournament);
   const round = ctx.allRounds.find((r) => r.number === slot.roundNo);
   if (!round) notFound();
+  const isFinal = slot.roundNo === ctx.allRounds.length;
 
   const [textA] = m.textAId ? await db.select().from(textVersions).where(eq(textVersions.id, m.textAId)) : [];
   const [textB] = m.textBId ? await db.select().from(textVersions).where(eq(textVersions.id, m.textBId)) : [];
@@ -79,6 +80,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">
           Round {slot.roundNo}
+          {isFinal ? " (final)" : ""}
           {m.isAdHoc ? " (ad-hoc)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
         </h1>
         {ctx.running && round.state === "open" && (
@@ -110,7 +112,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                     </Link>
                   </>
                 )}
-                {" · carried by "}{bearerName(m.advancingBearerId)}
+                {/* In the final round nothing is carried onward; abandoned merges have no carrier either. */}
+                {!isFinal && m.advancingBearerId && <>{" · carried by "}{bearerName(m.advancingBearerId)}</>}
               </span>
             );
             // Only animate flips that just happened; cold visitors see history.
@@ -204,6 +207,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               lock={lock === "locked" ? "editing" : (lock as "editing" | "proposed")}
               proposedBy={m.proposedBy}
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
+              finalRound={isFinal}
             />
           )}
             {!mySide && m.state === "open" && (

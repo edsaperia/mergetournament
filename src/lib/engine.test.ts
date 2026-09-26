@@ -93,6 +93,18 @@ describe("resolveMerge", () => {
     expect(conflicted.advancing!.text).toBe("m");
   });
 
+  it("final round: locked resolves AGREED with no bearer and no flip, whatever the preferences", () => {
+    const r = resolveMerge(A, B, session({
+      lock: "locked", workingText: "the canonical text",
+      bearerPref: { A: "A", B: "B" }, active: { A: true, B: true },
+    }), null, rng(), { finalRound: true });
+    expect(r).toEqual({
+      kind: "AGREED",
+      advancing: { source: "working", text: "the canonical text", bearer: null },
+      flips: [],
+    });
+  });
+
   it("BACKSTOP_FLIP: unlocked with both active advances an input intact", () => {
     const r = resolveMerge(A, B, session({
       workingText: "half-finished", active: { A: true, B: true },
@@ -188,6 +200,15 @@ describe("planRound / completeRound", () => {
     expect(out.filter(Boolean).map((e) => e!.text).sort()).toEqual(["adhoc", "m"]);
     const vacated = plan.adHoc[0].vacatedSlot;
     expect(out[vacated]).toBeNull();
+
+    // A bearer-less resolution belongs to the final round; it can never feed a next round.
+    const [firstMergeSlot] = plan.merges.keys();
+    resolutions.set(firstMergeSlot, {
+      kind: "AGREED",
+      advancing: { source: "working", text: "m", bearer: null },
+      flips: [],
+    });
+    expect(() => completeRound(slots, plan, resolutions)).toThrow(/no bearer/);
   });
 });
 
