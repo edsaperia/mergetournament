@@ -39,6 +39,7 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
           # the server's forced command runs update.sh whatever is asked
           ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes root@mergetournament.org deploy | tee deploy.log
-          grep -q '^Deployed ' deploy.log
+          # not anchored: drizzle-kit's spinner leaves no newline before update.sh's last line
+          grep -q 'Deployed [0-9a-f]\{7\}' deploy.log
       - name: Health check
         run: curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors https://mergetournament.org/healthz
