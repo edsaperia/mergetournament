@@ -10,4 +10,13 @@ Stable names for parts of the product, so instructions can refer to them precise
 - **confirmation-strip** — the decision-modal's view of the frozen text: word and line count, first and last three lines with their real line numbers, "show all" to expand. It confirms *which* text, it isn't for rereading.
 - **accept-vote** — one bearer's Accept in the decision-window; two lock the merge. A lock-in proposed before expiry counts as one. A sole active bearer's accept-vote advances the working text; otherwise their own input advances.
 
-Deferred work lives in `docs/outstanding-issues.md`.
+## Deferred work and questions for Ed
+
+- **Deferred work is tracked as GitHub issues** on this repo, where a builder can be started on it with `@claude`. Each issue says what is deferred, why, and has a **Condition to act** section: checkable without judgement (a date, a file existing, a state a command can test, a decision Ed has taken). At the end of a task, re-read the open issues: condition met and trivial → do it; met and not trivial → offer it; not met → leave it out.
+- **Questions only Ed can answer** go on his questions page (dev-ops `claude/QUESTIONS-PAGE.md`) with `project: "mergetournament"` and document id `mergetournament-<issue or PR number>` (or a slug), when he isn't at the keyboard. In a live session with him, ask directly.
+
+## Builders and deploys
+
+- This repo is wired for the shared Claude builder in `edsaperia/dev-ops` (`.github/workflows/claude.yml`): `@claude` in an issue or PR comment starts one on GitHub Actions. Follow dev-ops `CONVENTIONS.md` (draft PR as the conversation, `COORDINATOR:` / `QUESTION:` / `REPORT:` / `FINAL:` prefixes; Ed merges).
+- **Every push to `main` deploys** production (mergetournament.org, a DigitalOcean droplet) via `.github/workflows/deploy.yml`, except pushes touching only markdown or `docs/`. So merging is the deploy decision and is Ed's tap; agents never push code to `main` directly. A restart during a live round switches players to the new code. Setup and fallback: `docs/DEPLOY.md`.
+- Builders on Actions have no browser: UI changes need a human or local-session click-through before deploy.

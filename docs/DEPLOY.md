@@ -59,7 +59,35 @@ for subsequent deploys.
    `curl -fsSL https://raw.githubusercontent.com/edsaperia/mergetournament/main/deploy/setup.sh | bash`
 5. Edit `/etc/mergetournament.env` (Postgres password, `RESEND_API_KEY`),
    `systemctl restart mergetournament`.
-6. Subsequent deploys: `bash /opt/mergetournament/deploy/update.sh`.
+6. Subsequent deploys are automatic: **every push to `main` deploys** (see
+   *Automatic deploys* below). By hand, as a fallback:
+   `bash /opt/mergetournament/deploy/update.sh`.
+
+## Automatic deploys (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs on every push to `main` (merging a PR is
+the deploy decision) and from the *Run workflow* button. Pushes that touch
+only markdown or `docs/` don't deploy. Deploys queue and never overlap. The
+job SSHes to the droplet, runs `update.sh`, fails unless it prints
+`Deployed <sha>`, then checks `/healthz`.
+
+One-time setup (bash commands; on Windows use Git Bash, since PowerShell 5.1
+drops empty `""` arguments and has no `<` redirect):
+
+1. Make a key for the workflow alone (on any machine):
+   `ssh-keygen -t ed25519 -N "" -C "github-actions deploy" -f mt_deploy`
+2. On the droplet, append the **public** key to `/root/.ssh/authorized_keys`,
+   locked to the deploy script:
+   `command="bash /opt/mergetournament/deploy/update.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA… github-actions deploy`
+   Whatever the workflow asks, this key can only run `update.sh`.
+3. Store the **private** key as a repo secret, then delete the local copies:
+   `gh secret set DEPLOY_SSH_KEY -R edsaperia/mergetournament < mt_deploy`
+4. Pin the server's host key as a secret: the droplet's line(s) from a
+   `known_hosts` whose fingerprint you have checked against the droplet
+   console (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
+   `DEPLOY_KNOWN_HOSTS` holds those lines verbatim.
+
+To revoke: delete the line from `authorized_keys` and the secret.
 
 ## Fly.io sketch
 

@@ -1,0 +1,44 @@
+# Deploy production on every push to main: merging is the deploy decision
+# (dev-ops CONVENTIONS.md). SSHes to the droplet with a key whose
+# authorized_keys entry forces `deploy/update.sh` (pull, build, migrate,
+# restart), then checks the health endpoint. See docs/DEPLOY.md.
+name: deploy
+on:
+  push:
+    branches: [main]
+    # Notes-only pushes don't restart the server (a restart mid-round switches
+    # players to new code). A push touching anything else deploys.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  # one deploy at a time, in order; never cancel one mid-build
+  group: deploy-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Deploy to mergetournament.org
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "::error::DEPLOY_SSH_KEY and DEPLOY_KNOWN_HOSTS secrets must be set (docs/DEPLOY.md)"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          # strip CRs: a key stored from Windows may carry CRLF, which ssh rejects
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          # pinned host key: never trust whatever answers for the name
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          # the server's forced command runs update.sh whatever is asked
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes root@mergetournament.org deploy | tee deploy.log
+          grep -q '^Deployed ' deploy.log
+      - name: Health check
+        run: curl --fail --silent --show-error --retry 10 --retry-delay 3 --retry-all-errors https://mergetournament.org/healthz
