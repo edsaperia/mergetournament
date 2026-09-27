@@ -45,10 +45,26 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   // The text is frozen: the editor no longer takes input.
   await expect(pageA.getByText("live · read-only")).toBeVisible();
 
+  // Only A typed, so each footer has one short rule line; "what if…" opens the full rules in place.
+  await expect(modalA).toContainText(`If ${b.name} stays silent, your Accept advances this merge.`);
+  await expect(modalB).toContainText(`If you stay silent, ${a.name}'s Accept advances this merge.`);
+  const whatIfA = modalA.getByRole("button", { name: "what if…" });
+  await expect(whatIfA).toHaveAttribute("aria-expanded", "false");
+  await expect(modalA).not.toContainText("anything else advances your own input");
+  await whatIfA.focus();
+  await pageA.keyboard.press("Enter");
+  await expect(modalA).toContainText(
+    `While ${b.name} stays silent, your Accept advances this merge and anything else advances your own input`
+  );
+  await expect(modalA.getByRole("button", { name: "less" })).toHaveAttribute("aria-expanded", "true");
+
   // Both choose who carries the result forward, so the merge locks as agreed rather than by coin flip.
   for (const modal of [modalA, modalB]) {
     await modal.getByRole("button", { name: a.name, exact: true }).click();
   }
+  // B's press makes both active: A's footer switches to the both-active line and collapses.
+  await expect(modalA).toContainText("Anything else: a coin flip between the input texts.");
+  await expect(whatIfA).toHaveAttribute("aria-expanded", "false");
 
   // First accept-vote: A waits for B, and B's modal shows it without B pressing anything.
   await modalA.getByRole("button", { name: "Accept the Merge" }).click();

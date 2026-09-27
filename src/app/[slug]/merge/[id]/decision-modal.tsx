@@ -79,33 +79,52 @@ export function DecisionModal({
   // What the window's end does (resolveMerge): both accept-votes lock; else,
   // with both bearers active this round, a coin flip between the inputs; with
   // one, their accept-vote advances the merge, anything else their input;
-  // with none, abandoned. Worded for who is active now.
+  // with none, abandoned. Worded for who is active now: one short sentence,
+  // and the full rules behind "what if…" (short enough for a 360×640 phone).
   const both = `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}.`;
   const orFlip = "it's both accepting or a coin flip between the input texts";
-  const rules =
-    iAmActive && partnerActive
-      ? `${both} Anything else: a coin flip picks one input text to advance unchanged.`
-      : iAmActive
-        ? `${both} While ${partner} stays silent, your Accept advances this merge and anything else advances ` +
-          `your own input; once ${partner} responds, ${orFlip}.`
-        : partnerActive
-          ? `${both} If you stay silent, ${partner}'s Accept advances this merge and anything else advances ` +
-            `their own input; once you respond, ${orFlip}.`
-          : `${both} If just one of you responds, their Accept advances this merge and anything else their own ` +
-            `input; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`;
+  const variant = iAmActive && partnerActive ? "both" : iAmActive ? "me" : partnerActive ? "partner" : "none";
+  const rules = {
+    both: {
+      short: `${both} Anything else: a coin flip between the input texts.`,
+      full: `${both} Anything else: a coin flip picks one input text to advance unchanged.`,
+    },
+    me: {
+      short: `${both} If ${partner} stays silent, your Accept advances this merge.`,
+      full:
+        `${both} While ${partner} stays silent, your Accept advances this merge and anything else advances ` +
+        `your own input; once ${partner} responds, ${orFlip}.`,
+    },
+    partner: {
+      short: `${both} If you stay silent, ${partner}'s Accept advances this merge.`,
+      full:
+        `${both} If you stay silent, ${partner}'s Accept advances this merge and anything else advances ` +
+        `their own input; once you respond, ${orFlip}.`,
+    },
+    none: {
+      short: `${both} If nobody responds, the merge is abandoned.`,
+      full:
+        `${both} If just one of you responds, their Accept advances this merge and anything else their own ` +
+        `input; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
+    },
+  }[variant];
+  // Expanded for one variant only, so a change of who is active collapses it.
+  const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
+  const whatIf = whatIfFor === variant;
 
   return (
     // Header and footer stay put; only the middle scrolls, so the buttons
     // are always in reach however long the text or small the screen.
     <Modal label="Time is up — decide on the merge" className="flex max-w-2xl flex-col">
-      <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-2 border-b border-edge px-5 py-4">
-        <p className="text-xl font-bold">Time is up — the text is frozen</p>
-        <Countdown remainingS={remainingS} className="text-2xl font-bold text-warn" dangerAtS={15} />
+      {/* Smaller type on a phone, so on 360×640 the confirmation-strip's first line stays in view. */}
+      <div className="flex shrink-0 items-baseline justify-between gap-2 border-b border-edge px-5 py-3 sm:py-4">
+        <p className="text-base font-bold sm:text-xl">Time is up — the text is frozen</p>
+        <Countdown remainingS={remainingS} className="shrink-0 text-xl font-bold text-warn sm:text-2xl" dangerAtS={15} />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-        {!iAmActive && <p className="font-semibold text-warn">Are you still here? Any button below counts.</p>}
-        <p className="text-sm text-muted">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-3 sm:gap-3 sm:py-4">
+        {!iAmActive && <p className="text-sm font-semibold text-warn sm:text-base">Are you still here? Any button below counts.</p>}
+        <p className="text-xs text-muted sm:text-sm">
           The merge you would accept · {plural(countWords(workingText), "word")} · {plural(lines.length, "line")}
         </p>
         <div className="rounded-md border border-edge p-3">
@@ -150,7 +169,18 @@ export function DecisionModal({
         )}
 
         {/* The rules sit with the buttons so they are never below the fold. */}
-        <p className="text-xs text-muted">{rules}</p>
+        {/* Expanded, the full rules scroll in a capped box rather than push the buttons away. */}
+        <p className={`text-xs text-muted ${whatIf ? "max-h-16 overflow-y-auto" : ""}`}>
+          {whatIf ? rules.full : rules.short}{" "}
+          <button
+            type="button"
+            aria-expanded={whatIf}
+            onClick={() => setWhatIfFor(whatIf ? null : variant)}
+            className="whitespace-nowrap underline underline-offset-2 hover:text-foreground"
+          >
+            {whatIf ? "less" : "what if…"}
+          </button>
+        </p>
         {iAccepted && <p className="text-sm text-warn">You accepted — waiting for {partner}.</p>}
         {partnerAccepted && (
           <p className="text-sm text-warn">{`${partner} has accepted. Accept too and the merge locks in.`}</p>
