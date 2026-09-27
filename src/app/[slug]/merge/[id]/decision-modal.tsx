@@ -16,6 +16,8 @@ const initial: ActionState = { ok: true, message: "" };
 const STRIP_HEAD = 3;
 const STRIP_TAIL = 3;
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 /**
  * The decision modal (SPEC §4, the decision window): once the clock expires
  * the text is frozen, and each bearer of an unfinished merge gets this for the
@@ -74,11 +76,23 @@ export function DecisionModal({
   const lines = workingText.split("\n");
   // Confirmation strip: the modal confirms which text, it isn't for rereading.
   const excerpt = !showAll && lines.length > STRIP_HEAD + STRIP_TAIL + 2;
-  const rules = partnerActive
-    ? `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}. Either rejects: a coin flip ` +
-      "picks one input text to advance unchanged. No choice counts as rejecting."
-    : `If ${partner} doesn't respond, Accept advances this merge and Reject advances your own input. ` +
-      "No choice counts as rejecting.";
+  // What the window's end does (resolveMerge): both accept-votes lock; else,
+  // with both bearers active this round, a coin flip between the inputs; with
+  // one, their accept-vote advances the merge, anything else their input;
+  // with none, abandoned. Worded for who is active now.
+  const both = `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}.`;
+  const orFlip = "it's both accepting or a coin flip between the input texts";
+  const rules =
+    iAmActive && partnerActive
+      ? `${both} Anything else: a coin flip picks one input text to advance unchanged.`
+      : iAmActive
+        ? `${both} While ${partner} stays silent, your Accept advances this merge and anything else advances ` +
+          `your own input; once ${partner} responds, ${orFlip}.`
+        : partnerActive
+          ? `${both} If you stay silent, ${partner}'s Accept advances this merge and anything else advances ` +
+            `their own input; once you respond, ${orFlip}.`
+          : `${both} If just one of you responds, their Accept advances this merge and anything else their own ` +
+            `input; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`;
 
   return (
     // Header and footer stay put; only the middle scrolls, so the buttons
@@ -92,7 +106,7 @@ export function DecisionModal({
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
         {!iAmActive && <p className="font-semibold text-warn">Are you still here? Any button below counts.</p>}
         <p className="text-sm text-muted">
-          The merge you would accept · {countWords(workingText)} words · {lines.length} lines
+          The merge you would accept · {plural(countWords(workingText), "word")} · {plural(lines.length, "line")}
         </p>
         <div className="rounded-md border border-edge p-3">
           {blank ? (

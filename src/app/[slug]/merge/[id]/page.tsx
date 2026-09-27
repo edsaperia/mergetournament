@@ -95,7 +95,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             {...warnThresholds(tournament.roundDurationS)}
           />
         )}
-        {ctx.running && round.state === "closing" && (
+        {/* This merge's window only: once it resolves, the resolved banner says what happened. */}
+        {ctx.running && round.state === "closing" && m.state === "open" && (
           <span className="text-lg text-warn">
             decision window <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
           </span>

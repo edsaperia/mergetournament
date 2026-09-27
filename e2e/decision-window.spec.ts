@@ -34,7 +34,7 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
 
   for (const modal of [modalA, modalB]) {
     // The confirmation-strip shows the frozen text, as typed before the deadline.
-    await expect(modal.getByText("7 words · 1 lines")).toBeVisible();
+    await expect(modal.getByText(/7 words · 1 line$/)).toBeVisible();
     await expect(modal).toContainText(frozen);
     // Bearer buttons named for the two bearers, and the two votes.
     await expect(modal.getByRole("button", { name: a.name, exact: true })).toBeVisible();
@@ -61,6 +61,10 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   await expect(pageB.getByText(/^Resolved \(agreed\)/)).toBeVisible();
   await expect(modalA).toBeHidden();
   await expect(pageA.getByText(/^Resolved \(agreed\)/)).toBeVisible();
+  // The round is still in its decision-window, but this merge's is over: the header stops showing it.
+  for (const page of [pageA, pageB]) {
+    await expect(page.getByText("decision window")).toBeHidden();
+  }
 
   const [row] = await withDb((db) => db.select().from(merges).where(eq(merges.id, id)));
   expect(row.state).toBe("resolved");
@@ -96,6 +100,9 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     const flip = page.getByRole("dialog", { name: "Coin flip" });
     await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
     await expect(flip).toContainText("Time ran out — deciding which input text advances");
+    // Who carries the result isn't shown behind the overlay while the coin is in the air.
+    await expect(flip).toContainText("the coin is in the air");
+    await expect(page.getByText(/carried by/)).toBeHidden();
     await expect(page.getByRole("dialog", { name: "Time is up — decide on the merge" })).toBeHidden();
   }
 

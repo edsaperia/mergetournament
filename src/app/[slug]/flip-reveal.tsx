@@ -8,6 +8,7 @@ import { Modal } from "../modal";
  * decided, flashing between the two choices faster and faster for about six
  * seconds, then showing the winner. Plays once per browser session per
  * flip; afterwards (and for later visitors) the static result renders.
+ * `children` (the result) stays hidden while the coin is in the air.
  */
 export function FlipReveal({
   flipKey,
@@ -86,7 +87,8 @@ export function FlipReveal({
           {phase === "animating" ? "the coin is in the air…" : "decided — click outside to dismiss"}
         </p>
       </Modal>
-      {children}
+      {/* The result behind the overlay would spoil the flip: withheld until the coin lands. */}
+      {phase === "animating" ? <span className="text-muted">coin flip…</span> : children}
     </>
   );
 }

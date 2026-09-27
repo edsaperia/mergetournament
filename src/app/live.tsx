@@ -39,15 +39,15 @@ export function RefreshAt({ iso, bufferMs = 1500 }: { iso: string; bufferMs?: nu
   return null;
 }
 
+/** Time left, stopping at 0:00: a countdown whose refresh is late never runs negative. */
 function fmt(s: number): string {
-  const sign = s < 0 ? "-" : "";
-  const abs = Math.max(0, Math.abs(s));
+  const abs = Math.max(0, s);
   const h = Math.floor(abs / 3600);
   const m = Math.floor((abs % 3600) / 60);
   const sec = Math.floor(abs % 60);
   return h > 0
-    ? `${sign}${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-    : `${sign}${m}:${String(sec).padStart(2, "0")}`;
+    ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+    : `${m}:${String(sec).padStart(2, "0")}`;
 }
 
 /**
