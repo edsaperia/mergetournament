@@ -57,6 +57,13 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
     `While ${b.name} stays silent, your Accept advances this merge and anything else advances your own input`
   );
   await expect(modalA.getByRole("button", { name: "less" })).toHaveAttribute("aria-expanded", "true");
+  // On a 360×640 phone the full rules fit without scrolling, final words included, and "less" is on screen.
+  await pageA.setViewportSize({ width: 360, height: 640 });
+  const fullRulesA = modalA.getByText(/^Both accept: it locks in\. While /);
+  await expect(fullRulesA).toHaveText(new RegExp(`once ${b.name} responds, it's both accepting or a coin flip between the input texts\\.$`));
+  expect(await fullRulesA.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  await expect(modalA.getByRole("button", { name: "less" })).toBeInViewport({ ratio: 1 });
+  await pageA.setViewportSize({ width: 1280, height: 720 });
 
   // Both choose who carries the result forward, so the merge locks as agreed rather than by coin flip.
   for (const modal of [modalA, modalB]) {

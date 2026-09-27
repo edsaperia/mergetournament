@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { countWords } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
@@ -111,6 +111,20 @@ export function DecisionModal({
   // Expanded for one variant only, so a change of who is active collapses it.
   const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
   const whatIf = whatIfFor === variant;
+  const rulesRef = useRef<HTMLSpanElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+  const measureRules = useCallback(() => {
+    const el = rulesRef.current;
+    setMoreBelow(el !== null && el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, []);
+  useEffect(() => {
+    measureRules();
+    const el = rulesRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(measureRules);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measureRules, whatIf, rules.full]);
 
   return (
     // Header and footer stay put; only the middle scrolls, so the buttons
@@ -148,7 +162,8 @@ export function DecisionModal({
         </div>
       </div>
 
-      <form action={dispatch} className="flex shrink-0 flex-col gap-3 border-t border-edge bg-panel px-5 py-4">
+      {/* Tighter on a phone too, so the expanded rules leave the strip's first line in view at 360×640. */}
+      <form action={dispatch} className="flex shrink-0 flex-col gap-2 border-t border-edge bg-panel px-5 py-3 sm:gap-3 sm:py-4">
         {!finalRound && (
           <fieldset className="rounded-md border border-edge p-3 text-sm">
             <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
@@ -168,10 +183,23 @@ export function DecisionModal({
           </fieldset>
         )}
 
-        {/* The rules sit with the buttons so they are never below the fold. */}
-        {/* Expanded, the full rules scroll in a capped box rather than push the buttons away. */}
-        <p className={`text-xs text-muted ${whatIf ? "max-h-16 overflow-y-auto" : ""}`}>
-          {whatIf ? rules.full : rules.short}{" "}
+        {/* The rules sit with the buttons so they are never below the fold. Collapsed, "what if…" follows
+            the short line; expanded, the full rules take a capped box (five lines, enough for every variant
+            at 360 px) and "less" sits below it, so the button is always in view and keeps keyboard focus. */}
+        <div className="text-xs text-muted">
+          <span className={whatIf ? "relative block" : ""}>
+            <span
+              ref={rulesRef}
+              onScroll={measureRules}
+              className={whatIf ? "block max-h-20 overflow-y-auto" : ""}
+            >
+              {whatIf ? rules.full : rules.short}
+            </span>
+            {/* Only on a screen too narrow for five lines: a fade says there is more to scroll to. */}
+            {whatIf && moreBelow && (
+              <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-linear-to-t from-panel" />
+            )}
+          </span>{" "}
           <button
             type="button"
             aria-expanded={whatIf}
@@ -180,7 +208,7 @@ export function DecisionModal({
           >
             {whatIf ? "less" : "what if…"}
           </button>
-        </p>
+        </div>
         {iAccepted && <p className="text-sm text-warn">You accepted — waiting for {partner}.</p>}
         {partnerAccepted && (
           <p className="text-sm text-warn">{`${partner} has accepted. Accept too and the merge locks in.`}</p>
