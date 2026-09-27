@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "seed": "tsx scripts/seed-dev.ts",
     "seed:live": "tsx scripts/seed-live.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.1",
