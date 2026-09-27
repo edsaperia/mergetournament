@@ -14,7 +14,8 @@ import { merges, slots } from "../src/db/schema";
 import { ConsoleEmailer, type Email } from "../src/lib/email";
 import { makeTournament } from "../src/services/test-fixture";
 import type { Db } from "../src/services/tournament-service";
-import { BASE_URL, E2E_DATABASE_URL } from "./env";
+import { assertConnectedTo } from "./db-guard";
+import { BASE_URL, E2E_DATABASE_NAME, E2E_DATABASE_URL } from "./env";
 
 /** The console emailer, minus the console: invitations are kept in `sent` for the test to read. */
 class QuietEmailer extends ConsoleEmailer {
@@ -26,6 +27,7 @@ class QuietEmailer extends ConsoleEmailer {
 export async function withDb<T>(fn: (db: Db) => Promise<T>): Promise<T> {
   const client = postgres(E2E_DATABASE_URL, { onnotice: () => {} });
   try {
+    await assertConnectedTo(client, E2E_DATABASE_NAME);
     return await fn(drizzle(client, { schema }) as unknown as Db);
   } finally {
     await client.end();

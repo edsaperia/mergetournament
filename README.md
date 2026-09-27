@@ -34,7 +34,7 @@ persists under `.data/`; the seed scripts must run while the dev server is
 stopped (single-process database).
 
 ```bash
-npm test                       # 81 tests: property-based bracket/schedule/engine,
+npm test                       # 138 tests: property-based bracket/schedule/engine,
                                # PGlite-backed services, real-WebSocket collab gates
 npm run test:e2e               # browser tests (Playwright): magic-link sign-in,
                                # live co-typing, the decision-modal

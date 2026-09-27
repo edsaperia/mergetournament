@@ -10,7 +10,12 @@ import { BASE_URL, COLLAB_PORT, E2E_DATABASE_URL, PORT } from "./e2e/env";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Only the browser tests; e2e/*.test.ts are vitest unit tests.
+  testMatch: "**/*.spec.ts",
   fullyParallel: true,
+  // The decision-window test runs on real time; one worker on slow CI runners
+  // costs a few seconds and removes the main flake risk.
+  workers: process.env.CI ? 1 : undefined,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
