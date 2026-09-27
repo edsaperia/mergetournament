@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { merges } from "../src/db/schema";
+import { GRACE_S } from "../src/services/runtime-service";
 import { openWorkspace, setUpTournament, typeAtEnd, withDb } from "./tournament";
 
 /** Short enough to wait out, long enough to open both workspaces and type first. */
@@ -49,23 +50,56 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
     await modal.getByRole("button", { name: a.name, exact: true }).click();
   }
 
-  // First accept-vote: A waits for B.
+  // First accept-vote: A waits for B, and B's modal shows it without B pressing anything.
   await modalA.getByRole("button", { name: "Accept the Merge" }).click();
   await expect(modalA.getByText(`You accepted — waiting for ${b.name}.`)).toBeVisible();
+  await expect(modalB.getByText(`${a.name} has accepted. Accept too and the merge locks in.`)).toBeVisible();
 
-  // Second accept-vote locks the merge; B's modal goes and the result shows.
+  // Second accept-vote locks the merge; both modals go and the result shows, on A's page without a reload.
   await modalB.getByRole("button", { name: "Accept the Merge" }).click();
   await expect(modalB).toBeHidden();
   await expect(pageB.getByText(/^Resolved \(agreed\)/)).toBeVisible();
+  await expect(modalA).toBeHidden();
+  await expect(pageA.getByText(/^Resolved \(agreed\)/)).toBeVisible();
 
   const [row] = await withDb((db) => db.select().from(merges).where(eq(merges.id, id)));
   expect(row.state).toBe("resolved");
   expect(row.resolution).toBe("agreed");
   expect(row.workingText).toBe(frozen);
+});
 
-  // A's page doesn't refresh itself during the decision-window (nothing
-  // pushes the partner's vote to it), so A sees the result on reload.
-  await pageA.reload();
-  await expect(modalA).toBeHidden();
-  await expect(pageA.getByText(/^Resolved \(agreed\)/)).toBeVisible();
+test("decision-window runs out with both bearers rejecting: both modals clear by themselves for the coin flip", async ({
+  browser,
+}) => {
+  // The whole 60-second window has to run out.
+  test.setTimeout(ROUND_S * 1000 + (GRACE_S + 60) * 1000);
+  const { merge } = await setUpTournament({ names: ["Ada", "Brook", "Cyd", "Dee"], roundDurationS: ROUND_S });
+  const { a, b, url, id } = merge!;
+
+  const pageA = await (await browser.newContext()).newPage();
+  const pageB = await (await browser.newContext()).newPage();
+  await pageA.goto(a.link);
+  await pageB.goto(b.link);
+  await openWorkspace(pageA, url);
+  await openWorkspace(pageB, url);
+
+  const modalA = pageA.getByRole("dialog", { name: "Time is up — decide on the merge" });
+  const modalB = pageB.getByRole("dialog", { name: "Time is up — decide on the merge" });
+  await expect(modalA).toBeVisible({ timeout: (ROUND_S + 15) * 1000 });
+  await expect(modalB).toBeVisible();
+
+  // Both present, neither accepts: at the window's end a coin flip picks an input text.
+  await modalA.getByRole("button", { name: "Reject the Merge" }).click();
+  await modalB.getByRole("button", { name: "Reject the Merge" }).click();
+
+  for (const page of [pageA, pageB]) {
+    const flip = page.getByRole("dialog", { name: "Coin flip" });
+    await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
+    await expect(flip).toContainText("Time ran out — deciding which input text advances");
+    await expect(page.getByRole("dialog", { name: "Time is up — decide on the merge" })).toBeHidden();
+  }
+
+  const [row] = await withDb((db) => db.select().from(merges).where(eq(merges.id, id)));
+  expect(row.state).toBe("resolved");
+  expect(row.resolution).toBe("backstop_flip");
 });
