@@ -36,7 +36,16 @@ stopped (single-process database).
 ```bash
 npm test                       # 81 tests: property-based bracket/schedule/engine,
                                # PGlite-backed services, real-WebSocket collab gates
+npm run test:e2e               # browser tests (Playwright): magic-link sign-in,
+                               # live co-typing, the decision-modal
 ```
+
+The browser tests build and start the app themselves (ports 3100/3101) on a
+Postgres database they wipe first — `mergetournament_e2e` on
+`localhost:5432` (user/password `postgres`), or set `E2E_DATABASE_URL`; the
+name must end in `_e2e`. For example:
+`docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`, then
+`npx playwright install chromium` once.
 
 ## Stack
 
