@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { countWords } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
@@ -15,6 +15,8 @@ const initial: ActionState = { ok: true, message: "" };
 /** Lines of the frozen text the confirmation strip shows from each end. */
 const STRIP_HEAD = 3;
 const STRIP_TAIL = 3;
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * The decision modal (SPEC §4, the decision window): once the clock expires
@@ -74,25 +76,70 @@ export function DecisionModal({
   const lines = workingText.split("\n");
   // Confirmation strip: the modal confirms which text, it isn't for rereading.
   const excerpt = !showAll && lines.length > STRIP_HEAD + STRIP_TAIL + 2;
-  const rules = partnerActive
-    ? `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}. Either rejects: a coin flip ` +
-      "picks one input text to advance unchanged. No choice counts as rejecting."
-    : `If ${partner} doesn't respond, Accept advances this merge and Reject advances your own input. ` +
-      "No choice counts as rejecting.";
+  // What the window's end does (resolveMerge): both accept-votes lock; else,
+  // with both bearers active this round, a coin flip between the inputs; with
+  // one, their accept-vote advances the merge, anything else their input;
+  // with none, abandoned. Worded for who is active now: one short sentence,
+  // and the full rules behind "what if…" (short enough for a 360×640 phone).
+  const both = `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}.`;
+  const orFlip = "it's both accepting or a coin flip between the input texts";
+  const variant = iAmActive && partnerActive ? "both" : iAmActive ? "me" : partnerActive ? "partner" : "none";
+  const rules = {
+    both: {
+      short: `${both} Anything else: a coin flip between the input texts.`,
+      full: `${both} Anything else: a coin flip picks one input text to advance unchanged.`,
+    },
+    me: {
+      short: `${both} If ${partner} stays silent, your Accept advances this merge.`,
+      full:
+        `${both} While ${partner} stays silent, your Accept advances this merge and anything else advances ` +
+        `your own input; once ${partner} responds, ${orFlip}.`,
+    },
+    partner: {
+      short: `${both} If you stay silent, ${partner}'s Accept advances this merge.`,
+      full:
+        `${both} If you stay silent, ${partner}'s Accept advances this merge and anything else advances ` +
+        `their own input; once you respond, ${orFlip}.`,
+    },
+    none: {
+      short: `${both} If nobody responds, the merge is abandoned.`,
+      full:
+        `${both} If just one of you responds, their Accept advances this merge and anything else their own ` +
+        `input; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
+    },
+  }[variant];
+  // Expanded for one variant only, so a change of who is active collapses it.
+  const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
+  const whatIf = whatIfFor === variant;
+  const rulesRef = useRef<HTMLSpanElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+  const measureRules = useCallback(() => {
+    const el = rulesRef.current;
+    setMoreBelow(el !== null && el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, []);
+  useEffect(() => {
+    measureRules();
+    const el = rulesRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(measureRules);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measureRules, whatIf, rules.full]);
 
   return (
     // Header and footer stay put; only the middle scrolls, so the buttons
     // are always in reach however long the text or small the screen.
     <Modal label="Time is up — decide on the merge" className="flex max-w-2xl flex-col">
-      <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-2 border-b border-edge px-5 py-4">
-        <p className="text-xl font-bold">Time is up — the text is frozen</p>
-        <Countdown remainingS={remainingS} className="text-2xl font-bold text-warn" dangerAtS={15} />
+      {/* Smaller type on a phone, so on 360×640 the confirmation-strip's first line stays in view. */}
+      <div className="flex shrink-0 items-baseline justify-between gap-2 border-b border-edge px-5 py-3 sm:py-4">
+        <p className="text-base font-bold sm:text-xl">Time is up — the text is frozen</p>
+        <Countdown remainingS={remainingS} className="shrink-0 text-xl font-bold text-warn sm:text-2xl" dangerAtS={15} />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-        {!iAmActive && <p className="font-semibold text-warn">Are you still here? Any button below counts.</p>}
-        <p className="text-sm text-muted">
-          The merge you would accept · {countWords(workingText)} words · {lines.length} lines
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-3 sm:gap-3 sm:py-4">
+        {!iAmActive && <p className="text-sm font-semibold text-warn sm:text-base">Are you still here? Any button below counts.</p>}
+        <p className="text-xs text-muted sm:text-sm">
+          The merge you would accept · {plural(countWords(workingText), "word")} · {plural(lines.length, "line")}
         </p>
         <div className="rounded-md border border-edge p-3">
           {blank ? (
@@ -115,7 +162,8 @@ export function DecisionModal({
         </div>
       </div>
 
-      <form action={dispatch} className="flex shrink-0 flex-col gap-3 border-t border-edge bg-panel px-5 py-4">
+      {/* Tighter on a phone too, so the expanded rules leave the strip's first line in view at 360×640. */}
+      <form action={dispatch} className="flex shrink-0 flex-col gap-2 border-t border-edge bg-panel px-5 py-3 sm:gap-3 sm:py-4">
         {!finalRound && (
           <fieldset className="rounded-md border border-edge p-3 text-sm">
             <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
@@ -135,8 +183,32 @@ export function DecisionModal({
           </fieldset>
         )}
 
-        {/* The rules sit with the buttons so they are never below the fold. */}
-        <p className="text-xs text-muted">{rules}</p>
+        {/* The rules sit with the buttons so they are never below the fold. Collapsed, "what if…" follows
+            the short line; expanded, the full rules take a capped box (five lines, enough for every variant
+            at 360 px) and "less" sits below it, so the button is always in view and keeps keyboard focus. */}
+        <div className="text-xs text-muted">
+          <span className={whatIf ? "relative block" : ""}>
+            <span
+              ref={rulesRef}
+              onScroll={measureRules}
+              className={whatIf ? "block max-h-20 overflow-y-auto" : ""}
+            >
+              {whatIf ? rules.full : rules.short}
+            </span>
+            {/* Only on a screen too narrow for five lines: a fade says there is more to scroll to. */}
+            {whatIf && moreBelow && (
+              <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-linear-to-t from-panel" />
+            )}
+          </span>{" "}
+          <button
+            type="button"
+            aria-expanded={whatIf}
+            onClick={() => setWhatIfFor(whatIf ? null : variant)}
+            className="whitespace-nowrap underline underline-offset-2 hover:text-foreground"
+          >
+            {whatIf ? "less" : "what if…"}
+          </button>
+        </div>
         {iAccepted && <p className="text-sm text-warn">You accepted — waiting for {partner}.</p>}
         {partnerAccepted && (
           <p className="text-sm text-warn">{`${partner} has accepted. Accept too and the merge locks in.`}</p>

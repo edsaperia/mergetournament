@@ -34,7 +34,7 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
 
   for (const modal of [modalA, modalB]) {
     // The confirmation-strip shows the frozen text, as typed before the deadline.
-    await expect(modal.getByText("7 words · 1 lines")).toBeVisible();
+    await expect(modal.getByText(/7 words · 1 line$/)).toBeVisible();
     await expect(modal).toContainText(frozen);
     // Bearer buttons named for the two bearers, and the two votes.
     await expect(modal.getByRole("button", { name: a.name, exact: true })).toBeVisible();
@@ -45,10 +45,33 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   // The text is frozen: the editor no longer takes input.
   await expect(pageA.getByText("live · read-only")).toBeVisible();
 
+  // Only A typed, so each footer has one short rule line; "what if…" opens the full rules in place.
+  await expect(modalA).toContainText(`If ${b.name} stays silent, your Accept advances this merge.`);
+  await expect(modalB).toContainText(`If you stay silent, ${a.name}'s Accept advances this merge.`);
+  const whatIfA = modalA.getByRole("button", { name: "what if…" });
+  await expect(whatIfA).toHaveAttribute("aria-expanded", "false");
+  await expect(modalA).not.toContainText("anything else advances your own input");
+  await whatIfA.focus();
+  await pageA.keyboard.press("Enter");
+  await expect(modalA).toContainText(
+    `While ${b.name} stays silent, your Accept advances this merge and anything else advances your own input`
+  );
+  await expect(modalA.getByRole("button", { name: "less" })).toHaveAttribute("aria-expanded", "true");
+  // On a 360×640 phone the full rules fit without scrolling, final words included, and "less" is on screen.
+  await pageA.setViewportSize({ width: 360, height: 640 });
+  const fullRulesA = modalA.getByText(/^Both accept: it locks in\. While /);
+  await expect(fullRulesA).toHaveText(new RegExp(`once ${b.name} responds, it's both accepting or a coin flip between the input texts\\.$`));
+  expect(await fullRulesA.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  await expect(modalA.getByRole("button", { name: "less" })).toBeInViewport({ ratio: 1 });
+  await pageA.setViewportSize({ width: 1280, height: 720 });
+
   // Both choose who carries the result forward, so the merge locks as agreed rather than by coin flip.
   for (const modal of [modalA, modalB]) {
     await modal.getByRole("button", { name: a.name, exact: true }).click();
   }
+  // B's press makes both active: A's footer switches to the both-active line and collapses.
+  await expect(modalA).toContainText("Anything else: a coin flip between the input texts.");
+  await expect(whatIfA).toHaveAttribute("aria-expanded", "false");
 
   // First accept-vote: A waits for B, and B's modal shows it without B pressing anything.
   await modalA.getByRole("button", { name: "Accept the Merge" }).click();
@@ -61,6 +84,10 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   await expect(pageB.getByText(/^Resolved \(agreed\)/)).toBeVisible();
   await expect(modalA).toBeHidden();
   await expect(pageA.getByText(/^Resolved \(agreed\)/)).toBeVisible();
+  // The round is still in its decision-window, but this merge's is over: the header stops showing it.
+  for (const page of [pageA, pageB]) {
+    await expect(page.getByText("decision window")).toBeHidden();
+  }
 
   const [row] = await withDb((db) => db.select().from(merges).where(eq(merges.id, id)));
   expect(row.state).toBe("resolved");
@@ -96,6 +123,9 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     const flip = page.getByRole("dialog", { name: "Coin flip" });
     await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
     await expect(flip).toContainText("Time ran out — deciding which input text advances");
+    // Who carries the result isn't shown behind the overlay while the coin is in the air.
+    await expect(flip).toContainText("the coin is in the air");
+    await expect(page.getByText(/carried by/)).toBeHidden();
     await expect(page.getByRole("dialog", { name: "Time is up — decide on the merge" })).toBeHidden();
   }
 
