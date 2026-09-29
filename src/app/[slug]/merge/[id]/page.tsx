@@ -46,6 +46,10 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const paused = ctx.paused;
   const live = tournament.phase === "running" && round.state === "open" && m.state === "open";
   const canAct = Boolean(mySide) && live && !paused;
+  // Keep listening through the decision-window, so the decision-modal sees
+  // the partner's vote, the lock-in and the coin flip. The render that shows
+  // the merge resolved drops the listener.
+  const deciding = tournament.phase === "running" && round.state === "closing" && m.state === "open";
 
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
@@ -76,7 +80,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-      {live && <AutoRefresh slug={slug} />}
+      {(live || deciding) && <AutoRefresh slug={slug} />}
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">
           Round {slot.roundNo}
