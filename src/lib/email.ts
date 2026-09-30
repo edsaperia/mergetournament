@@ -4,6 +4,8 @@
  * the Resend implementation arrives with deployment.
  */
 
+import { DECISION_WINDOW_S } from "./schedule";
+
 export interface Email {
   to: string;
   subject: string;
@@ -96,7 +98,7 @@ export function scheduleLine(t: {
   }
   parts.push(
     `Rounds last ${durationWords(t.roundDurationS)}, and the breaks between them ${durationWords(t.breakDurationS)}; ` +
-      `a pair still deciding when a round's time is up gets 1 more minute. ` +
+      `a pair still deciding when a round's time is up gets ${durationWords(DECISION_WINDOW_S)} more. ` +
       `How many rounds depends on how many drafts come in.`
   );
   return parts.join(" ");
@@ -109,6 +111,8 @@ export function inviteEmail(opts: {
   tournamentName: string;
   /** Who invited them; omitted for the admin's own (self) invite. */
   adminName?: string;
+  /** The recipient is the tournament's administrator (their own invite). */
+  selfIsAdmin?: boolean;
   /** The admin's participant brief; may be empty. */
   intro?: string;
   /** Derived logistics sentence(s); may be empty. */
@@ -119,9 +123,11 @@ export function inviteEmail(opts: {
   const lines = [
     `Hello ${opts.participantName},`,
     ``,
-    opts.adminName
-      ? `${opts.adminName} has invited you to "${opts.tournamentName}" on Merge Tournament.`
-      : `You're the administrator of "${opts.tournamentName}" on Merge Tournament.`,
+    opts.selfIsAdmin
+      ? `You're the administrator of "${opts.tournamentName}" on Merge Tournament.`
+      : opts.adminName
+        ? `${opts.adminName} has invited you to "${opts.tournamentName}" on Merge Tournament.`
+        : `You're invited to "${opts.tournamentName}" on Merge Tournament.`,
   ];
   if (opts.intro?.trim()) lines.push(``, opts.intro.trim());
   if (opts.schedule) lines.push(``, opts.schedule);
@@ -130,9 +136,9 @@ export function inviteEmail(opts: {
     `Your personal link (keep it private — it signs you in):`,
     opts.magicLink,
     ``,
-    opts.adminName
-      ? `Use it to read the details and write your draft.`
-      : `Use it to open the admin dashboard, invite participants and run the tournament.`
+    opts.selfIsAdmin
+      ? `Use it to open the admin dashboard, invite participants and run the tournament.`
+      : `Use it to read the details and write your draft.`
   );
   if (opts.baseUrl) {
     lines.push(

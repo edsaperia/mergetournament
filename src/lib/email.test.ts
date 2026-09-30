@@ -31,7 +31,7 @@ describe("scheduleLine", () => {
   it("gives exact durations instead of rounding to minutes (the 30 Sep playtest: 150 s rounds, 30 s breaks)", () => {
     const line = scheduleLine({ ...base, roundDurationS: 150, breakDurationS: 30 });
     expect(line).toContain("Rounds last 2 minutes 30 seconds, and the breaks between them 30 seconds");
-    expect(line).toContain("gets 1 more minute");
+    expect(line).toContain("gets 1 minute more");
     expect(line).not.toContain("3 minutes");
   });
 
@@ -97,6 +97,7 @@ describe("inviteEmail", () => {
       to: "a@x.org",
       participantName: "Ada",
       tournamentName: "Club Constitution",
+      selfIsAdmin: true,
       intro: "  ",
       magicLink: "http://x/club/auth/tok456",
     });
@@ -112,10 +113,26 @@ describe("the admin's own invite", () => {
       to: "a@x.org",
       participantName: "Morgan",
       tournamentName: "Club Constitution",
+      selfIsAdmin: true,
       magicLink: "http://x/club/auth/tok",
     });
     expect(email.text).toContain("You're the administrator");
     expect(email.text).not.toContain("write your draft");
     expect(email.text).toContain("run the tournament");
+  });
+});
+
+describe("a participant's invite with no admin on record", () => {
+  it("still gets the participant wording, not the admin's", () => {
+    const email = inviteEmail({
+      to: "p@x.org",
+      participantName: "Pat",
+      tournamentName: "Club Constitution",
+      magicLink: "http://x/club/auth/tok",
+    });
+    expect(email.text).toContain(`You're invited to "Club Constitution"`);
+    expect(email.text).toContain("write your draft");
+    expect(email.text).not.toContain("administrator");
+    expect(email.text).not.toContain("run the tournament");
   });
 });
