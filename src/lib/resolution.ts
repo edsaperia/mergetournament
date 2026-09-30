@@ -37,6 +37,9 @@ export interface ResolvedMergeView {
   /** Each player's pick for who goes into the next round, when known: says why a coin flip chose. */
   bearerPrefA?: "A" | "B" | null;
   bearerPrefB?: "A" | "B" | null;
+  /** Each player's last Accept ("working") or Reject ("input") in the decision-window, when known. */
+  activeChoiceA?: "working" | "input" | null;
+  activeChoiceB?: "working" | "input" | null;
 }
 
 /** What advanced from a resolved merge: the merged text, one input unchanged, or nothing. */
@@ -74,11 +77,16 @@ export function resolutionSentence(m: ResolvedMergeView, nameOf: (id: string | n
     }
     case "backstop_flip":
       return `No agreement, so a coin flip between the inputs: ${inputOwner}'s ${finalRound ? "input" : "text"} ${goes} unchanged.`;
-    case "active_advance":
-      return advanced === "merged"
-        ? `Only ${carrier} took part, so the merged text ${carrier} accepted ${goes}.`
-        : // Not accepting, or accepting a blank merged text: either way the input goes on.
-          `Only ${carrier} took part, and there was no accepted merged text, so ${carrier}'s input ${goes} unchanged.`;
+    case "active_advance": {
+      if (advanced === "merged") return `Only ${carrier} took part, so the merged text ${carrier} accepted ${goes}.`;
+      // Not accepting, or accepting a blank merged text: either way the input goes on.
+      const choice = m.advancingBearerId === m.bearerAId ? m.activeChoiceA : m.activeChoiceB;
+      if (choice === "input") return `${carrier} rejected the merge, so ${carrier}'s input ${goes} unchanged.`;
+      if (choice === "working") {
+        return `Only ${carrier} took part, and the merge ${carrier} accepted was empty, so ${carrier}'s input ${goes} unchanged.`;
+      }
+      return `Only ${carrier} took part, and there was no accepted merged text, so ${carrier}'s input ${goes} unchanged.`;
+    }
     case "abandoned":
       return finalRound
         ? "Neither player took part, so this merge is abandoned and nothing from it becomes the final text."

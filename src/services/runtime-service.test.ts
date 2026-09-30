@@ -472,3 +472,25 @@ describe("pause and the no-canonical-text ending", () => {
     expect(last.text).toContain("no final text");
   });
 });
+
+describe("a lone player's Reject", () => {
+  it("is named in the merge chat's result line", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await makeTournament(db, { slug: "lone-reject", names: ["Cleo", "Ben"], beginAt: T0, emailer });
+    const [m] = await mergesOfRound(t.id, 1).then((rows) => rows.map((r) => r.merge));
+    const cleo = (await nameOfParticipant(m.bearerAId)) === "Cleo" ? m.bearerAId! : m.bearerBId!;
+    await mergeAction(db, m.id, cleo, { type: "edit", text: "Cleo's attempt." }, at(60));
+    await tick(db, emailer, BASE, t.id, at(600));
+    await mergeAction(db, m.id, cleo, { type: "reject" }, at(610));
+    await tick(db, emailer, BASE, t.id, at(660));
+    const [row] = await db.select().from(merges).where(eq(merges.id, m.id));
+    expect(row.resolution).toBe("active_advance");
+    const [room] = await db
+      .select()
+      .from(chatRooms)
+      .where(and(eq(chatRooms.kind, "merge"), eq(chatRooms.subjectId, m.id)));
+    const lines = (await db.select().from(messages).where(eq(messages.roomId, room.id))).map((x) => x.body);
+    // Two players, so this is the final.
+    expect(lines).toContain("Cleo rejected the merge, so Cleo's input becomes the final text unchanged.");
+  });
+});

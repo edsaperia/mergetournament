@@ -215,3 +215,30 @@ describe("a coin flip on who goes into the next round says why it was needed", (
     }
   });
 });
+
+describe("a lone player who rejects", () => {
+  it("is said to have rejected the merge", () => {
+    // Only Ada took part; in the decision-window she pressed Reject, so no accept-vote stands.
+    const session = { ...newSession(), workingText: "Ada's merge", active: { A: true, B: false } };
+    const r = resolveMerge({ text: "tA", bearer: "ada" }, { text: "tB", bearer: "ben" }, session, null, mulberry32(1));
+    expect(r.kind).toBe("ACTIVE_ADVANCE");
+    expect(r.advancing).toEqual({ source: "input", text: "tA", bearer: "ada" });
+    const m = { ...base, resolution: "active_advance", resultTextId: "tA", advancingBearerId: "ada", activeChoiceA: "input" as const };
+    expect(resolutionSentence(m, nameOf, false)).toBe("Ada rejected the merge, so Ada's input goes into the next round unchanged.");
+    expect(resolutionSentence(m, nameOf, true)).toBe("Ada rejected the merge, so Ada's input becomes the final text unchanged.");
+    // Ben's side: the same when Ben is the one who took part.
+    const mB = { ...base, resolution: "active_advance", resultTextId: "tB", advancingBearerId: "ben", activeChoiceB: "input" as const };
+    expect(resolutionSentence(mB, nameOf, false)).toBe("Ben rejected the merge, so Ben's input goes into the next round unchanged.");
+  });
+  it("tells an accepted but empty merge from a rejection, and silence from both", () => {
+    const m = { ...base, resolution: "active_advance", resultTextId: "tA", advancingBearerId: "ada" };
+    expect(resolutionSentence({ ...m, activeChoiceA: "working" }, nameOf, false)).toBe(
+      "Only Ada took part, and the merge Ada accepted was empty, so Ada's input goes into the next round unchanged."
+    );
+    expect(resolutionSentence({ ...m, activeChoiceA: null }, nameOf, false)).toBe(
+      "Only Ada took part, and there was no accepted merged text, so Ada's input goes into the next round unchanged."
+    );
+    // The partner's press can't be what decided it.
+    expect(resolutionSentence({ ...m, activeChoiceB: "input" }, nameOf, false)).not.toMatch(/rejected/);
+  });
+});
