@@ -1,9 +1,11 @@
 import { type Tournament } from "../../db/schema";
 import { workspaceAction } from "../../server/actions";
 import { projectedStarts, wallClockIso } from "../../lib/schedule";
-import { roundMerges, scheduleContext } from "../../server/queries";
+import { flipKeysFor } from "../../lib/flip";
+import { freshFlipsFor, roundMerges, scheduleContext } from "../../server/queries";
 import { LocalTime } from "../local-time";
 import { ControlButton } from "./admin/admin-controls";
+import { ShownOnceLanded } from "./flip-reveal";
 
 /**
  * During a break: the next round starts early only when every bearer in it
@@ -38,6 +40,8 @@ export async function BreakPanel({
       ? mine.readyA
       : mine.readyB
     : false;
+  // Only a player who goes on gets a button: it waits for the coin that sent them.
+  const flipKeys = mine ? flipKeysFor(await freshFlipsFor(tournament.id), next.number, [mine.textAId, mine.textBId]) : [];
 
   return (
     <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-edge p-4">
@@ -54,13 +58,15 @@ export async function BreakPanel({
           sooner only when all its players are ready ({bearersReady} of {bearersTotal} so far).
         </p>
       </div>
-      {mine && !iAmReady && (
-        <ControlButton
-          action={workspaceAction.bind(null, slug, mine.id, { type: "readyForRound" as const })}
-          label={`I'm ready for round ${next.number}`}
-        />
-      )}
-      {mine && iAmReady && <span className="text-sm font-medium text-ok">You&apos;re ready ✓</span>}
+      <ShownOnceLanded flipKey={flipKeys}>
+        {mine && !iAmReady && (
+          <ControlButton
+            action={workspaceAction.bind(null, slug, mine.id, { type: "readyForRound" as const })}
+            label={`I'm ready for round ${next.number}`}
+          />
+        )}
+        {mine && iAmReady && <span className="text-sm font-medium text-ok">You&apos;re ready ✓</span>}
+      </ShownOnceLanded>
     </div>
   );
 }

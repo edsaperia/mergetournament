@@ -9,6 +9,7 @@ import {
   type RoundProgress,
   type ScheduleConfig,
 } from "../lib/schedule";
+import { isFreshFlip, type FreshFlip } from "../lib/flip";
 import { effectiveT, GRACE_S } from "../services/runtime-service";
 
 /**
@@ -106,3 +107,13 @@ export async function scheduleContext(tournament: Tournament): Promise<ScheduleC
     globalRemaining: () => globalRemainingS(config, progress, te),
   };
 }
+
+/** The tournament's merges whose coin flip is still being performed (see lib/flip). */
+export const freshFlipsFor = cache(async (tournamentId: string): Promise<FreshFlip[]> => {
+  const [allSlots, allMerges] = await Promise.all([slotsFor(tournamentId), mergesFor(tournamentId)]);
+  const roundOf = new Map(allSlots.map((s) => [s.id, s.roundNo]));
+  const now = Date.now();
+  return allMerges
+    .filter((m) => isFreshFlip(m, now))
+    .map((m) => ({ key: m.id, roundNo: roundOf.get(m.slotId) ?? 0, resultTextId: m.resultTextId }));
+});

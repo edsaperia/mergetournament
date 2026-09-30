@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
 import { advancedFrom, resolutionSentence, whatNow } from "../../../../lib/resolution";
+import { isFreshFlip } from "../../../../lib/flip";
 import { warnThresholds } from "../../../../lib/schedule";
 import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
@@ -55,8 +56,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   // The candidate didn't advance: an input did instead, or nothing did.
   const candidateLost = m.state === "resolved" && advanced !== "merged";
   // Only animate flips that just happened; cold visitors see history.
-  const flipAgeMs = m.resolvedAt ? new Date().getTime() - m.resolvedAt.getTime() : Infinity;
-  const flipFresh = m.state === "resolved" && m.flipSeed !== null && flipAgeMs < 120_000;
+  const flipFresh = isFreshFlip(m, new Date().getTime());
   // While that coin is in the air, nothing may name its result: marks, tags and the opening tab wait for it.
   const flipKey = flipFresh ? m.id : null;
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";

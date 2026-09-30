@@ -106,25 +106,37 @@ export function FlipReveal({
   );
 }
 
+/** One flip's key, several (the result names each of them), or none. */
+type FlipKeys = string | readonly string[] | null;
+
 /**
- * True while the flip keyed `flipKey` is still to land in this browser: from
+ * True while a flip keyed by `flipKey` is still to land in this browser: from
  * the first render (so the server-rendered page never shows the result) until
  * FlipReveal lands it, or at once if this browser has already seen that flip.
- * False for no `flipKey`.
+ * With several keys, until the last of them lands. False for no key.
  */
-function useFlipping(flipKey: string | null): boolean {
-  const [flipping, setFlipping] = useState(flipKey !== null);
+function useFlipping(flipKey: FlipKeys): boolean {
+  // One string, so the effect reruns only when the keys change.
+  const joined = flipKey === null ? "" : typeof flipKey === "string" ? flipKey : flipKey.join(" ");
+  const [flipping, setFlipping] = useState(joined !== "");
   useEffect(() => {
     // FlipReveal marks the flip seen only after this runs (in a timeout), so
     // a mark here means an earlier visit.
-    const seen = flipKey === null || sessionStorage.getItem(`flip:${flipKey}`) !== null;
+    const inAir = new Set(
+      (joined === "" ? [] : joined.split(" ")).filter((k) => sessionStorage.getItem(`flip:${k}`) === null)
+    );
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
-    setFlipping(!seen);
-    if (seen) return;
-    const land = () => setFlipping(false);
-    window.addEventListener(landedEvent(flipKey), land);
-    return () => window.removeEventListener(landedEvent(flipKey), land);
-  }, [flipKey]);
+    setFlipping(inAir.size > 0);
+    const listeners = [...inAir].map((k) => {
+      const land = () => {
+        inAir.delete(k);
+        if (inAir.size === 0) setFlipping(false);
+      };
+      window.addEventListener(landedEvent(k), land);
+      return () => window.removeEventListener(landedEvent(k), land);
+    });
+    return () => listeners.forEach((remove) => remove());
+  }, [joined]);
   return flipping;
 }
 
@@ -135,7 +147,7 @@ function useFlipping(flipKey: string | null): boolean {
  * `flipKey` it shows its children. Hidden, not removed: the space stays and
  * nothing inside remounts.
  */
-export function HiddenWhileFlipping({ flipKey, children }: { flipKey: string | null; children: React.ReactNode }) {
+export function HiddenWhileFlipping({ flipKey, children }: { flipKey: FlipKeys; children: React.ReactNode }) {
   const hidden = useFlipping(flipKey);
   return <div className={hidden ? "invisible" : undefined}>{children}</div>;
 }
@@ -145,7 +157,7 @@ export function HiddenWhileFlipping({ flipKey, children }: { flipKey: string | n
  * "goes into the next round" tag — until the coin lands. Inline, and nothing
  * takes its place.
  */
-export function ShownOnceLanded({ flipKey, children }: { flipKey: string | null; children: React.ReactNode }) {
+export function ShownOnceLanded({ flipKey, children }: { flipKey: FlipKeys; children: React.ReactNode }) {
   return useFlipping(flipKey) ? null : <>{children}</>;
 }
 

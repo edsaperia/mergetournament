@@ -12,8 +12,9 @@ import {
   wallClockIso,
   warnThresholds,
 } from "../../lib/schedule";
-import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../server/queries";
-import { FlipReveal } from "./flip-reveal";
+import { flipKeysFor } from "../../lib/flip";
+import { freshFlipsFor, mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../server/queries";
+import { FlipReveal, HiddenWhileFlipping } from "./flip-reveal";
 import { Countdown } from "../live";
 import { LocalTime } from "../local-time";
 
@@ -31,6 +32,8 @@ export async function BracketView({
   const allSlots = await slotsFor(tournament.id);
   const allMerges = await mergesFor(tournament.id);
   const nameOf = await nameMapFor(tournament.id);
+  const flips = await freshFlipsFor(tournament.id);
+  const flipping = new Set(flips.map((f) => f.key));
   const texts = await db
     .select({ id: textVersions.id, kind: textVersions.kind, wordCount: textVersions.wordCount, authorId: textVersions.authorId })
     .from(textVersions)
@@ -151,100 +154,13 @@ export async function BracketView({
               <div className="flex flex-wrap gap-2">
                 {roundSlots.map((slot) => {
                   const m = mergeBySlot.get(slot.id);
-                  if (!m) {
-                    // The viewer's own bye, or their text standing over: marked like "you are here".
-                    const mine = viewerId !== null && slot.outState === "filled" && slot.outBearerId === viewerId;
-                    return (
-                      <div
-                        key={slot.id}
-                        className={`w-64 rounded-lg border border-dashed p-3 text-sm text-muted ${mine ? "border-live" : "border-line"}`}
-                      >
-                        {slot.kind === "bye" ? (
-                          slot.outTextId ? (
-                            <>
-                              bye ·{" "}
-                              <Link className="underline" href={`/${tournament.slug}/text/${slot.outTextId}`}>
-                                {title(slot.outTextId)}
-                              </Link>
-                            </>
-                          ) : slot.outState === "empty" ? (
-                            // Used up: its text went into an extra pairing instead.
-                            "—"
-                          ) : (
-                            "bye"
-                          )
-                        ) : slot.outState === "filled" && slot.outTextId ? (
-                          <>
-                            stands over ·{" "}
-                            <Link className="underline" href={`/${tournament.slug}/text/${slot.outTextId}`}>
-                              {title(slot.outTextId)}
-                            </Link>
-                          </>
-                        ) : slot.outState === "empty" ? (
-                          "—"
-                        ) : (
-                          "…"
-                        )}
-                        {mine && <span className="ml-1 text-xs text-live-ink">yours</span>}
-                      </div>
-                    );
-                  }
-                  // "You are here" points at where you should be NOW — never
-                  // at resolved merges you've already carried forward from.
-                  const involved = viewerId !== null && (m.bearerAId === viewerId || m.bearerBId === viewerId);
-                  const here = involved && m.state === "open";
-                  const upNext = involved && m.state === "pending";
+                  // A card in the round after a coin flip names who won it (the
+                  // text, its player, "yours"): withheld until the coin lands.
+                  const flipKeys = flipKeysFor(flips, slot.roundNo, m ? [m.textAId, m.textBId] : [slot.outTextId]);
                   return (
-                    <Link
-                      key={slot.id}
-                      href={`/${tournament.slug}/merge/${m.id}`}
-                      className={`block w-64 rounded-lg border p-3 text-sm hover:border-strong ${
-                        here ? "border-live ring-1 ring-live" : upNext ? "border-live" : "border-line"
-                      }`}
-                    >
-                      <p className="font-medium">
-                        {nameOf.get(m.bearerAId ?? "") ?? "?"} + {nameOf.get(m.bearerBId ?? "") ?? "?"}
-                        {m.isAdHoc && <span className="ml-1 text-xs text-muted">(extra pairing)</span>}
-                        {here && <span className="ml-1 text-xs text-live-ink">you are here</span>}
-                        {upNext && <span className="ml-1 text-xs text-live-ink">you, up next</span>}
-                      </p>
-                      <p className="mt-1 text-xs text-muted">
-                        {title(m.textAId)} + {title(m.textBId)}
-                      </p>
-                      <p className="mt-1 text-xs">
-                        {m.state === "resolved" ? (
-                          m.flipSeed !== null &&
-                          m.resolvedAt &&
-                          Date.now() - m.resolvedAt.getTime() < 120_000 ? (
-                            <FlipReveal
-                              flipKey={m.id}
-                              a={m.resolution === "bearer_flip" ? nameOf.get(m.bearerAId ?? "") ?? "?" : title(m.textAId)}
-                              b={m.resolution === "bearer_flip" ? nameOf.get(m.bearerBId ?? "") ?? "?" : title(m.textBId)}
-                              title={
-                                m.resolution === "bearer_flip"
-                                  ? `Deciding who goes into round ${slot.roundNo + 1}: ${nameOf.get(m.bearerAId ?? "") ?? "?"} or ${nameOf.get(m.bearerBId ?? "") ?? "?"}`
-                                  : `Round ${slot.roundNo}: time ran out — deciding which text ${slot.roundNo === allRounds.length ? "becomes the final text" : "goes into the next round"}`
-                              }
-                              winner={
-                                m.resolution === "bearer_flip"
-                                  ? nameOf.get(m.advancingBearerId ?? "") ?? "?"
-                                  : title(m.resultTextId)
-                              }
-                            >
-                              <span className="text-muted">
-                                {resolutionLabel(m.resolution)}
-                              </span>
-                            </FlipReveal>
-                          ) : (
-                            <span className="text-muted">{resolutionLabel(m.resolution)}</span>
-                          )
-                        ) : m.state === "open" ? (
-                          <span className="text-ok">negotiating</span>
-                        ) : (
-                          <span className="text-faint">{m.state}</span>
-                        )}
-                      </p>
-                    </Link>
+                    <HiddenWhileFlipping key={slot.id} flipKey={flipKeys}>
+                      {slotCard(slot, m)}
+                    </HiddenWhileFlipping>
                   );
                 })}
               </div>
@@ -255,6 +171,100 @@ export async function BracketView({
       {tournament.phase === "complete" && <CanonicalBanner tournament={tournament} roundsCount={allRounds.length} />}
     </div>
   );
+
+  function slotCard(slot: (typeof allSlots)[number], m: (typeof allMerges)[number] | undefined) {
+    if (!m) {
+      // The viewer's own bye, or their text standing over: marked like "you are here".
+      const mine = viewerId !== null && slot.outState === "filled" && slot.outBearerId === viewerId;
+      return (
+        <div
+          className={`w-64 rounded-lg border border-dashed p-3 text-sm text-muted ${mine ? "border-live" : "border-line"}`}
+        >
+          {slot.kind === "bye" ? (
+            slot.outTextId ? (
+              <>
+                bye ·{" "}
+                <Link className="underline" href={`/${tournament.slug}/text/${slot.outTextId}`}>
+                  {title(slot.outTextId)}
+                </Link>
+              </>
+            ) : slot.outState === "empty" ? (
+              // Used up: its text went into an extra pairing instead.
+              "—"
+            ) : (
+              "bye"
+            )
+          ) : slot.outState === "filled" && slot.outTextId ? (
+            <>
+              stands over ·{" "}
+              <Link className="underline" href={`/${tournament.slug}/text/${slot.outTextId}`}>
+                {title(slot.outTextId)}
+              </Link>
+            </>
+          ) : slot.outState === "empty" ? (
+            "—"
+          ) : (
+            "…"
+          )}
+          {mine && <span className="ml-1 text-xs text-live-ink">yours</span>}
+        </div>
+      );
+    }
+    // "You are here" points at where you should be NOW — never
+    // at resolved merges you've already carried forward from.
+    const involved = viewerId !== null && (m.bearerAId === viewerId || m.bearerBId === viewerId);
+    const here = involved && m.state === "open";
+    const upNext = involved && m.state === "pending";
+    return (
+      <Link
+        href={`/${tournament.slug}/merge/${m.id}`}
+        className={`block w-64 rounded-lg border p-3 text-sm hover:border-strong ${
+          here ? "border-live ring-1 ring-live" : upNext ? "border-live" : "border-line"
+        }`}
+      >
+        <p className="font-medium">
+          {nameOf.get(m.bearerAId ?? "") ?? "?"} + {nameOf.get(m.bearerBId ?? "") ?? "?"}
+          {m.isAdHoc && <span className="ml-1 text-xs text-muted">(extra pairing)</span>}
+          {here && <span className="ml-1 text-xs text-live-ink">you are here</span>}
+          {upNext && <span className="ml-1 text-xs text-live-ink">you, up next</span>}
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          {title(m.textAId)} + {title(m.textBId)}
+        </p>
+        <p className="mt-1 text-xs">
+          {m.state === "resolved" ? (
+            flipping.has(m.id) ? (
+              <FlipReveal
+                flipKey={m.id}
+                a={m.resolution === "bearer_flip" ? nameOf.get(m.bearerAId ?? "") ?? "?" : title(m.textAId)}
+                b={m.resolution === "bearer_flip" ? nameOf.get(m.bearerBId ?? "") ?? "?" : title(m.textBId)}
+                title={
+                  m.resolution === "bearer_flip"
+                    ? `Deciding who goes into round ${slot.roundNo + 1}: ${nameOf.get(m.bearerAId ?? "") ?? "?"} or ${nameOf.get(m.bearerBId ?? "") ?? "?"}`
+                    : `Round ${slot.roundNo}: time ran out — deciding which text ${slot.roundNo === allRounds.length ? "becomes the final text" : "goes into the next round"}`
+                }
+                winner={
+                  m.resolution === "bearer_flip"
+                    ? nameOf.get(m.advancingBearerId ?? "") ?? "?"
+                    : title(m.resultTextId)
+                }
+              >
+                <span className="text-muted">
+                  {resolutionLabel(m.resolution)}
+                </span>
+              </FlipReveal>
+            ) : (
+              <span className="text-muted">{resolutionLabel(m.resolution)}</span>
+            )
+          ) : m.state === "open" ? (
+            <span className="text-ok">negotiating</span>
+          ) : (
+            <span className="text-faint">{m.state}</span>
+          )}
+        </p>
+      </Link>
+    );
+  }
 }
 
 async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tournament; roundsCount: number }) {

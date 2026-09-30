@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { merges } from "../src/db/schema";
 import { GRACE_S } from "../src/services/runtime-service";
@@ -96,12 +96,12 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   expect(row.workingText).toBe(frozen);
 });
 
-test("decision-window runs out with both bearers rejecting: both modals clear by themselves for the coin flip, and nothing names the winner while the coin is in the air", async ({
+test("decision-window runs out with both bearers rejecting: both modals clear by themselves for the coin flip, and nothing names the winner while the coin is in the air, on the workspace or the event page", async ({
   browser,
 }) => {
   // The whole 60-second window has to run out.
   test.setTimeout(ROUND_S * 1000 + (GRACE_S + 60) * 1000);
-  const { merge, people } = await setUpTournament({ names: ["Ada", "Brook", "Cyd", "Dee"], roundDurationS: ROUND_S });
+  const { merge, people, slug } = await setUpTournament({ names: ["Ada", "Brook", "Cyd", "Dee"], roundDurationS: ROUND_S });
   const { a, b, url, id } = merge!;
   // A player from the other merge, watching this one.
   const watcher = people.find((p) => p.name !== a.name && p.name !== b.name)!;
@@ -118,6 +118,15 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
   // A watcher's editor is read-only.
   await pageW.goto(url);
   await expect(pageW.getByText("live · read-only")).toBeVisible();
+  // Both players' event pages too, in tabs of their own (each tab plays the flip once).
+  // The other merge is abandoned, so whoever wins stands over into the final alone.
+  const eventA = await pageA.context().newPage();
+  const eventB = await pageB.context().newPage();
+  for (const page of [eventA, eventB]) {
+    await page.goto(`/${slug}`);
+    await expect(page.getByRole("heading", { name: /^Round 2/ })).toBeVisible();
+  }
+  const round2 = (page: Page) => page.locator("section").filter({ has: page.getByRole("heading", { name: /^Round 2/ }) });
 
   const modalA = pageA.getByRole("dialog", { name: "Time is up — decide on the merge" });
   const modalB = pageB.getByRole("dialog", { name: "Time is up — decide on the merge" });
@@ -132,11 +141,7 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     wide: [`Input A · ${a.name}`, "Merge candidate", `Input B · ${b.name}`],
     phone: [`${a.name}'s input`, "Merge", `${b.name}'s input`],
   };
-  for (const [page, labels] of [
-    [pageA, unmarked.wide],
-    [pageB, unmarked.wide],
-    [pageW, unmarked.phone],
-  ] as const) {
+  const inAirOnWorkspace = async (page: Page, labels: readonly string[]) => {
     const flip = page.getByRole("dialog", { name: "Coin flip" });
     await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
     await expect(flip).toContainText("Time ran out — deciding which input text goes into the next round");
@@ -152,7 +157,27 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     await expect(page.getByRole("dialog", { name: "Time is up — decide on the merge" })).toBeHidden();
     // Still in the air after all that: the checks above ran while the coin was up.
     await expect(flip).toContainText("the coin is in the air");
-  }
+  };
+  const inAirOnEventPage = async (page: Page) => {
+    const flip = page.getByRole("dialog", { name: "Coin flip" });
+    await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
+    await expect(flip).toContainText("the coin is in the air");
+    // The final's card would name the winner's text (and mark it "yours"): held back.
+    await expect(round2(page).getByRole("link", { name: /'s draft$/ })).toBeHidden();
+    await expect(round2(page).getByText("yours", { exact: true })).toBeHidden();
+    // So would the tournament chat's stand-over line and the what-now card (either player's).
+    await expect(page.getByText(/no partner in the final/)).toHaveCount(0);
+    await expect(page.getByText(/goes into the next round with this text/)).toHaveCount(0);
+    await expect(flip).toContainText("the coin is in the air");
+  };
+  // All at once: each tab's coin is up for only six seconds.
+  await Promise.all([
+    inAirOnWorkspace(pageA, unmarked.wide),
+    inAirOnWorkspace(pageB, unmarked.wide),
+    inAirOnWorkspace(pageW, unmarked.phone),
+    inAirOnEventPage(eventA),
+    inAirOnEventPage(eventB),
+  ]);
 
   // A message started while the coin is in the air (input A's chat, beside the merge at 1280).
   const draftBox = pageA.getByPlaceholder("Say something…").first();
@@ -172,4 +197,16 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
   }
   // The tabs moved to the winner in place: the unsent message is still there.
   await expect(draftBox).toHaveValue("typed during the flip");
+
+  // On the event pages, once the coin lands: the final's card, the stand-over line, and each player's card.
+  const winnerName = row.advancingBearerId === row.bearerAId ? a.name : b.name;
+  const [winnerEvent, loserEvent] = winnerName === a.name ? [eventA, eventB] : [eventB, eventA];
+  for (const page of [eventA, eventB]) {
+    await expect(page.getByRole("dialog", { name: "Coin flip" }).getByRole("button", { name: "Close" })).toBeVisible({ timeout: 15_000 });
+    await expect(round2(page).getByRole("link", { name: `${winnerName}'s draft` })).toBeVisible();
+    await expect(page.getByText(`${winnerName}'s text has no partner in the final, so it becomes the final text.`)).toBeVisible();
+  }
+  await expect(round2(winnerEvent).getByText("yours", { exact: true })).toBeVisible();
+  await expect(winnerEvent.getByText("Your text has no partner in the final, so it becomes the final text.")).toBeVisible();
+  await expect(loserEvent.getByText(`${winnerName} goes into the next round with this text.`)).toBeVisible();
 });
