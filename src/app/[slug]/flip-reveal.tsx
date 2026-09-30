@@ -79,7 +79,7 @@ export function FlipReveal({
         className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
       >
         <span className="text-4xl" aria-hidden>
-          🪙
+          🎲
         </span>
         <p className="text-sm text-muted">{title}</p>
         {phase === "animating" ? (
