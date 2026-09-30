@@ -66,7 +66,7 @@ async function madeBy(db: Db, text: { id: string; parentAId: string | null; pare
   if (producer.resolution === "active_advance") {
     const writer = nameOf(producer.advancingBearerId);
     const absent = producer.advancingBearerId === producer.bearerAId ? b : a;
-    return { verb: `Written by ${writer} alone from`, note: `${absent} didn't take part, so ${writer}'s Accept alone advanced it.` };
+    return { verb: `Written by ${writer} alone from`, note: `${absent} didn't take part, so ${writer}'s Accept alone decided it.` };
   }
   return { verb: "Merged from", note: `Agreed by ${a} and ${b}.` };
 }

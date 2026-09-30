@@ -57,7 +57,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const candidateLost = m.state === "resolved" && advanced !== "merged";
   const advancesTag = (
     <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
-      {isFinal ? "the final text" : "advances"}
+      {isFinal ? "the final text" : "goes into the next round"}
     </span>
   );
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
@@ -122,7 +122,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                   <>
                     {" · "}
                     <Link className="underline" href={`/${slug}/text/${m.resultTextId}`}>
-                      {isFinal ? "read the final text" : "read the advancing text"}
+                      {isFinal ? "read the final text" : "read the text"}
                     </Link>
                   </>
                 )}
@@ -140,8 +140,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 b={m.resolution === "bearer_flip" ? bearerName(m.bearerBId) : `${bearerName(m.bearerBId)}'s input`}
                 title={
                   m.resolution === "bearer_flip"
-                    ? `Deciding between ${bearerName(m.bearerAId)} and ${bearerName(m.bearerBId)} to carry this merge into round ${slot.roundNo + 1}`
-                    : "Time ran out — deciding which input text advances"
+                    ? `Deciding who goes into round ${slot.roundNo + 1}: ${bearerName(m.bearerAId)} or ${bearerName(m.bearerBId)}`
+                    : `Time ran out — deciding which input text ${isFinal ? "becomes the final text" : "goes into the next round"}`
                 }
                 winner={
                   m.resolution === "bearer_flip"
@@ -199,7 +199,9 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               Merge candidate
               {advanced === "merged" && advancesTag}
               {candidateLost && (
-                <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">did not advance</span>
+                <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">
+                  {isFinal ? "not the final text" : "doesn't go into the next round"}
+                </span>
               )}
             </h2>
           {m.state === "resolved" ? (
@@ -250,7 +252,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           )}
             {!mySide && m.state === "open" && (
               <p className="mt-3 text-xs text-muted">
-                Only this merge&apos;s bearers hold the pen — you are watching
+                Only this merge&apos;s two players hold the pen — you are watching
                 live. Lobbying arrives through the chat on the right.
               </p>
             )}

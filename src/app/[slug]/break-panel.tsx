@@ -51,7 +51,7 @@ export async function BreakPanel({
           ) : (
             "It starts on schedule;"
           )}{" "}
-          sooner only when all its bearers are ready ({bearersReady} of {bearersTotal} so far).
+          sooner only when all its players are ready ({bearersReady} of {bearersTotal} so far).
         </p>
       </div>
       {mine && !iAmReady && (

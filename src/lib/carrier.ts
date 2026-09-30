@@ -25,14 +25,14 @@ export function carrierLine(mySide: Side, names: { A: string; B: string }, prefs
   const outcome = carrierOutcome(prefs);
 
   if (mine === null && theirs === null) {
-    return "No picks yet. One pick settles it; if neither of you picks, a coin flip chooses the carrier.";
+    return "No picks yet. One pick settles it; if neither of you picks, a coin flip decides who goes into the next round.";
   }
   const myPick = mine === mySide ? "You picked yourself" : `You picked ${partner}`;
-  const theirPick = theirs === mySide ? `${partner} picked you` : `${partner} wants to carry it`;
+  const theirPick = theirs === mySide ? `${partner} picked you` : `${partner} picked themselves`;
   if (outcome === "flip") {
-    return `${myPick}; ${theirPick}. Unless one of you changes, a coin flip chooses the carrier.`;
+    return `${myPick}; ${theirPick}. Unless one of you changes, a coin flip decides who goes into the next round.`;
   }
-  const carries = outcome === mySide ? "you carry it forward" : `${partner} carries it forward`;
+  const carries = outcome === mySide ? "you go into the next round" : `${partner} goes into the next round`;
   if (mine !== null && theirs !== null) return `You both agree: ${carries}.`;
   if (mine !== null) return `${myPick}. ${partner} hasn't picked, so ${carries} unless ${partner} picks differently.`;
   return `${theirPick}. That stands, so ${carries}, unless you pick differently.`;

@@ -16,22 +16,22 @@ export function HowItWorks({ open = false }: { open?: boolean }) {
         </li>
         <li>
           Each round, you and your partner sit together and merge your two texts into one in a
-          shared editor, against a countdown. Lock it in together and it advances at once. When
+          shared editor, against a countdown. Lock it in together and it goes into the next round at once. When
           the countdown runs out, the text freezes and you have 60 seconds to decide:
           <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5">
-            <li>you both accept: the merged text advances;</li>
+            <li>you both accept: the merged text goes into the next round;</li>
             <li>
-              only one of you took part this round: their Accept advances the merged text (their
-              own input if the merged text is blank), and anything else advances their own input;
+              only one of you took part this round: their Accept sends the merged text into the next
+              round (their own input if the merged text is blank), and anything else sends their own input;
             </li>
-            <li>you both took part but don&apos;t both accept: a recorded coin flip picks one input text to advance unchanged;</li>
+            <li>you both took part but don&apos;t both accept: a recorded coin flip picks one input text to go into the next round unchanged;</li>
             <li>neither of you took part: the merge is abandoned and its place in the bracket stays empty.</li>
           </ul>
           So it pays to find a version you can both live with.
         </li>
         <li>
-          Whoever carries the advancing text repeats this in the next round with a new partner,
-          merging again, until a single text remains: the canonical result.
+          Whoever goes into the next round repeats this there with a new partner, merging again,
+          until a single text remains: the canonical result.
         </li>
         <li>
           Afterwards, the random seed is revealed and every flip can be checked against the

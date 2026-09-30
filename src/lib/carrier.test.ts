@@ -33,10 +33,10 @@ describe("carrierOutcome", () => {
 describe("carrierLine", () => {
   it("shows the partner's pick", () => {
     expect(carrierLine("A", names, { A: null, B: "A" })).toBe(
-      "Ben picked you. That stands, so you carry it forward, unless you pick differently."
+      "Ben picked you. That stands, so you go into the next round, unless you pick differently."
     );
     expect(carrierLine("A", names, { A: null, B: "B" })).toBe(
-      "Ben wants to carry it. That stands, so Ben carries it forward, unless you pick differently."
+      "Ben picked themselves. That stands, so Ben goes into the next round, unless you pick differently."
     );
   });
 
@@ -44,15 +44,16 @@ describe("carrierLine", () => {
     for (const prefs of all) {
       for (const side of ["A", "B"] as const) {
         const line = carrierLine(side, names, prefs);
-        expect(line.includes("coin flip chooses the carrier")).toBe(carrierOutcome(prefs) === "flip");
+        expect(line).not.toMatch(/bearer|carrier|carr(y|ies)|advanc/i);
+        expect(line.includes("coin flip decides who goes into the next round")).toBe(carrierOutcome(prefs) === "flip");
       }
     }
     expect(carrierLine("B", names, { A: "A", B: "B" })).toBe(
-      "You picked yourself; Ada wants to carry it. Unless one of you changes, a coin flip chooses the carrier."
+      "You picked yourself; Ada picked themselves. Unless one of you changes, a coin flip decides who goes into the next round."
     );
-    expect(carrierLine("A", names, { A: "B", B: "B" })).toBe("You both agree: Ben carries it forward.");
+    expect(carrierLine("A", names, { A: "B", B: "B" })).toBe("You both agree: Ben goes into the next round.");
     expect(carrierLine("A", names, { A: "A", B: null })).toBe(
-      "You picked yourself. Ben hasn't picked, so you carry it forward unless Ben picks differently."
+      "You picked yourself. Ben hasn't picked, so you go into the next round unless Ben picks differently."
     );
   });
 });

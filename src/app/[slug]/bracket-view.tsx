@@ -210,8 +210,8 @@ export async function BracketView({
                               b={m.resolution === "bearer_flip" ? nameOf.get(m.bearerBId ?? "") ?? "?" : title(m.textBId)}
                               title={
                                 m.resolution === "bearer_flip"
-                                  ? `Deciding between ${nameOf.get(m.bearerAId ?? "") ?? "?"} and ${nameOf.get(m.bearerBId ?? "") ?? "?"} to carry this merge into round ${slot.roundNo + 1}`
-                                  : `Round ${slot.roundNo}: time ran out — deciding which text advances`
+                                  ? `Deciding who goes into round ${slot.roundNo + 1}: ${nameOf.get(m.bearerAId ?? "") ?? "?"} or ${nameOf.get(m.bearerBId ?? "") ?? "?"}`
+                                  : `Round ${slot.roundNo}: time ran out — deciding which text ${slot.roundNo === allRounds.length ? "becomes the final text" : "goes into the next round"}`
                               }
                               winner={
                                 m.resolution === "bearer_flip"

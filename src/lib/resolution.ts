@@ -12,13 +12,13 @@ export function resolutionLabel(r: string | null | undefined): string {
     case "agreed":
       return "agreed";
     case "bearer_flip":
-      return "agreed · coin flip chose the carrier";
+      return "agreed · coin flip chose who goes into the next round";
     case "backstop_flip":
       return "no agreement · coin flip between the inputs";
     case "active_advance":
-      return "only one bearer took part";
+      return "only one player took part";
     case "abandoned":
-      return "abandoned · neither bearer took part";
+      return "abandoned · neither player took part";
     case "walkover":
       return "walkover";
     default:
@@ -53,23 +53,25 @@ export function resolutionSentence(m: ResolvedMergeView, nameOf: (id: string | n
   const carrier = nameOf(m.advancingBearerId);
   const advanced = advancedFrom(m);
   const inputOwner = advanced === "A" ? nameOf(m.bearerAId) : advanced === "B" ? nameOf(m.bearerBId) : carrier;
-  const goes = finalRound ? "becomes the final text" : "advances";
+  const goes = finalRound ? "becomes the final text" : "goes into the next round";
   switch (m.resolution) {
     case "agreed":
       return finalRound
         ? "Agreed: the merged text is the tournament's final text."
-        : `Agreed: ${carrier} carries the merged text forward.`;
+        : `Agreed: ${carrier} goes into the next round with the merged text.`;
     case "bearer_flip":
-      return `Agreed. The carrier picks differed or were missing, so a coin flip chose ${carrier} to carry the merged text forward.`;
+      return `Agreed. The picks for who goes into the next round differed or were missing, so a coin flip chose ${carrier}.`;
     case "backstop_flip":
-      return `No agreement, so a coin flip between the inputs: ${inputOwner}'s input ${goes} unchanged.`;
+      return `No agreement, so a coin flip between the inputs: ${inputOwner}'s ${finalRound ? "input" : "text"} ${goes} unchanged.`;
     case "active_advance":
       return advanced === "merged"
         ? `Only ${carrier} took part, so the merged text ${carrier} accepted ${goes}.`
         : // Not accepting, or accepting a blank merged text: either way the input goes on.
           `Only ${carrier} took part, and there was no accepted merged text, so ${carrier}'s input ${goes} unchanged.`;
     case "abandoned":
-      return "Neither bearer took part, so this merge is abandoned and nothing advances from it.";
+      return finalRound
+        ? "Neither player took part, so this merge is abandoned and nothing from it becomes the final text."
+        : "Neither player took part, so this merge is abandoned and nothing from it goes into the next round.";
     case "walkover":
       return `Walkover: ${carrier}'s text ${goes}.`;
     default:
@@ -95,7 +97,7 @@ export function whatNow(
     ? "The tournament is over; read the final text or look back through the bracket."
     : "You're done merging; watch the other merges or join the chat.";
   if (m.resolution === "abandoned" || !m.resultTextId) {
-    return `Neither of you took part, so neither text goes on. ${done}`;
+    return `Neither of you took part, so neither text ${finalRound ? "becomes the final text" : "goes into the next round"}. ${done}`;
   }
   const carrier = nameOf(m.advancingBearerId);
   if (finalRound) {
@@ -107,11 +109,11 @@ export function whatNow(
     return "That was the final, so you're done merging. Read the final text or join the chat.";
   }
   if (m.advancingBearerId === meId) {
-    return `You carry this into round ${roundNo + 1}. In the break, read the texts and find your next partner.`;
+    return `You go into round ${roundNo + 1} with this text. In the break, read the texts and find your next partner.`;
   }
   if (m.resolution === "active_advance") {
     const what = advancedFrom(m) === "merged" ? "the merged text they accepted" : "their own input";
-    return `While you were away, only ${carrier} took part, so ${what} goes on with ${carrier}. ${done}`;
+    return `While you were away, only ${carrier} took part, so ${carrier} goes into the next round with ${what}. ${done}`;
   }
-  return `${carrier} carries this forward. ${done}`;
+  return `${carrier} goes into the next round with this text. ${done}`;
 }

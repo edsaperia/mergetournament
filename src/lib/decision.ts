@@ -17,12 +17,15 @@ export interface VoteView {
   partnerVote: "working" | "input" | null;
   iAmActive: boolean;
   partnerActive: boolean;
+  /** The final round: an input left alone becomes the final text instead of going into the next round. */
+  finalRound?: boolean;
 }
 
 const FLIP = "a coin flip between the inputs decides when the countdown ends";
 
 export function voteLine(v: VoteView): string | null {
   const P = v.partner;
+  const goes = v.finalRound ? "becomes the final text" : "goes into the next round";
   const iAccept = v.proposedBy === v.mySide;
   const theyAccept = v.proposedBy !== null && v.proposedBy !== v.mySide;
   const iReject = !iAccept && v.myVote === "input";
@@ -34,12 +37,12 @@ export function voteLine(v: VoteView): string | null {
   if (theyReject) {
     return v.iAmActive
       ? `${P} rejected the merge. Unless ${P} switches to Accept and you accept too, ${FLIP}.`
-      : `${P} rejected the merge. If you stay silent, ${P}'s input advances unchanged; if you respond, it's a coin flip unless you both accept.`;
+      : `${P} rejected the merge. If you stay silent, ${P}'s input ${goes} unchanged; if you respond, it's a coin flip unless you both accept.`;
   }
   if (iReject) {
     return v.partnerActive
       ? `You rejected. Unless you switch to Accept and ${P} accepts too, ${FLIP}.`
-      : `You rejected. If ${P} stays silent, your input advances unchanged.`;
+      : `You rejected. If ${P} stays silent, your input ${goes} unchanged.`;
   }
   if (iAccept) return `You accepted — waiting for ${P}.`;
   if (theyAccept) return `${P} has accepted. Accept too and the merge locks in.`;

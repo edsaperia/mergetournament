@@ -261,7 +261,7 @@ export async function mergeAction(
     .from(rounds)
     .where(and(eq(rounds.tournamentId, t.id), eq(rounds.number, slot.roundNo)));
   const side: Side | null = m.bearerAId === participantId ? "A" : m.bearerBId === participantId ? "B" : null;
-  if (!side) throw new DomainError("only this merge's bearers may act on it");
+  if (!side) throw new DomainError("only this merge's two players may act on it");
 
   // Break-time readiness (SPEC deviation agreed with Ed): a pending merge's
   // bearer confirms they're present, which lets the round start early.
@@ -530,7 +530,7 @@ export async function tick(db: Db, emailer: Emailer, baseUrl: string, tournament
           await postSystem(
             tx,
             tournamentId,
-            `Round ${current.number}: time is up — texts are frozen. Unfinished pairs have ${GRACE_S} seconds to accept or reject their merge and choose a bearer.`
+            `Round ${current.number}: time is up — texts are frozen. Unfinished pairs have ${GRACE_S} seconds to accept or reject their merge${current.number === allRounds.length ? "" : " and decide who goes into the next round"}.`
           );
           continue;
         }
