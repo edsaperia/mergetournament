@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "../modal";
+import { Tabs } from "./tabs";
 
 const landedEvent = (flipKey: string) => `flip-landed:${flipKey}`;
 
@@ -106,6 +107,28 @@ export function FlipReveal({
 }
 
 /**
+ * True while the flip keyed `flipKey` is still to land in this browser: from
+ * the first render (so the server-rendered page never shows the result) until
+ * FlipReveal lands it, or at once if this browser has already seen that flip.
+ * False for no `flipKey`.
+ */
+function useFlipping(flipKey: string | null): boolean {
+  const [flipping, setFlipping] = useState(flipKey !== null);
+  useEffect(() => {
+    // FlipReveal marks the flip seen only after this runs (in a timeout), so
+    // a mark here means an earlier visit.
+    const seen = flipKey === null || sessionStorage.getItem(`flip:${flipKey}`) !== null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
+    setFlipping(!seen);
+    if (seen) return;
+    const land = () => setFlipping(false);
+    window.addEventListener(landedEvent(flipKey), land);
+    return () => window.removeEventListener(landedEvent(flipKey), land);
+  }, [flipKey]);
+  return flipping;
+}
+
+/**
  * Withholds a part of the page that would spoil the flip keyed `flipKey` —
  * e.g. the merge's chat, whose system message names the result — until the
  * coin lands, or at once if this browser has already seen that flip. With no
@@ -113,17 +136,30 @@ export function FlipReveal({
  * nothing inside remounts.
  */
 export function HiddenWhileFlipping({ flipKey, children }: { flipKey: string | null; children: React.ReactNode }) {
-  const [hidden, setHidden] = useState(flipKey !== null);
-  useEffect(() => {
-    // FlipReveal marks the flip seen only after this runs (in a timeout), so
-    // a mark here means an earlier visit.
-    const seen = flipKey === null || sessionStorage.getItem(`flip:${flipKey}`) !== null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
-    setHidden(!seen);
-    if (seen) return;
-    const show = () => setHidden(false);
-    window.addEventListener(landedEvent(flipKey), show);
-    return () => window.removeEventListener(landedEvent(flipKey), show);
-  }, [flipKey]);
+  const hidden = useFlipping(flipKey);
   return <div className={hidden ? "invisible" : undefined}>{children}</div>;
+}
+
+/**
+ * Leaves out a small mark that names the flip's result — a ✓ on a tab, a
+ * "goes into the next round" tag — until the coin lands. Inline, and nothing
+ * takes its place.
+ */
+export function ShownOnceLanded({ flipKey, children }: { flipKey: string | null; children: React.ReactNode }) {
+  return useFlipping(flipKey) ? null : <>{children}</>;
+}
+
+/**
+ * Tabs whose opening tab would give away a flip's result (the input that won
+ * it): while the coin is in the air they open on `whileFlipping`, and once it
+ * lands they start again on `defaultIndex`.
+ */
+export function FlipAwareTabs({
+  flipKey,
+  whileFlipping,
+  defaultIndex,
+  ...rest
+}: { flipKey: string | null; whileFlipping: number } & React.ComponentProps<typeof Tabs>) {
+  const flipping = useFlipping(flipKey);
+  return <Tabs key={flipping ? "flipping" : "landed"} defaultIndex={flipping ? whileFlipping : defaultIndex} {...rest} />;
 }

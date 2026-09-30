@@ -14,9 +14,8 @@ import { messagesFor, roomForMerge, roomForText } from "../../../../services/cha
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
-import { FlipReveal, HiddenWhileFlipping } from "../../flip-reveal";
+import { FlipAwareTabs, FlipReveal, HiddenWhileFlipping, ShownOnceLanded } from "../../flip-reveal";
 import { NumberedText } from "../../../numbered-text";
-import { Tabs } from "../../tabs";
 import { CollabEditor } from "./collab-editor";
 import { DecisionModal } from "./decision-modal";
 import { WorkspaceControls } from "./workspace-controls";
@@ -55,14 +54,11 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const advanced = m.state === "resolved" ? advancedFrom(m) : null;
   // The candidate didn't advance: an input did instead, or nothing did.
   const candidateLost = m.state === "resolved" && advanced !== "merged";
-  const advancesTag = (
-    <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
-      {isFinal ? "the final text" : "goes into the next round"}
-    </span>
-  );
   // Only animate flips that just happened; cold visitors see history.
   const flipAgeMs = m.resolvedAt ? new Date().getTime() - m.resolvedAt.getTime() : Infinity;
   const flipFresh = m.state === "resolved" && m.flipSeed !== null && flipAgeMs < 120_000;
+  // While that coin is in the air, nothing may name its result: marks, tags and the opening tab wait for it.
+  const flipKey = flipFresh ? m.id : null;
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
 
@@ -162,20 +158,23 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </div>
       )}
 
-      <Tabs
+      <FlipAwareTabs
         // Remount on resolution, so a tab open during the flip also moves to what advanced.
         key={advanced ?? "open"}
         // Once resolved, open on what advanced: after a coin flip that is an
-        // input, and the merge candidate is the text that lost.
+        // input, and the merge candidate is the text that lost. While the
+        // coin is in the air, on the merge candidate, which gives nothing away.
+        flipKey={flipKey}
+        whileFlipping={1}
         defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 2 : 1}
         // From lg up the merge sits beside an input: A | Merge or Merge | B.
         pinned={1}
         fill
         // Short on a phone, so the three tabs share one row at 360 px.
         labels={[
-          <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} />,
-          <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} />,
-          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} />,
+          <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} flipKey={flipKey} />,
+          <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} flipKey={flipKey} />,
+          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} flipKey={flipKey} />,
         ]}
       >
         <section className="grid gap-4">
@@ -183,7 +182,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input A · {bearerName(m.bearerAId)}
               {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
-              {advanced === "A" && advancesTag}
+              {advanced === "A" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
             </h2>
             {textA ? <InputText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
@@ -193,11 +192,13 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           <div className="min-w-0 rounded-lg border-2 border-line p-4">
             <h2 className="mb-2 font-semibold">
               Merge candidate
-              {advanced === "merged" && advancesTag}
+              {advanced === "merged" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
               {candidateLost && (
-                <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">
-                  {isFinal ? "not the final text" : "doesn't go into the next round"}
-                </span>
+                <ShownOnceLanded flipKey={flipKey}>
+                  <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">
+                    {isFinal ? "not the final text" : "doesn't go into the next round"}
+                  </span>
+                </ShownOnceLanded>
               )}
             </h2>
             {m.state === "resolved" ? (
@@ -242,7 +243,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           </div>
           <aside className="min-w-0">
             {/* Its system message names the flip's result; side by side this chat stays in view. */}
-            <HiddenWhileFlipping flipKey={flipFresh ? m.id : null}>
+            <HiddenWhileFlipping flipKey={flipKey}>
               {await chatFor(mergeRoom, "This merge's chat")}
             </HiddenWhileFlipping>
           </aside>
@@ -252,13 +253,13 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input B · {bearerName(m.bearerBId)}
               {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
-              {advanced === "B" && advancesTag}
+              {advanced === "B" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
             </h2>
             {textB ? <InputText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
           <aside className="min-w-0">{await chatFor(roomB, "This text's chat")}</aside>
         </section>
-      </Tabs>
+      </FlipAwareTabs>
       {/* Outside the tabs, so no tab choice can hide it: it covers the whole page. */}
       {round.state === "closing" && m.state === "open" && mySide && !paused && (
         <DecisionModal
@@ -291,12 +292,23 @@ function InputText({ body }: { body: string }) {
   );
 }
 
-function TabLabel({ short, long, mark }: { short: string; long: string; mark: string }) {
+function TabLabel({ short, long, mark, flipKey }: { short: string; long: string; mark: string; flipKey: string | null }) {
   return (
     <>
       <span className="sm:hidden">{short}</span>
       <span className="hidden sm:inline">{long}</span>
-      {mark}
+      {mark && <ShownOnceLanded flipKey={flipKey}>{mark}</ShownOnceLanded>}
     </>
+  );
+}
+
+/** The tag on the text that goes on; held back while a coin that decided it is in the air. */
+function AdvancesTag({ isFinal, flipKey }: { isFinal: boolean; flipKey: string | null }) {
+  return (
+    <ShownOnceLanded flipKey={flipKey}>
+      <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
+        {isFinal ? "the final text" : "goes into the next round"}
+      </span>
+    </ShownOnceLanded>
   );
 }
