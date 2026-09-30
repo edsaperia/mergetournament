@@ -154,6 +154,10 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     await expect(flip).toContainText("the coin is in the air");
   }
 
+  // A message started while the coin is in the air (input A's chat, beside the merge at 1280).
+  const draftBox = pageA.getByPlaceholder("Say something…").first();
+  await draftBox.fill("typed during the flip");
+
   const [row] = await withDb((db) => db.select().from(merges).where(eq(merges.id, id)));
   expect(row.state).toBe("resolved");
   expect(row.resolution).toBe("backstop_flip");
@@ -166,4 +170,6 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     await expect(page.locator("[role=tab]").nth(1)).toContainText("✗");
     await expect(page.locator("[role=tab]").nth(winner)).toHaveAttribute("aria-selected", "true");
   }
+  // The tabs moved to the winner in place: the unsent message is still there.
+  await expect(draftBox).toHaveValue("typed during the flip");
 });

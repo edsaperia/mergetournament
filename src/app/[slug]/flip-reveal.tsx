@@ -152,7 +152,7 @@ export function ShownOnceLanded({ flipKey, children }: { flipKey: string | null;
 /**
  * Tabs whose opening tab would give away a flip's result (the input that won
  * it): while the coin is in the air they open on `whileFlipping`, and once it
- * lands they start again on `defaultIndex`.
+ * lands they move to `defaultIndex`, in place, so nothing typed meanwhile is lost.
  */
 export function FlipAwareTabs({
   flipKey,
@@ -161,5 +161,5 @@ export function FlipAwareTabs({
   ...rest
 }: { flipKey: string | null; whileFlipping: number } & React.ComponentProps<typeof Tabs>) {
   const flipping = useFlipping(flipKey);
-  return <Tabs key={flipping ? "flipping" : "landed"} defaultIndex={flipping ? whileFlipping : defaultIndex} {...rest} />;
+  return <Tabs defaultIndex={flipping ? whileFlipping : defaultIndex} {...rest} />;
 }
