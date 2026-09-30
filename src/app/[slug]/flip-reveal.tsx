@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal } from "../modal";
 import { Tabs } from "./tabs";
 
@@ -73,33 +74,40 @@ export function FlipReveal({
   if (phase === "pending") return null;
   return (
     <>
-      <Modal
-        label="Coin flip"
-        onDismiss={phase === "revealed" ? () => setPhase("done") : undefined}
-        className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
-      >
-        <span className="text-4xl" aria-hidden>
-          🎲
-        </span>
-        <p className="text-sm text-muted">{title}</p>
-        {phase === "animating" ? (
-          <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
-        ) : (
-          <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
-        )}
-        {phase === "animating" ? (
-          <p className="text-xs text-faint">the coin is in the air…</p>
-        ) : (
-          // A button as well as tapping outside: on a phone the card fills nearly the whole screen.
-          <button
-            type="button"
-            onClick={() => setPhase("done")}
-            className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-wash"
+      {/* On the event page the flip sits inside its bracket card, a link: in a portal, and
+          with clicks kept from bubbling to it, closing the flip doesn't open the merge. */}
+      {createPortal(
+        <div onClick={(e) => e.stopPropagation()}>
+          <Modal
+            label="Coin flip"
+            onDismiss={phase === "revealed" ? () => setPhase("done") : undefined}
+            className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
           >
-            Close
-          </button>
-        )}
-      </Modal>
+            <span className="text-4xl" aria-hidden>
+              🎲
+            </span>
+            <p className="text-sm text-muted">{title}</p>
+            {phase === "animating" ? (
+              <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
+            ) : (
+              <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
+            )}
+            {phase === "animating" ? (
+              <p className="text-xs text-faint">the coin is in the air…</p>
+            ) : (
+              // A button as well as tapping outside: on a phone the card fills nearly the whole screen.
+              <button
+                type="button"
+                onClick={() => setPhase("done")}
+                className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-wash"
+              >
+                Close
+              </button>
+            )}
+          </Modal>
+        </div>,
+        document.body
+      )}
       {/* The result behind the overlay would spoil the flip: withheld until the coin lands. */}
       {phase === "animating" ? <span className="text-muted">coin flip…</span> : children}
     </>

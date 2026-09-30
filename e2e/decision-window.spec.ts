@@ -209,4 +209,11 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
   await expect(round2(winnerEvent).getByText("yours", { exact: true })).toBeVisible();
   await expect(winnerEvent.getByText("Your text has no partner in the final, so it becomes the final text.")).toBeVisible();
   await expect(loserEvent.getByText(`${winnerName} goes into the next round with this text.`)).toBeVisible();
+  // The flip sits in its bracket card, a link: closing it, by button or outside, stays on the event page.
+  await winnerEvent.getByRole("dialog", { name: "Coin flip" }).getByRole("button", { name: "Close" }).click();
+  await loserEvent.getByRole("dialog", { name: "Coin flip" }).click({ position: { x: 5, y: 5 } });
+  for (const page of [winnerEvent, loserEvent]) {
+    await expect(page.getByRole("dialog", { name: "Coin flip" })).toBeHidden();
+    await expect(page).toHaveURL(new RegExp(`/${slug}$`));
+  }
 });
