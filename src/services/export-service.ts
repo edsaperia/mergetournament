@@ -6,6 +6,7 @@
 
 import { and, asc, eq } from "drizzle-orm";
 import { auditLog, merges, participants, slots, textVersions, tournaments, rounds } from "../db/schema";
+import { resolutionLabel } from "../lib/resolution";
 import type { Db } from "./tournament-service";
 
 export async function canonicalText(db: Db, tournamentId: string): Promise<string | null> {
@@ -27,10 +28,37 @@ export interface ProvenanceNode {
   author: string | null;
   parentAId: string | null;
   parentBId: string | null;
+  /** How the merge that created this text resolved; null for drafts. */
   resolution: string | null;
+  /** The round whose merge created this text; null for drafts. */
+  round: number | null;
 }
 
-export async function provenance(db: Db, tournamentId: string): Promise<ProvenanceNode[]> {
+/**
+ * A resolved merge that created no new text: an input advanced unchanged
+ * (coin flip, or one bearer taking part without accepting), or nothing
+ * advanced (abandoned). Without these the tree would skip the merge.
+ */
+export interface ProvenanceStep {
+  mergeId: string;
+  round: number;
+  inputAId: string;
+  inputBId: string;
+  resolution: string;
+  /** The input that advanced unchanged, or null if the merge was abandoned. */
+  advancedTextId: string | null;
+}
+
+export interface Provenance {
+  nodes: ProvenanceNode[];
+  steps: ProvenanceStep[];
+  /** The tournament's final text, once it has one. */
+  canonicalTextId: string | null;
+  /** The number of the final round, once the bracket exists. */
+  finalRound: number | null;
+}
+
+export async function provenance(db: Db, tournamentId: string): Promise<Provenance> {
   const texts = await db
     .select({
       id: textVersions.id,
@@ -44,13 +72,66 @@ export async function provenance(db: Db, tournamentId: string): Promise<Provenan
     .leftJoin(participants, eq(textVersions.authorId, participants.id))
     .where(eq(textVersions.tournamentId, tournamentId))
     .orderBy(asc(textVersions.createdAt));
-  const producers = await db
-    .select({ resultTextId: merges.resultTextId, resolution: merges.resolution })
+  const resolved = await db
+    .select({
+      id: merges.id,
+      round: slots.roundNo,
+      textAId: merges.textAId,
+      textBId: merges.textBId,
+      resultTextId: merges.resultTextId,
+      resolution: merges.resolution,
+    })
     .from(merges)
     .innerJoin(slots, eq(merges.slotId, slots.id))
-    .where(eq(slots.tournamentId, tournamentId));
-  const resolutionOf = new Map(producers.filter((p) => p.resultTextId).map((p) => [p.resultTextId!, p.resolution]));
-  return texts.map((t) => ({ ...t, author: t.author ?? null, resolution: resolutionOf.get(t.id) ?? null }));
+    .where(and(eq(slots.tournamentId, tournamentId), eq(merges.state, "resolved")))
+    .orderBy(asc(slots.roundNo), asc(slots.position));
+
+  // A text's creator is the merge that wrote it: a new text whose parents are
+  // that merge's inputs. A later merge that advances the same text unchanged
+  // shares its result id, so keying by result id alone would relabel it.
+  const created = new Map<string, { resolution: string | null; round: number }>();
+  const steps: ProvenanceStep[] = [];
+  for (const m of resolved) {
+    if (!m.textAId || !m.textBId) continue;
+    const unchanged = m.resultTextId === null || m.resultTextId === m.textAId || m.resultTextId === m.textBId;
+    if (unchanged) {
+      steps.push({
+        mergeId: m.id,
+        round: m.round,
+        inputAId: m.textAId,
+        inputBId: m.textBId,
+        resolution: m.resolution ?? "abandoned",
+        advancedTextId: m.resultTextId,
+      });
+    } else {
+      created.set(m.resultTextId!, { resolution: m.resolution, round: m.round });
+    }
+  }
+  const { canonicalTextId, finalRound } = await finalOf(db, tournamentId);
+  return {
+    nodes: texts.map((t) => ({
+      ...t,
+      author: t.author ?? null,
+      resolution: created.get(t.id)?.resolution ?? null,
+      round: created.get(t.id)?.round ?? null,
+    })),
+    steps,
+    canonicalTextId,
+    finalRound,
+  };
+}
+
+async function finalOf(db: Db, tournamentId: string) {
+  const allRounds = await db.select().from(rounds).where(eq(rounds.tournamentId, tournamentId));
+  if (allRounds.length === 0) return { canonicalTextId: null, finalRound: null };
+  const [finalSlot] = await db
+    .select()
+    .from(slots)
+    .where(and(eq(slots.tournamentId, tournamentId), eq(slots.roundNo, allRounds.length)));
+  return {
+    canonicalTextId: finalSlot?.outState === "filled" ? finalSlot.outTextId : null,
+    finalRound: allRounds.length,
+  };
 }
 
 /** Short stable node ids for the diagram. */
@@ -59,55 +140,83 @@ function nodeRef(id: string, index: Map<string, string>): string {
   return index.get(id)!;
 }
 
-export function provenanceMermaid(nodes: ProvenanceNode[]): string {
+const clean = (s: string) => s.replace(/[\[\]"|]/g, "");
+
+function textLabel(n: ProvenanceNode): string {
+  return n.kind === "draft"
+    ? `${clean(n.author ?? "unknown")}'s draft (${n.wordCount}w)`
+    : `round ${n.round ?? "?"} merge (${n.wordCount}w${n.resolution ? `, ${resolutionLabel(n.resolution)}` : ""})`;
+}
+
+function stepLabel(s: ProvenanceStep, index: Map<string, string>, finalRound: number | null): string {
+  const how = resolutionLabel(s.resolution);
+  const what = `round ${s.round} merge${s.round === finalRound ? " (the final)" : ""}: ${how}`;
+  return s.advancedTextId ? `${what}; ${index.get(s.advancedTextId) ?? "?"} advances unchanged` : what;
+}
+
+export function provenanceMermaid({ nodes, steps, canonicalTextId, finalRound }: Provenance): string {
   const index = new Map<string, string>();
   const lines = ["flowchart TD"];
   for (const n of nodes) {
     const ref = nodeRef(n.id, index);
-    const label =
-      n.kind === "draft"
-        ? `${(n.author ?? "unknown").replace(/[\[\]"|]/g, "")}'s draft (${n.wordCount}w)`
-        : `merge result (${n.wordCount}w${n.resolution ? `, ${n.resolution}` : ""})`;
-    lines.push(`  ${ref}["${label}"]`);
+    lines.push(`  ${ref}["${textLabel(n)}${n.id === canonicalTextId ? " · final text" : ""}"]`);
   }
+  steps.forEach((s, i) => lines.push(`  M${i}{{"${stepLabel(s, index, finalRound)}"}}`));
   for (const n of nodes) {
     const ref = index.get(n.id)!;
     if (n.parentAId && index.has(n.parentAId)) lines.push(`  ${index.get(n.parentAId)} --> ${ref}`);
     if (n.parentBId && index.has(n.parentBId)) lines.push(`  ${index.get(n.parentBId)} --> ${ref}`);
   }
+  steps.forEach((s, i) => {
+    if (index.has(s.inputAId)) lines.push(`  ${index.get(s.inputAId)} --> M${i}`);
+    if (index.has(s.inputBId)) lines.push(`  ${index.get(s.inputBId)} --> M${i}`);
+  });
   return lines.join("\n");
 }
 
 export async function provenanceMarkdown(db: Db, tournamentId: string): Promise<string> {
   const [t] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId));
-  const nodes = await provenance(db, tournamentId);
+  const tree = await provenance(db, tournamentId);
   const index = new Map<string, string>();
-  nodes.forEach((n) => nodeRef(n.id, index));
-  const listing = nodes
+  tree.nodes.forEach((n) => nodeRef(n.id, index));
+  const listing = tree.nodes
     .map((n) => {
       const ref = index.get(n.id)!;
+      const what = n.kind === "draft" ? `draft by ${n.author ?? "unknown"}` : `round ${n.round ?? "?"} merge result`;
       const parents =
         n.parentAId && n.parentBId
           ? ` ← ${index.get(n.parentAId) ?? "?"} + ${index.get(n.parentBId) ?? "?"}`
           : "";
-      const who = n.kind === "draft" ? ` by ${n.author ?? "unknown"}` : "";
-      const how = n.resolution ? ` (${n.resolution})` : "";
-      return `- **${ref}** — ${n.kind}${who}, ${n.wordCount} words${parents}${how} — id \`${n.id}\``;
+      const how = n.resolution ? ` (${resolutionLabel(n.resolution)})` : "";
+      const final = n.id === tree.canonicalTextId ? " — **the final text**" : "";
+      return `- **${ref}** — ${what}, ${n.wordCount} words${parents}${how}${final} — id \`${n.id}\``;
     })
+    .join("\n");
+  const stepListing = tree.steps
+    .map(
+      (s, i) =>
+        `- **M${i}** — round ${s.round} merge of ${index.get(s.inputAId) ?? "?"} + ${index.get(s.inputBId) ?? "?"}: ` +
+        (s.advancedTextId
+          ? `${resolutionLabel(s.resolution)}; ${index.get(s.advancedTextId) ?? "?"} advances unchanged`
+          : resolutionLabel(s.resolution)) +
+        (s.round === tree.finalRound ? " — the final" : "") +
+        ` — merge id \`${s.mergeId}\``
+    )
     .join("\n");
   return [
     `# Provenance — ${t?.name ?? tournamentId}`,
     "",
-    "Every text version with its parentage. The final text traces back through every merge to the original drafts.",
+    "Every text version with its parentage, and every merge where an input advanced unchanged. The final text traces back through every merge to the original drafts.",
     "",
     "```mermaid",
-    provenanceMermaid(nodes),
+    provenanceMermaid(tree),
     "```",
     "",
     "## Versions",
     "",
     listing,
     "",
+    ...(stepListing ? ["## Merges that advanced an input unchanged", "", stepListing, ""] : []),
   ].join("\n");
 }
 

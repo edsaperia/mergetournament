@@ -52,8 +52,27 @@ export async function roomForText(db: Db, textVersionId: string) {
       .where(and(eq(chatRooms.kind, "draft"), eq(chatRooms.subjectId, text.id)));
     return room ?? null;
   }
-  const [producer] = await db.select().from(merges).where(eq(merges.resultTextId, text.id));
+  const producer = await producingMerge(db, text);
   return producer ? roomForMerge(db, producer.id) : null;
+}
+
+/**
+ * The merge that wrote a merge result: its result is the text and its inputs
+ * are the text's parents. A later merge that advanced the same text unchanged
+ * has the same result id, so matching on the result alone can pick that one.
+ */
+export async function producingMerge(
+  db: Db,
+  text: { id: string; parentAId: string | null; parentBId: string | null }
+) {
+  if (!text.parentAId || !text.parentBId) return null;
+  const [producer] = await db
+    .select()
+    .from(merges)
+    .where(
+      and(eq(merges.resultTextId, text.id), eq(merges.textAId, text.parentAId), eq(merges.textBId, text.parentBId))
+    );
+  return producer ?? null;
 }
 
 export interface MessageView {
