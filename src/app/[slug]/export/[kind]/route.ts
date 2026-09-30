@@ -29,7 +29,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/[slug]/export/[
   switch (kind) {
     case "canonical.md": {
       const text = await canonicalText(db, tournament.id);
-      if (text === null) return new Response("no canonical text (yet)", { status: 404 });
+      if (text === null) return new Response("no final text (yet)", { status: 404 });
       return respond(text, "canonical.md");
     }
     case "provenance.md":

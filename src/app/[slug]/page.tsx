@@ -147,7 +147,7 @@ function ExportsSection({ slug }: { slug: string }) {
     <section className="mt-6 rounded-lg border border-edge p-4 text-sm">
       <h2 className="mb-2 font-semibold">Exports</h2>
       <ul className="flex flex-wrap gap-4">
-        <li><a className="underline" href={`/${slug}/export/canonical.md`}>Canonical text</a></li>
+        <li><a className="underline" href={`/${slug}/export/canonical.md`}>Final text</a></li>
         <li><a className="underline" href={`/${slug}/export/provenance.md`}>Provenance tree</a></li>
         <li><a className="underline" href={`/${slug}/export/drafts.md`}>Original drafts</a></li>
         <li><a className="underline" href={`/${slug}/export/audit.jsonl`}>Audit log</a></li>

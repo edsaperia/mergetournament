@@ -25,7 +25,7 @@ export default async function CanonicalTextPage(props: PageProps<"/[slug]/text">
     }
     return (
       <main className="mx-auto max-w-xl flex-1 px-6 py-16">
-        <p className="text-soft">This tournament concluded with no canonical text.</p>
+        <p className="text-soft">This tournament concluded with no final text.</p>
       </main>
     );
   }
@@ -42,7 +42,7 @@ export default async function CanonicalTextPage(props: PageProps<"/[slug]/text">
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-16">
       <p className="mb-6 text-soft">
-        No canonical text yet — it emerges when the tournament completes. Here is how it is
+        No final text yet — it emerges when the tournament completes. Here is how it is
         getting on:
       </p>
       <Timeline

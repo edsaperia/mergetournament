@@ -110,7 +110,7 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
       </p>
       {verdict && (
         <div className="mb-4 rounded-lg border-2 border-ok p-4">
-          <h1 className="text-lg font-bold">🏆 The tournament&apos;s final (canonical) text</h1>
+          <h1 className="text-lg font-bold">🏆 The tournament&apos;s final text</h1>
           <p className="mt-1 text-sm text-soft">How the final was decided: {verdict}</p>
         </div>
       )}

@@ -60,7 +60,7 @@ export function WorkspaceControls({
     <form action={dispatch} className="mt-3 flex flex-col gap-3">
       {finalRound && (
         <p className="text-sm text-muted">
-          This is the final round: the text you lock in becomes the canonical text.
+          This is the final round: the text you lock in becomes the final text.
         </p>
       )}
       {/* Bearer choice first: settle it before lock-in, since picks that

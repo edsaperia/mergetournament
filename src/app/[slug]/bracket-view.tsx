@@ -264,7 +264,7 @@ async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tourna
       <div className="mt-6">
         <h2 className="mb-2 text-2xl font-bold">Merge Tournament Over!</h2>
         <p className="rounded-lg border border-line p-4">
-          The tournament concluded with no canonical text.
+          The tournament concluded with no final text.
         </p>
       </div>
     );
@@ -273,7 +273,7 @@ async function CanonicalBanner({ tournament, roundsCount }: { tournament: Tourna
     <div className="mt-6">
       <h2 className="mb-2 text-2xl font-bold">Merge Tournament Over!</h2>
       <p className="rounded-lg border-2 border-ok p-4 text-lg">
-        🏆 The canonical text has emerged:{" "}
+        🏆 The final text has emerged:{" "}
         <Link className="font-semibold underline" href={`/${tournament.slug}/text`}>
           read it
         </Link>

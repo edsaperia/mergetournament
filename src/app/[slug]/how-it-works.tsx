@@ -31,7 +31,7 @@ export function HowItWorks({ open = false }: { open?: boolean }) {
         </li>
         <li>
           Whoever goes into the next round repeats this there with a new partner, merging again,
-          until a single text remains: the canonical result.
+          until a single text remains: the final text.
         </li>
         <li>
           Afterwards, the random seed is revealed and every flip can be checked against the

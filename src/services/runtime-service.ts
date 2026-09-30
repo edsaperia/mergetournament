@@ -707,7 +707,7 @@ async function completeTournament(db: Db, baseUrl: string, t: Tournament, outbox
   await postSystem(
     db,
     t.id,
-    canonical ? "The tournament is complete: a canonical text has emerged." : "The tournament concluded with no canonical text."
+    canonical ? "The tournament is complete: the final text has emerged." : "The tournament concluded with no final text."
   );
   const roster = await db.select().from(participants).where(eq(participants.tournamentId, t.id));
   for (const p of roster) {
@@ -715,8 +715,8 @@ async function completeTournament(db: Db, baseUrl: string, t: Tournament, outbox
       to: p.email,
       subject: `${t.name}: the tournament is complete`,
       text: canonical
-        ? `The canonical text:\n\n${baseUrl}/${t.slug}\n\n---\n\n${canonical.bodyMd}`
-        : `The tournament concluded with no canonical text.\n\n${baseUrl}/${t.slug}`,
+        ? `The final text:\n\n${baseUrl}/${t.slug}\n\n---\n\n${canonical.bodyMd}`
+        : `The tournament concluded with no final text.\n\n${baseUrl}/${t.slug}`,
     });
   }
 }

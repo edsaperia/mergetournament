@@ -88,7 +88,7 @@ export function DecisionModal({
   // one, their accept-vote advances the merge, anything else their input;
   // with none, abandoned. Worded for who is active now: one short sentence,
   // and the full rules behind "what if…" (short enough for a 360×640 phone).
-  const both = `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}.`;
+  const both = `Both accept: ${finalRound ? "it becomes the final text" : "it locks in"}.`;
   const orFlip = "it's both accepting or a coin flip between the input texts";
   // Where a text goes at the window's end: the next round, or in the final
   // round, the final text.

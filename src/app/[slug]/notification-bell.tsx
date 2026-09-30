@@ -55,7 +55,7 @@ export function NotificationBell({
       p.warned = roundNo;
     }
     if (phase === "complete" && p.phase !== "complete") {
-      notify("The tournament is complete", "A canonical text has emerged.");
+      notify("The tournament is complete", "The final text has emerged.");
     }
     p.mergeId = myOpenMergeId;
     p.phase = phase;

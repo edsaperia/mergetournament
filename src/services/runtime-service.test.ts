@@ -469,6 +469,6 @@ describe("pause and the no-canonical-text ending", () => {
     const [finalSlot] = await db.select().from(slots).where(eq(slots.tournamentId, t.id));
     expect(finalSlot.outState).toBe("empty");
     const last = emailer.sent.at(-1)!;
-    expect(last.text).toContain("no canonical text");
+    expect(last.text).toContain("no final text");
   });
 });
