@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
-import { resolutionSentence } from "../../../../lib/resolution";
+import { advancedFrom, resolutionSentence } from "../../../../lib/resolution";
 import { warnThresholds } from "../../../../lib/schedule";
 import { nameMapFor, scheduleContext } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
@@ -52,6 +52,14 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   // the merge resolved drops the listener.
   const deciding = tournament.phase === "running" && round.state === "closing" && m.state === "open";
 
+  const advanced = m.state === "resolved" ? advancedFrom(m) : null;
+  // The candidate didn't advance: an input did instead, or nothing did.
+  const candidateLost = m.state === "resolved" && advanced !== "merged";
+  const advancesTag = (
+    <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
+      {isFinal ? "the final text" : "advances"}
+    </span>
+  );
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
 
@@ -148,11 +156,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
       )}
 
       <Tabs
-        defaultIndex={2}
+        // Remount on resolution, so a tab open during the flip also moves to what advanced.
+        key={advanced ?? "open"}
+        // Once resolved, open on what advanced: after a coin flip that is an
+        // input, and the merge candidate is the text that lost.
+        defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 1 : 2}
         labels={[
-          `Input A · ${bearerName(m.bearerAId)}`,
-          `Input B · ${bearerName(m.bearerBId)}`,
-          "Merge candidate",
+          `Input A · ${bearerName(m.bearerAId)}${advanced === "A" ? " ✓" : ""}`,
+          `Input B · ${bearerName(m.bearerBId)}${advanced === "B" ? " ✓" : ""}`,
+          candidateLost ? "Merge candidate ✗" : "Merge candidate",
         ]}
       >
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -160,6 +172,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input A · {bearerName(m.bearerAId)}
               {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
+              {advanced === "A" && advancesTag}
             </h2>
             {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
@@ -170,6 +183,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input B · {bearerName(m.bearerBId)}
               {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
+              {advanced === "B" && advancesTag}
             </h2>
             {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
@@ -177,7 +191,13 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </section>
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="min-w-0 rounded-lg border-2 border-line p-4">
-            <h2 className="mb-2 font-semibold">Merge candidate</h2>
+            <h2 className="mb-2 font-semibold">
+              Merge candidate
+              {advanced === "merged" && advancesTag}
+              {candidateLost && (
+                <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">did not advance</span>
+              )}
+            </h2>
           {m.state === "resolved" ? (
             m.workingText ? (
               <NumberedText body={m.workingText} />
