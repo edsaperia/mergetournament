@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import {
+  DECISION_WINDOW_S,
   effectiveNow,
+  fmtDuration,
+  projectedEnd,
   globalRemainingS,
   projectedStarts,
   roundRemainingS,
@@ -165,5 +168,59 @@ describe("effectiveNow", () => {
     const frozen = effectiveNow(begunAt + 200_000, begunAt, 30, begunAt + 80_000);
     expect(frozen).toBe(50);
     expect(effectiveNow(begunAt + 500_000, begunAt, 30, begunAt + 80_000)).toBe(frozen);
+  });
+});
+
+describe("the decision-window in schedules", () => {
+  const withWindow = (c: ScheduleConfig): ScheduleConfig => ({ ...c, decisionWindowS: DECISION_WINDOW_S });
+
+  it("counts a decision-window per round in the total and in every later start", () => {
+    fc.assert(
+      fc.property(anyConfig, (config) => {
+        const c = withWindow(config);
+        expect(totalDurationS(c)).toBe(totalDurationS(config) + config.numRounds * DECISION_WINDOW_S);
+        const plain = scheduledStarts(config);
+        const counted = scheduledStarts(c);
+        counted.forEach((s, r) => expect(s).toBe(plain[r] + r * DECISION_WINDOW_S));
+        expect(globalRemainingS(c, [], 0)).toBe(totalDurationS(c));
+      })
+    );
+  });
+
+  it("the 30 Sep playtest: 2 rounds of 150s with a 30s break end by 7m, not 5m30s", () => {
+    const c: ScheduleConfig = { numRounds: 2, roundDurationS: 150, breakDurationS: 30, decisionWindowS: DECISION_WINDOW_S };
+    expect(scheduledStarts(c)).toEqual([0, 240]);
+    expect(totalDurationS(c)).toBe(450);
+    // Round 1 used its window and closed at 210: round 2 opens at 240, ends by 450.
+    expect(projectedStarts(c, [{ actualStart: 0, actualClose: 210 }])).toEqual([0, 240]);
+    expect(globalRemainingS(c, [{ actualStart: 0, actualClose: 210 }], 210)).toBe(240);
+  });
+
+  it("drops a closed round's unused window from the projection", () => {
+    const c: ScheduleConfig = { numRounds: 2, roundDurationS: 150, breakDurationS: 30, decisionWindowS: 60 };
+    expect(projectedStarts(c, [{ actualStart: 0, actualClose: 150 }])).toEqual([0, 180]);
+  });
+
+  it("never projects a round before its printed start", () => {
+    const c: ScheduleConfig = { numRounds: 2, roundDurationS: 150, breakDurationS: 30, decisionWindowS: 60 };
+    // Round 1 closed early at 40; round 2 still waits for its printed 180 unless everyone is ready.
+    expect(projectedStarts(c, [{ actualStart: 0, actualClose: 40 }, { scheduledStart: 180 }])).toEqual([0, 180]);
+    expect(projectedEnd(c, [{ actualStart: 0, actualClose: 40 }], [0, 180], 1)).toBe(40);
+    expect(projectedEnd(c, [{ actualStart: 0, actualClose: 40 }], [0, 180], 2)).toBe(390);
+  });
+
+  it("leaves the round-countdown (the writing deadline) without the window", () => {
+    const c: ScheduleConfig = { numRounds: 2, roundDurationS: 150, breakDurationS: 30, decisionWindowS: 60 };
+    expect(roundRemainingS(c, [{ actualStart: 0 }], 1, 0)).toBe(150);
+  });
+});
+
+describe("fmtDuration", () => {
+  it("shows exact lengths instead of rounding to minutes", () => {
+    expect(fmtDuration(150)).toBe("2m 30s");
+    expect(fmtDuration(30)).toBe("30s");
+    expect(fmtDuration(180)).toBe("3m");
+    expect(fmtDuration(3900)).toBe("1h 5m");
+    expect(fmtDuration(7200)).toBe("2h");
   });
 });

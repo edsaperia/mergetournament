@@ -3,7 +3,14 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { textVersions, type Tournament } from "../../db/schema";
 import { resolutionLabel } from "../../lib/resolution";
-import { projectedStarts, wallClockIso, warnThresholds } from "../../lib/schedule";
+import {
+  DECISION_WINDOW_S,
+  fmtDuration,
+  projectedEnd,
+  projectedStarts,
+  wallClockIso,
+  warnThresholds,
+} from "../../lib/schedule";
 import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../server/queries";
 import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
@@ -40,22 +47,24 @@ export async function BracketView({
 
   const starts = allRounds.length > 0 ? projectedStarts(config, progress) : [];
 
-  const wallIso = (s: number) => wallClockIso(tournament, s);
+  // Clock times once Round 1 has a start (begun, or scheduled while
+  // convening); before that, only lengths are known.
+  const wallIso = (s: number): string | null =>
+    wallClockIso(tournament, s) ??
+    (tournament.startAt ? new Date(tournament.startAt.getTime() + s * 1000).toISOString() : null);
 
-  const TimeSpan = ({ fromS, toS }: { fromS: number; toS: number }) => {
-    const dur = `${Math.round((toS - fromS) / 60)}m`;
+  const TimeSpan = ({ fromS, toS, length }: { fromS: number; toS: number; length: string }) => {
     const from = wallIso(fromS);
     const to = wallIso(toS);
     return from && to ? (
       <>
-        <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly /> ({dur})
+        <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly />
       </>
     ) : (
-      <>
-        +{Math.round(fromS / 60)}m – +{Math.round(toS / 60)}m ({dur})
-      </>
+      <>{length}</>
     );
   };
+  const roundLength = `${fmtDuration(tournament.roundDurationS)} + up to ${fmtDuration(DECISION_WINDOW_S)} to decide`;
 
   return (
     <div>
@@ -72,8 +81,9 @@ export async function BracketView({
           const inThisBreak =
             running && !paused && round.state === "scheduled" && prev?.state === "closed";
           const roundStart = round.actualStartS ?? starts[round.number - 1] ?? round.scheduledStartS;
-          const roundEnd = round.actualCloseS ?? roundStart + tournament.roundDurationS;
-          const breakStart = roundStart - tournament.breakDurationS;
+          // At the latest: unfinished pairs get the decision-window after the clock.
+          const roundEnd = projectedEnd(config, progress, starts, round.number);
+          const breakStart = round.number > 1 ? projectedEnd(config, progress, starts, round.number - 1) : roundStart;
           return (
             <section key={round.number}>
               {round.number > 1 && (
@@ -81,7 +91,7 @@ export async function BracketView({
                   <header className="mb-1 flex items-baseline justify-between">
                     <h3 className="font-semibold text-muted">Break</h3>
                     <span className="text-xs text-muted">
-                      <TimeSpan fromS={breakStart} toS={roundStart} />
+                      <TimeSpan fromS={breakStart} toS={roundStart} length={fmtDuration(tournament.breakDurationS)} />
                     </span>
                   </header>
                   <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-3 py-1.5 text-sm text-muted">
@@ -89,7 +99,7 @@ export async function BracketView({
                       <>
                         back in{" "}
                         <Countdown
-                          remainingS={prev.actualCloseS + tournament.breakDurationS - te}
+                          remainingS={roundStart - te}
                           paused={paused}
                         />
                       </>
@@ -103,7 +113,7 @@ export async function BracketView({
                 <h3 className="font-semibold">
                   Round {round.number}
                   <span className="ml-2 text-xs font-normal text-muted">
-                    <TimeSpan fromS={roundStart} toS={roundEnd} />
+                    <TimeSpan fromS={roundStart} toS={roundEnd} length={roundLength} />
                   </span>
                 </h3>
                 <span className="text-xs text-muted">

@@ -1,6 +1,14 @@
 import type { Round, Tournament } from "../../../db/schema";
 import { numRounds } from "../../../lib/bracket";
-import { projectedStarts, scheduledStarts, wallClockIso, type RoundProgress } from "../../../lib/schedule";
+import {
+  DECISION_WINDOW_S,
+  fmtDuration,
+  projectedEnd,
+  projectedStarts,
+  scheduledStarts,
+  wallClockIso,
+  type RoundProgress,
+} from "../../../lib/schedule";
 import {
   beginAction,
   closeSubmissionsAction,
@@ -20,10 +28,6 @@ import { DurationEditor, TimeControl } from "./timeline-controls";
  * Round 1 is scheduled are shown relative to the start ("start +30m").
  */
 
-function fmtOffset(s: number): string {
-  const m = Math.round(s / 60);
-  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
-}
 
 type Mark = "done" | "current" | "future";
 
@@ -86,12 +90,22 @@ export function Timeline({
   const inviteDone = invited >= 2;
 
   const roundCount = prePublish ? numRounds(Math.max(submitted, 2)) : allRounds.length;
-  const config = { numRounds: roundCount, roundDurationS: t.roundDurationS, breakDurationS: t.breakDurationS };
+  // Times are ceilings: each round may run a decision-window past its clock.
+  const config = {
+    numRounds: roundCount,
+    roundDurationS: t.roundDurationS,
+    breakDurationS: t.breakDurationS,
+    decisionWindowS: DECISION_WINDOW_S,
+  };
   const progress: RoundProgress[] = prePublish
     ? []
-    : allRounds.map((r) => ({ actualStart: r.actualStartS ?? undefined, actualClose: r.actualCloseS ?? undefined }));
+    : allRounds.map((r) => ({
+        actualStart: r.actualStartS ?? undefined,
+        actualClose: r.actualCloseS ?? undefined,
+        scheduledStart: r.scheduledStartS,
+      }));
   const starts = prePublish ? scheduledStarts(config) : projectedStarts(config, progress);
-  const roundEnd = (k: number) => progress[k - 1]?.actualClose ?? starts[k - 1] + t.roundDurationS;
+  const roundEnd = (k: number) => projectedEnd(config, progress, starts, k);
 
   // Pre-begin, the planned startAt anchors the projection instead.
   const wallIso = (s: number): string | null =>
@@ -105,7 +119,7 @@ export function Timeline({
         <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly />
       </>
     ) : (
-      <>start +{fmtOffset(fromS)} – +{fmtOffset(toS)}</>
+      <>start +{fmtDuration(fromS)} – +{fmtDuration(toS)}</>
     );
   };
 
@@ -325,7 +339,7 @@ export function Timeline({
               wallIso(roundEnd(roundCount)) ? (
                 <LocalTime iso={wallIso(roundEnd(roundCount))!} />
               ) : (
-                <>start +{fmtOffset(roundEnd(roundCount))}</>
+                <>start +{fmtDuration(roundEnd(roundCount))}</>
               )
             }
           >

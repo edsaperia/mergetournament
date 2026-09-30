@@ -85,10 +85,12 @@ export async function scheduleContext(tournament: Tournament): Promise<ScheduleC
     numRounds: allRounds.length,
     roundDurationS: tournament.roundDurationS,
     breakDurationS: tournament.breakDurationS,
+    decisionWindowS: GRACE_S,
   };
   const progress: RoundProgress[] = allRounds.map((r) => ({
     actualStart: r.actualStartS ?? undefined,
     actualClose: r.actualCloseS ?? undefined,
+    scheduledStart: r.scheduledStartS,
   }));
   const running = tournament.phase === "running" && Boolean(tournament.begunAt);
   const te = running ? effectiveT(tournament, new Date()) : 0;
