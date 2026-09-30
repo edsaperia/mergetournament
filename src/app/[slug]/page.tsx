@@ -73,7 +73,7 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
         <ConveningPanel slug={slug} tournamentId={tournament.id} me={me} />
       )}
       {me && me.role === "participant" && (tournament.phase === "running" || tournament.phase === "complete") && (
-        <WhatNow tournamentId={tournament.id} slug={slug} meId={me.id} />
+        <WhatNow tournamentId={tournament.id} slug={slug} meId={me.id} complete={tournament.phase === "complete"} />
       )}
       {tournament.phase === "running" && (
         <BreakPanel slug={slug} tournament={tournament} participantId={me?.id ?? null} />

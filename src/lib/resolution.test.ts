@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { newSession, resolveMerge } from "./engine";
+import { mulberry32 } from "./rng";
 import { resolutionLabel, resolutionSentence, whatNow, type ResolvedMergeView } from "./resolution";
 
 const names: Record<string, string> = { ada: "Ada", ben: "Ben" };
@@ -28,7 +30,7 @@ describe("resolutionSentence", () => {
     expect(resolutionSentence(merged, nameOf, false)).toBe("Only Ada took part, so the merged text Ada accepted advances.");
     const input = { ...merged, resultTextId: "tA" };
     expect(resolutionSentence(input, nameOf, false)).toBe(
-      "Only Ada took part and didn't accept the merge, so Ada's input advances unchanged."
+      "Only Ada took part, and there was no accepted merged text, so Ada's input advances unchanged."
     );
   });
 
@@ -70,6 +72,29 @@ describe("whatNow", () => {
     const soloFinal = { ...base, resolution: "active_advance", resultTextId: "new", advancingBearerId: "ada" };
     expect(whatNow(soloFinal, "ben", nameOf, 2, true)).toBe(
       "While you were away, only Ada took part, so the merged text they accepted became the final text. Read it or join the chat."
+    );
+  });
+});
+
+describe("whatNow once the tournament is over", () => {
+  it("stops telling an eliminated bearer to watch the other merges", () => {
+    const flip = { ...base, resolution: "backstop_flip", resultTextId: "tA", advancingBearerId: "ada" };
+    expect(whatNow(flip, "ben", nameOf, 1, false, false)).toContain("watch the other merges");
+    const over = whatNow(flip, "ben", nameOf, 1, false, true);
+    expect(over).toBe("Ada carries this forward. The tournament is over; read the final text or look back through the bracket.");
+    expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 1, false, true)).not.toContain("watch the other merges");
+  });
+});
+
+describe("a lone bearer who accepts a blank merged text", () => {
+  it("is described truly: the engine advances their input, and the sentence says so", () => {
+    const session = { ...newSession(), workingText: "  ", active: { A: true, B: false }, proposedBy: "A" as const };
+    const r = resolveMerge({ text: "tA", bearer: "ada" }, { text: "tB", bearer: "ben" }, session, "working", mulberry32(1));
+    expect(r.kind).toBe("ACTIVE_ADVANCE");
+    expect(r.advancing).toEqual({ source: "input", text: "tA", bearer: "ada" });
+    const m = { ...base, resolution: "active_advance", resultTextId: r.advancing!.text, advancingBearerId: "ada" };
+    expect(resolutionSentence(m, nameOf, false)).toBe(
+      "Only Ada took part, and there was no accepted merged text, so Ada's input advances unchanged."
     );
   });
 });

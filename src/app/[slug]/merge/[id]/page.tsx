@@ -127,7 +127,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                   </>
                 )}
                 {me && mySide && (
-                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal)}</span>
+                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal, tournament.phase === "complete")}</span>
                 )}
               </span>
             );

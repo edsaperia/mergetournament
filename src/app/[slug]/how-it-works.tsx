@@ -21,8 +21,8 @@ export function HowItWorks({ open = false }: { open?: boolean }) {
           <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5">
             <li>you both accept: the merged text advances;</li>
             <li>
-              only one of you took part this round: their Accept advances the merged text, and
-              anything else advances their own input;
+              only one of you took part this round: their Accept advances the merged text (their
+              own input if the merged text is blank), and anything else advances their own input;
             </li>
             <li>you both took part but don&apos;t both accept: a recorded coin flip picks one input text to advance unchanged;</li>
             <li>neither of you took part: the merge is abandoned and its place in the bracket stays empty.</li>

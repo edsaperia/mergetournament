@@ -66,7 +66,8 @@ export function resolutionSentence(m: ResolvedMergeView, nameOf: (id: string | n
     case "active_advance":
       return advanced === "merged"
         ? `Only ${carrier} took part, so the merged text ${carrier} accepted ${goes}.`
-        : `Only ${carrier} took part and didn't accept the merge, so ${carrier}'s input ${goes} unchanged.`;
+        : // Not accepting, or accepting a blank merged text: either way the input goes on.
+          `Only ${carrier} took part, and there was no accepted merged text, so ${carrier}'s input ${goes} unchanged.`;
     case "abandoned":
       return "Neither bearer took part, so this merge is abandoned and nothing advances from it.";
     case "walkover":
@@ -86,9 +87,13 @@ export function whatNow(
   meId: string,
   nameOf: (id: string | null) => string,
   roundNo: number,
-  finalRound: boolean
+  finalRound: boolean,
+  /** The tournament has completed: nothing left to watch live. */
+  tournamentOver = false
 ): string {
-  const done = "You're done merging; watch the other merges or join the chat.";
+  const done = tournamentOver
+    ? "The tournament is over; read the final text or look back through the bracket."
+    : "You're done merging; watch the other merges or join the chat.";
   if (m.resolution === "abandoned" || !m.resultTextId) {
     return `Neither of you took part, so neither text goes on. ${done}`;
   }

@@ -7,7 +7,18 @@ import { mergesFor, nameMapFor, roundsFor, slotsFor } from "../../server/queries
  * carries, they were away, or the pair was abandoned) gets one line saying
  * so and what they can still do. Carriers see their next merge in the bracket.
  */
-export async function WhatNow({ tournamentId, slug, meId }: { tournamentId: string; slug: string; meId: string }) {
+export async function WhatNow({
+  tournamentId,
+  slug,
+  meId,
+  complete,
+}: {
+  tournamentId: string;
+  slug: string;
+  meId: string;
+  /** The tournament has completed. */
+  complete: boolean;
+}) {
   const [allSlots, allMerges, nameOf, allRounds] = await Promise.all([
     slotsFor(tournamentId),
     mergesFor(tournamentId),
@@ -23,7 +34,7 @@ export async function WhatNow({ tournamentId, slug, meId }: { tournamentId: stri
   const roundNo = roundOf.get(latest.slotId) ?? 0;
   return (
     <p className="mb-6 rounded-lg border border-edge bg-panel px-4 py-3 text-sm">
-      {whatNow(latest, meId, (id) => nameOf.get(id ?? "") ?? "?", roundNo, roundNo === allRounds.length)}{" "}
+      {whatNow(latest, meId, (id) => nameOf.get(id ?? "") ?? "?", roundNo, roundNo === allRounds.length, complete)}{" "}
       <Link className="underline" href={`/${slug}/merge/${latest.id}`}>
         See your round {roundNo} merge
       </Link>
