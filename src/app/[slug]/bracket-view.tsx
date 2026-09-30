@@ -152,8 +152,13 @@ export async function BracketView({
                 {roundSlots.map((slot) => {
                   const m = mergeBySlot.get(slot.id);
                   if (!m) {
+                    // The viewer's own bye, or their text standing over: marked like "you are here".
+                    const mine = viewerId !== null && slot.outState === "filled" && slot.outBearerId === viewerId;
                     return (
-                      <div key={slot.id} className="w-64 rounded-lg border border-dashed border-line p-3 text-sm text-muted">
+                      <div
+                        key={slot.id}
+                        className={`w-64 rounded-lg border border-dashed p-3 text-sm text-muted ${mine ? "border-live" : "border-line"}`}
+                      >
                         {slot.kind === "bye" ? (
                           slot.outTextId ? (
                             <>
@@ -177,6 +182,7 @@ export async function BracketView({
                         ) : (
                           "…"
                         )}
+                        {mine && <span className="ml-1 text-xs text-live-ink">yours</span>}
                       </div>
                     );
                   }

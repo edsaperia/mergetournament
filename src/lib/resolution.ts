@@ -122,3 +122,38 @@ export function whatNow(
   }
   return `${carrier} ${goesOn} with this text. ${done}`;
 }
+
+/**
+ * The "what now" line for a player whose text has no partner in a round and
+ * goes on without a merge: a bye, or a text standing over (its partner's
+ * side came up empty). In the final round it becomes the final text.
+ */
+export function sittingOutLine(opts: {
+  /** A bye slot in the bracket, or a text standing over. */
+  kind: "bye" | "standOver";
+  roundNo: number;
+  finalRound: boolean;
+  /** The text is still the player's own draft (they haven't merged yet). */
+  isDraft: boolean;
+  tournamentOver: boolean;
+}): string {
+  const { kind, roundNo, finalRound, isDraft, tournamentOver: over } = opts;
+  const text = isDraft ? "draft" : "text";
+  const meanwhile = over
+    ? "The tournament is over; read the final text or look back through the bracket."
+    : "Meanwhile, read the texts and join the chat.";
+  if (finalRound) {
+    return over
+      ? `Your ${text} had no partner in the final, so it became the final text. Read it or look back through the bracket.`
+      : `Your ${text} has no partner in the final, so it becomes the final text.`;
+  }
+  const next = roundNo + 1;
+  if (kind === "bye") {
+    return over
+      ? `You had a bye in round ${roundNo}: your ${text} went into round ${next} unchanged. ${meanwhile}`
+      : `You have a bye in round ${roundNo}: your ${text} goes into round ${next} unchanged. ${meanwhile}`;
+  }
+  return over
+    ? `Your ${text} had no partner in round ${roundNo}, so it stood over into round ${next} unchanged. ${meanwhile}`
+    : `Your ${text} has no partner in round ${roundNo}, so it stands over into round ${next} unchanged. ${meanwhile}`;
+}

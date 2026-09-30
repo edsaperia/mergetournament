@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { newSession, resolveMerge } from "./engine";
 import { mulberry32 } from "./rng";
-import { resolutionLabel, resolutionSentence, whatNow, type ResolvedMergeView } from "./resolution";
+import { resolutionLabel, resolutionSentence, sittingOutLine, whatNow, type ResolvedMergeView } from "./resolution";
 
 const names: Record<string, string> = { ada: "Ada", ben: "Ben" };
 const nameOf = (id: string | null) => names[id ?? ""] ?? "?";
@@ -134,6 +134,41 @@ describe("a lone bearer who accepts a blank merged text", () => {
     const m = { ...base, resolution: "active_advance", resultTextId: r.advancing!.text, advancingBearerId: "ada" };
     expect(resolutionSentence(m, nameOf, false)).toBe(
       "Only Ada took part, and there was no accepted merged text, so Ada's input goes into the next round unchanged."
+    );
+  });
+});
+
+describe("sittingOutLine", () => {
+  const line = (o: Partial<Parameters<typeof sittingOutLine>[0]>) =>
+    sittingOutLine({ kind: "bye", roundNo: 1, finalRound: false, isDraft: true, tournamentOver: false, ...o });
+  it("tells a player with a bye that their draft goes on unchanged, and what to do meanwhile", () => {
+    expect(line({})).toBe("You have a bye in round 1: your draft goes into round 2 unchanged. Meanwhile, read the texts and join the chat.");
+    expect(line({ roundNo: 2 })).toBe("You have a bye in round 2: your draft goes into round 3 unchanged. Meanwhile, read the texts and join the chat.");
+  });
+  it("tells a player whose text stands over, and never sends them to find a partner", () => {
+    expect(line({ kind: "standOver", roundNo: 2, isDraft: false })).toBe(
+      "Your text has no partner in round 2, so it stands over into round 3 unchanged. Meanwhile, read the texts and join the chat."
+    );
+    expect(line({ kind: "standOver", roundNo: 3, finalRound: true, isDraft: false })).toBe(
+      "Your text has no partner in the final, so it becomes the final text."
+    );
+    for (const kind of ["bye", "standOver"] as const) {
+      for (const finalRound of [false, true]) {
+        for (const tournamentOver of [false, true]) {
+          const l = line({ kind, finalRound, tournamentOver });
+          expect(l).not.toMatch(/partner\b.*find|find your|next partner/i);
+          expect(l).not.toMatch(OLD_WORDS);
+          if (finalRound) expect(l).not.toMatch(/next round|round \d/);
+        }
+      }
+    }
+  });
+  it("looks back once the tournament is over", () => {
+    expect(line({ tournamentOver: true })).toBe(
+      "You had a bye in round 1: your draft went into round 2 unchanged. The tournament is over; read the final text or look back through the bracket."
+    );
+    expect(line({ kind: "standOver", roundNo: 3, finalRound: true, isDraft: false, tournamentOver: true })).toBe(
+      "Your text had no partner in the final, so it became the final text. Read it or look back through the bracket."
     );
   });
 });
