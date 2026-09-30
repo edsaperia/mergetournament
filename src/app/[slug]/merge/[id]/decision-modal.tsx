@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { carrierLine } from "../../../../lib/carrier";
 import { countWords } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
@@ -33,6 +34,7 @@ export function DecisionModal({
   proposedBy,
   myVote,
   myPref,
+  partnerPref,
   iAmActive,
   partnerActive,
   finalRound,
@@ -48,6 +50,7 @@ export function DecisionModal({
   /** My last pressed window vote (working = Accept, input = Reject), if any. */
   myVote: "working" | "input" | null;
   myPref: "A" | "B" | null;
+  partnerPref: "A" | "B" | null;
   iAmActive: boolean;
   partnerActive: boolean;
   finalRound: boolean;
@@ -108,6 +111,16 @@ export function DecisionModal({
         `input; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
     },
   }[variant];
+  // Who carries: with one bearer active, whatever advances at the window's
+  // end is theirs to carry (resolveMerge ignores the picks); the picks count
+  // only if both accept and the merge locks.
+  const picks = mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref };
+  // (The partner-only case needs no extra line: the rules line already says
+  // their Accept advances while you stay silent, and the picks count once you respond.)
+  const carrier =
+    variant === "me"
+      ? `While ${partner} stays silent, you carry whatever advances; your pick counts only if ${partner} accepts too.`
+      : carrierLine(mySide, names, picks);
   // Expanded for one variant only, so a change of who is active collapses it.
   const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
   const whatIf = whatIfFor === variant;
@@ -166,7 +179,7 @@ export function DecisionModal({
       <form action={dispatch} className="flex shrink-0 flex-col gap-2 border-t border-edge bg-panel px-5 py-3 sm:gap-3 sm:py-4">
         {!finalRound && (
           <fieldset className="rounded-md border border-edge p-3 text-sm">
-            <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
+            <legend className="px-1 text-muted">Who carries the result forward?</legend>
             <div className="flex flex-wrap gap-2">
               {(["A", "B"] as const).map((s) => (
                 <Button
@@ -180,6 +193,7 @@ export function DecisionModal({
                 </Button>
               ))}
             </div>
+            <p className="mt-2 text-xs text-muted">{carrier}</p>
           </fieldset>
         )}
 
