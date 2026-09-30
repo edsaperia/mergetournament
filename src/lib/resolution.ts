@@ -82,7 +82,8 @@ export function resolutionSentence(m: ResolvedMergeView, nameOf: (id: string | n
 /**
  * The "what now" line for one bearer of a resolved merge: whether they carry
  * on, and if not, why (their partner carries, they were away, or the merge
- * was abandoned) and what they can still do.
+ * was abandoned) and what they can still do. Once the tournament is over it
+ * looks back, in the past tense, and sends nobody off to find a partner.
  */
 export function whatNow(
   m: ResolvedMergeView,
@@ -96,8 +97,10 @@ export function whatNow(
   const done = tournamentOver
     ? "The tournament is over; read the final text or look back through the bracket."
     : "You're done merging; watch the other merges or join the chat.";
+  const goesOn = tournamentOver ? "went into the next round" : "goes into the next round";
   if (m.resolution === "abandoned" || !m.resultTextId) {
-    return `Neither of you took part, so neither text ${finalRound ? "becomes the final text" : "goes into the next round"}. ${done}`;
+    const went = finalRound ? (tournamentOver ? "became the final text" : "becomes the final text") : goesOn;
+    return `Neither of you took part, so neither text ${went}. ${done}`;
   }
   const carrier = nameOf(m.advancingBearerId);
   if (finalRound) {
@@ -109,11 +112,13 @@ export function whatNow(
     return "That was the final, so you're done merging. Read the final text or join the chat.";
   }
   if (m.advancingBearerId === meId) {
-    return `You go into round ${roundNo + 1} with this text. In the break, read the texts and find your next partner.`;
+    return tournamentOver
+      ? `You went into round ${roundNo + 1} with this text. ${done}`
+      : `You go into round ${roundNo + 1} with this text. In the break, read the texts and find your next partner.`;
   }
   if (m.resolution === "active_advance") {
     const what = advancedFrom(m) === "merged" ? "the merged text they accepted" : "their own input";
-    return `While you were away, only ${carrier} took part, so ${carrier} goes into the next round with ${what}. ${done}`;
+    return `While you were away, only ${carrier} took part, so ${carrier} ${goesOn} with ${what}. ${done}`;
   }
-  return `${carrier} goes into the next round with this text. ${done}`;
+  return `${carrier} ${goesOn} with this text. ${done}`;
 }

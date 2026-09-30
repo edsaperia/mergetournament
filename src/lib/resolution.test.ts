@@ -84,12 +84,44 @@ describe("whatNow", () => {
 });
 
 describe("whatNow once the tournament is over", () => {
+  const flip = { ...base, resolution: "backstop_flip", resultTextId: "tA", advancingBearerId: "ada" };
   it("stops telling an eliminated bearer to watch the other merges", () => {
-    const flip = { ...base, resolution: "backstop_flip", resultTextId: "tA", advancingBearerId: "ada" };
     expect(whatNow(flip, "ben", nameOf, 1, false, false)).toContain("watch the other merges");
     const over = whatNow(flip, "ben", nameOf, 1, false, true);
-    expect(over).toBe("Ada goes into the next round with this text. The tournament is over; read the final text or look back through the bracket.");
+    expect(over).toBe("Ada went into the next round with this text. The tournament is over; read the final text or look back through the bracket.");
     expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 1, false, true)).not.toContain("watch the other merges");
+  });
+
+  it("looks back in the past tense, and sends nobody to find a partner", () => {
+    expect(whatNow(flip, "ada", nameOf, 1, false, true)).toBe(
+      "You went into round 2 with this text. The tournament is over; read the final text or look back through the bracket."
+    );
+    const solo = { ...base, resolution: "active_advance", resultTextId: "new", advancingBearerId: "ada" };
+    expect(whatNow(solo, "ben", nameOf, 1, false, true)).toBe(
+      "While you were away, only Ada took part, so Ada went into the next round with the merged text they accepted. " +
+        "The tournament is over; read the final text or look back through the bracket."
+    );
+    expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 1, false, true)).toMatch(
+      /^Neither of you took part, so neither text went into the next round\./
+    );
+    expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 2, true, true)).toMatch(
+      /^Neither of you took part, so neither text became the final text\./
+    );
+    const merges = [
+      flip,
+      solo,
+      { ...base, resolution: "agreed", resultTextId: "new", advancingBearerId: "ben" },
+      { ...base, resolution: "abandoned" },
+    ];
+    for (const m of merges) {
+      for (const me of ["ada", "ben"]) {
+        for (const finalRound of [false, true]) {
+          const line = whatNow(m, me, nameOf, 1, finalRound, true);
+          expect(line).not.toMatch(/find your next partner|in the break|watch the other merges|\bgoes\b|\byou go\b/i);
+          expect(line).not.toMatch(OLD_WORDS);
+        }
+      }
+    }
   });
 });
 

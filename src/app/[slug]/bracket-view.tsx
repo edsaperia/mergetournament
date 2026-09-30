@@ -114,8 +114,11 @@ export async function BracketView({
                           paused={paused}
                         />
                       </>
-                    ) : (
+                    ) : round.state === "scheduled" ? (
                       <>read, lobby, find your next partner</>
+                    ) : (
+                      // Behind us (and after the end): nothing left to do in it.
+                      <>break over</>
                     )}
                   </div>
                 </div>
