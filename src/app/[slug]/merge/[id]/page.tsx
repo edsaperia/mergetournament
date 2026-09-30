@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
+import { resolutionSentence } from "../../../../lib/resolution";
 import { warnThresholds } from "../../../../lib/schedule";
 import { nameMapFor, scheduleContext } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
@@ -98,7 +99,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         {/* This merge's window only: once it resolves, the resolved banner says what happened. */}
         {ctx.running && round.state === "closing" && m.state === "open" && (
           <span className="text-lg text-warn">
-            decision window <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
+            decision window <Countdown remainingS={ctx.decisionWindowRemaining(round)} paused={paused} />
           </span>
         )}
       </div>
@@ -108,17 +109,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           {(() => {
             const summary = (
               <span>
-                Resolved ({m.resolution?.replace("_", " ")})
+                {resolutionSentence(m, bearerName, isFinal)}
                 {m.resultTextId && (
                   <>
                     {" · "}
                     <Link className="underline" href={`/${slug}/text/${m.resultTextId}`}>
-                      see the advancing text
+                      {isFinal ? "read the final text" : "read the advancing text"}
                     </Link>
                   </>
                 )}
-                {/* In the final round nothing is carried onward; abandoned merges have no carrier either. */}
-                {!isFinal && m.advancingBearerId && <>{" · carried by "}{bearerName(m.advancingBearerId)}</>}
               </span>
             );
             // Only animate flips that just happened; cold visitors see history.
@@ -208,7 +207,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               partnerActive={mySide === "A" ? m.activeB : m.activeA}
               finalRound={isFinal}
               workingText={m.workingText}
-              remainingS={ctx.backstopRemaining(round)}
+              remainingS={ctx.decisionWindowRemaining(round)}
             />
           )}
           {canAct && mySide && (

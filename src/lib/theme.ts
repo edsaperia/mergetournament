@@ -33,7 +33,7 @@ export const THEME_TOKENS: ThemeToken[] = [
   { key: "live-ink", label: "You-are-here text", group: "Live", light: "#2563eb", dark: "#93c5fd" },
   { key: "ok", label: "Positive / ready", group: "Status", light: "#16a34a", dark: "#4ade80" },
   { key: "ok-surface", label: "Positive surface", group: "Status", light: "#f0fdf4", dark: "#052e16" },
-  { key: "warn", label: "Warning / backstop", group: "Status", light: "#d97706", dark: "#fbbf24" },
+  { key: "warn", label: "Warning / decision window", group: "Status", light: "#d97706", dark: "#fbbf24" },
   { key: "warn-surface", label: "Warning surface", group: "Status", light: "#fffbeb", dark: "#451a03" },
   { key: "danger", label: "Danger / expiring", group: "Status", light: "#dc2626", dark: "#f87171" },
   { key: "danger-surface", label: "Danger surface", group: "Status", light: "#fef2f2", dark: "#450a0a" },

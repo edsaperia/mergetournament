@@ -2,20 +2,13 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { textVersions, type Tournament } from "../../db/schema";
+import { resolutionLabel } from "../../lib/resolution";
 import { projectedStarts, wallClockIso, warnThresholds } from "../../lib/schedule";
 import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../server/queries";
 import { FlipReveal } from "./flip-reveal";
 import { Countdown } from "../live";
 import { LocalTime } from "../local-time";
 
-const RESOLUTION_LABEL: Record<string, string> = {
-  agreed: "agreed",
-  bearer_flip: "agreed · bearer by flip",
-  backstop_flip: "clock ran out · coin flip",
-  active_advance: "one bearer present",
-  abandoned: "abandoned",
-  walkover: "walkover",
-};
 
 export async function BracketView({
   tournament,
@@ -123,7 +116,7 @@ export async function BracketView({
                   )}
                   {round.state === "closing" && running && (
                     <span className="text-warn">
-                      decision window <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
+                      decision window <Countdown remainingS={ctx.decisionWindowRemaining(round)} paused={paused} />
                     </span>
                   )}
                   {round.state === "closed" && "closed"}
@@ -205,11 +198,11 @@ export async function BracketView({
                               }
                             >
                               <span className="text-muted">
-                                {RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}
+                                {resolutionLabel(m.resolution)}
                               </span>
                             </FlipReveal>
                           ) : (
-                            <span className="text-muted">{RESOLUTION_LABEL[m.resolution ?? ""] ?? m.resolution}</span>
+                            <span className="text-muted">{resolutionLabel(m.resolution)}</span>
                           )
                         ) : m.state === "open" ? (
                           <span className="text-ok">negotiating</span>

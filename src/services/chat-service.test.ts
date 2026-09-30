@@ -62,7 +62,7 @@ describe("rooms", () => {
     expect(resultRoom?.id).toBe(mergeRoom?.id);
     // The merge chat received system events (lock-in resolution).
     const msgs = await messagesFor(db, mergeRoom!.id);
-    expect(msgs.some((x) => x.kind === "system" && x.body.includes("resolved"))).toBe(true);
+    expect(msgs.some((x) => x.kind === "system" && x.body.startsWith("Agreed"))).toBe(true);
   });
 });
 
