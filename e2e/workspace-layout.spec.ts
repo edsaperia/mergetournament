@@ -42,7 +42,7 @@ test("at phone width one pane shows at a time", async ({ browser }) => {
   await expect(page.locator(".cm-content")).toBeHidden();
 });
 
-test("on desktop a long merge text scrolls inside the editor: the picks, Propose lock-in and the merge chat stay in reach", async ({
+test("on desktop a long merge text scrolls inside the editor: the picks, Propose lock-in and the merge chat stay in reach, and on a short screen the editor keeps 10rem and the page scrolls", async ({
   browser,
 }) => {
   // Four drafts, so round 1 isn't the final and the picks show.
@@ -77,5 +77,26 @@ test("on desktop a long merge text scrolls inside the editor: the picks, Propose
     // The editor is still a usable size.
     const editor = (await page.locator(".cm-editor").boundingBox())!;
     expect(editor.height).toBeGreaterThanOrEqual(160);
+  }
+
+  // Too short a screen for all that: the editor keeps its 10rem floor and the page scrolls
+  // instead. Measured on the editor's host, which clips it: what the player can see.
+  // On a phone, one pane at a time and the editor at its full height.
+  const host = page.locator(".cm-editor").locator("..");
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 1024, height: 768 },
+    { width: 1280, height: 600 },
+    { width: 1024, height: 500 },
+    { width: 360, height: 640 },
+  ]) {
+    await page.setViewportSize(size);
+    const box = (await host.boundingBox())!;
+    expect(box.height, `editor host at ${size.width}×${size.height}`).toBeGreaterThanOrEqual(160);
+    // Nothing overlaps it: Propose lock-in sits below, a scroll away at most.
+    const proposeBox = (await propose.boundingBox())!;
+    expect(proposeBox.y).toBeGreaterThanOrEqual(box.y + box.height);
+    await propose.scrollIntoViewIfNeeded();
+    await expect(propose).toBeInViewport({ ratio: 1 });
   }
 });

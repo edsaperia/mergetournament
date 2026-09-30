@@ -209,8 +209,9 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             className={`min-w-0 rounded-lg border-2 border-line p-4 ${
               // From lg up, while it is being written, the pane fits the screen with room for the
               // merge chat's header below: a long text scrolls inside the editor, and the picks
-              // and Propose lock-in under it stay in view.
-              m.state === "open" ? "lg:flex lg:max-h-[calc(100dvh-15rem)] lg:flex-col" : ""
+              // and Propose lock-in under it stay in view. On a screen too short for that, the
+              // pane grows to fit its controls and a usable editor (min-content), and the page scrolls.
+              m.state === "open" ? "lg:flex lg:h-[calc(100dvh-15rem)] lg:min-h-min lg:flex-col" : ""
             }`}
           >
             <h2 className="mb-2 font-semibold">
@@ -231,8 +232,10 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 <p className="text-faint">(empty)</p>
               )
             ) : (
-              // From lg up the editor takes what the pane has left after the controls.
-              <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:[--editor-min-height:10rem]">
+              // From lg up the editor takes what the pane has left after the controls, but never
+              // less than 10rem (plus its word-count line). Size containment keeps a long text
+              // from counting towards the pane's min-content: only this floor does.
+              <div className="lg:flex lg:min-h-[calc(var(--editor-min-height)+1.5rem)] lg:flex-1 lg:flex-col lg:[contain:size] lg:[--editor-min-height:10rem]">
                 <CollabEditor
                   wsUrl={collabWsUrl()}
                   docName={docName(m.id)}
