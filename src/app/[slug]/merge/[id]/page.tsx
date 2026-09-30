@@ -14,7 +14,7 @@ import { messagesFor, roomForMerge, roomForText } from "../../../../services/cha
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
-import { FlipReveal } from "../../flip-reveal";
+import { FlipReveal, HiddenWhileFlipping } from "../../flip-reveal";
 import { NumberedText } from "../../../numbered-text";
 import { Tabs } from "../../tabs";
 import { CollabEditor } from "./collab-editor";
@@ -60,6 +60,9 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
       {isFinal ? "the final text" : "goes into the next round"}
     </span>
   );
+  // Only animate flips that just happened; cold visitors see history.
+  const flipAgeMs = m.resolvedAt ? new Date().getTime() - m.resolvedAt.getTime() : Infinity;
+  const flipFresh = m.state === "resolved" && m.flipSeed !== null && flipAgeMs < 120_000;
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
 
@@ -88,7 +91,10 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
     ) : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+    <main
+      // The tallest a text pane gets side by side (lg up), leaving the header and tabs in view.
+      className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 [--pane-max-height:calc(100dvh-16rem)] sm:px-6"
+    >
       {(live || deciding) && <AutoRefresh slug={slug} />}
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-xl font-bold">
@@ -131,9 +137,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 )}
               </span>
             );
-            // Only animate flips that just happened; cold visitors see history.
-            const flipAgeMs = m.resolvedAt ? new Date().getTime() - m.resolvedAt.getTime() : Infinity;
-            return m.flipSeed !== null && flipAgeMs < 120_000 ? (
+            return flipFresh ? (
               <FlipReveal
                 flipKey={m.id}
                 a={m.resolution === "bearer_flip" ? bearerName(m.bearerAId) : `${bearerName(m.bearerAId)}'s input`}
@@ -163,37 +167,29 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         key={advanced ?? "open"}
         // Once resolved, open on what advanced: after a coin flip that is an
         // input, and the merge candidate is the text that lost.
-        defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 1 : 2}
+        defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 2 : 1}
+        // From lg up the merge sits beside an input: A | Merge or Merge | B.
+        pinned={1}
+        fill
         // Short on a phone, so the three tabs share one row at 360 px.
         labels={[
           <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} />,
-          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} />,
           <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} />,
+          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} />,
         ]}
       >
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="grid gap-4">
           <div className="min-w-0 rounded-lg border border-edge p-4">
             <h2 className="mb-2 font-semibold">
               Input A · {bearerName(m.bearerAId)}
               {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
               {advanced === "A" && advancesTag}
             </h2>
-            {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
+            {textA ? <InputText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
           <aside className="min-w-0">{await chatFor(roomA, "This text's chat")}</aside>
         </section>
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="min-w-0 rounded-lg border border-edge p-4">
-            <h2 className="mb-2 font-semibold">
-              Input B · {bearerName(m.bearerBId)}
-              {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
-              {advanced === "B" && advancesTag}
-            </h2>
-            {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
-          </div>
-          <aside className="min-w-0">{await chatFor(roomB, "This text's chat")}</aside>
-        </section>
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <section className="grid gap-4">
           <div className="min-w-0 rounded-lg border-2 border-line p-4">
             <h2 className="mb-2 font-semibold">
               Merge candidate
@@ -204,63 +200,92 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 </span>
               )}
             </h2>
-          {m.state === "resolved" ? (
-            m.workingText ? (
-              <NumberedText body={m.workingText} />
+            {m.state === "resolved" ? (
+              m.workingText ? (
+                <InputText body={m.workingText} />
+              ) : (
+                <p className="text-faint">(blank)</p>
+              )
             ) : (
-              <p className="text-faint">(blank)</p>
-            )
-          ) : (
-            <CollabEditor
-              wsUrl={collabWsUrl()}
-              docName={docName(m.id)}
-              token={signCollabToken({ participantId: me?.id ?? "observer", mergeId: m.id }, authSecret())}
-              readOnly={!canAct || lock !== "editing"}
-              userName={me?.name ?? "observer"}
-            />
-          )}
-          {round.state === "closing" && m.state === "open" && mySide && !paused && (
-            <DecisionModal
-              slug={slug}
-              mergeId={m.id}
-              mySide={mySide}
-              names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
-              proposedBy={m.proposedBy}
-              myVote={mySide === "A" ? m.activeChoiceA : m.activeChoiceB}
-              partnerVote={mySide === "A" ? m.activeChoiceB : m.activeChoiceA}
-              myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
-              partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
-              iAmActive={mySide === "A" ? m.activeA : m.activeB}
-              partnerActive={mySide === "A" ? m.activeB : m.activeA}
-              finalRound={isFinal}
-              workingText={m.workingText}
-              remainingS={ctx.decisionWindowRemaining(round)}
-            />
-          )}
-          {canAct && mySide && (
-            <WorkspaceControls
-              slug={slug}
-              mergeId={m.id}
-              mySide={mySide}
-              names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
-              lock={lock === "locked" ? "editing" : (lock as "editing" | "proposed")}
-              proposedBy={m.proposedBy}
-              myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
-              partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
-              finalRound={isFinal}
-            />
-          )}
+              // Capped from lg up, like the input beside it, so both stay in view.
+              <div className="lg:[--editor-max-height:var(--pane-max-height)]">
+                <CollabEditor
+                  wsUrl={collabWsUrl()}
+                  docName={docName(m.id)}
+                  token={signCollabToken({ participantId: me?.id ?? "observer", mergeId: m.id }, authSecret())}
+                  readOnly={!canAct || lock !== "editing"}
+                  userName={me?.name ?? "observer"}
+                />
+              </div>
+            )}
+            {canAct && mySide && (
+              <WorkspaceControls
+                slug={slug}
+                mergeId={m.id}
+                mySide={mySide}
+                names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
+                lock={lock === "locked" ? "editing" : (lock as "editing" | "proposed")}
+                proposedBy={m.proposedBy}
+                myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
+                partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
+                finalRound={isFinal}
+              />
+            )}
             {!mySide && m.state === "open" && (
               <p className="mt-3 text-xs text-muted">
                 Only this merge&apos;s two players hold the pen — you are watching
-                live. Lobbying arrives through the chat on the right.
+                live. Lobbying arrives through the chat below.
               </p>
             )}
           </div>
-          <aside className="min-w-0">{await chatFor(mergeRoom, "This merge's chat")}</aside>
+          <aside className="min-w-0">
+            {/* Its system message names the flip's result; side by side this chat stays in view. */}
+            <HiddenWhileFlipping flipKey={flipFresh ? m.id : null}>
+              {await chatFor(mergeRoom, "This merge's chat")}
+            </HiddenWhileFlipping>
+          </aside>
+        </section>
+        <section className="grid gap-4">
+          <div className="min-w-0 rounded-lg border border-edge p-4">
+            <h2 className="mb-2 font-semibold">
+              Input B · {bearerName(m.bearerBId)}
+              {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
+              {advanced === "B" && advancesTag}
+            </h2>
+            {textB ? <InputText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
+          </div>
+          <aside className="min-w-0">{await chatFor(roomB, "This text's chat")}</aside>
         </section>
       </Tabs>
+      {/* Outside the tabs, so no tab choice can hide it: it covers the whole page. */}
+      {round.state === "closing" && m.state === "open" && mySide && !paused && (
+        <DecisionModal
+          slug={slug}
+          mergeId={m.id}
+          mySide={mySide}
+          names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
+          proposedBy={m.proposedBy}
+          myVote={mySide === "A" ? m.activeChoiceA : m.activeChoiceB}
+          partnerVote={mySide === "A" ? m.activeChoiceB : m.activeChoiceA}
+          myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
+          partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
+          iAmActive={mySide === "A" ? m.activeA : m.activeB}
+          partnerActive={mySide === "A" ? m.activeB : m.activeA}
+          finalRound={isFinal}
+          workingText={m.workingText}
+          remainingS={ctx.decisionWindowRemaining(round)}
+        />
+      )}
     </main>
+  );
+}
+
+/** A read-only text, capped in height from lg up so the pane beside it stays in view. */
+function InputText({ body }: { body: string }) {
+  return (
+    <div className="lg:max-h-(--pane-max-height) lg:overflow-y-auto">
+      <NumberedText body={body} />
+    </div>
   );
 }
 

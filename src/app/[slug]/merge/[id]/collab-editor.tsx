@@ -61,7 +61,9 @@ export function CollabEditor({
           EditorState.readOnly.of(readOnly),
           EditorView.lineWrapping,
           EditorView.theme({
-            "&": { fontSize: "var(--editor-font-size)", minHeight: "20rem" },
+            // --editor-max-height is set only where the editor sits beside an input (lg up).
+            "&": { fontSize: "var(--editor-font-size)", minHeight: "20rem", maxHeight: "var(--editor-max-height, none)" },
+            ".cm-scroller": { overflow: "auto" },
             ".cm-content": { fontFamily: "var(--font-geist-mono), monospace" },
           }),
         ],
