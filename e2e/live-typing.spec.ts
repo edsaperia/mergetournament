@@ -23,3 +23,16 @@ test("two bearers see each other's typing live and end with identical text", asy
   await expect.poll(() => editorText(pageA)).toBe(expected);
   await expect.poll(() => editorText(pageB)).toBe(expected);
 });
+
+test("typing a numbered list gives each number once", async ({ browser }) => {
+  const { merge } = await setUpTournament({ names: ["Ada", "Brook"], roundDurationS: 600 });
+  const page = await (await browser.newContext()).newPage();
+  await page.goto(merge!.a.link);
+  await openWorkspace(page, merge!.url);
+  await typeAtEnd(page, "1. Moorings by lottery.");
+  await typeAtEnd(page, "2. No motorboats before 7am.");
+  await typeAtEnd(page, "3. Review every two years.");
+  await expect
+    .poll(() => editorText(page))
+    .toBe("1. Moorings by lottery.\n2. No motorboats before 7am.\n3. Review every two years.");
+});

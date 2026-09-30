@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
-import { markdown } from "@codemirror/lang-markdown";
 import { saveDraftAction } from "../../../server/actions";
+import { markdownEditing } from "../../markdown-editing";
 import { countWords } from "../../../lib/text";
 
 /**
@@ -34,7 +34,7 @@ export function DraftEditor({ slug, initialBody }: { slug: string; initialBody: 
         doc: initialBody,
         extensions: [
           basicSetup,
-          markdown(),
+          markdownEditing(),
           EditorView.lineWrapping,
           EditorView.theme({
             "&": { fontSize: "var(--editor-font-size)", minHeight: "24rem" },
