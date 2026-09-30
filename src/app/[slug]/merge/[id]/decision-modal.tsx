@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { carrierLine } from "../../../../lib/carrier";
+import { voteLine } from "../../../../lib/decision";
 import { countWords } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
@@ -33,6 +34,7 @@ export function DecisionModal({
   names,
   proposedBy,
   myVote,
+  partnerVote,
   myPref,
   partnerPref,
   iAmActive,
@@ -49,6 +51,8 @@ export function DecisionModal({
   proposedBy: "A" | "B" | null;
   /** My last pressed window vote (working = Accept, input = Reject), if any. */
   myVote: "working" | "input" | null;
+  /** The partner's last pressed window vote, if any. */
+  partnerVote: "working" | "input" | null;
   myPref: "A" | "B" | null;
   partnerPref: "A" | "B" | null;
   iAmActive: boolean;
@@ -74,7 +78,7 @@ export function DecisionModal({
   const [showAll, setShowAll] = useState(false);
   const partner = names[mySide === "A" ? "B" : "A"];
   const iAccepted = proposedBy === mySide;
-  const partnerAccepted = proposedBy !== null && proposedBy !== mySide;
+  const votes = voteLine({ mySide, partner, proposedBy, myVote, partnerVote, iAmActive, partnerActive });
   const blank = workingText.trim() === "";
   const lines = workingText.split("\n");
   // Confirmation strip: the modal confirms which text, it isn't for rereading.
@@ -223,10 +227,7 @@ export function DecisionModal({
             {whatIf ? "less" : "what if…"}
           </button>
         </div>
-        {iAccepted && <p className="text-sm text-warn">You accepted — waiting for {partner}.</p>}
-        {partnerAccepted && (
-          <p className="text-sm text-warn">{`${partner} has accepted. Accept too and the merge locks in.`}</p>
-        )}
+        {votes && <p className="text-sm text-warn">{votes}</p>}
         {/* Side by side at every width: a wrapped pair doubles the footer on a phone. */}
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <Button size="lg" variant={iAccepted ? "primary" : "secondary"} name="intent" value="accept" disabled={pending}>
