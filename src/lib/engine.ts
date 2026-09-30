@@ -66,7 +66,7 @@ export function applyAction(s: MergeSession, a: MergeAction): MergeSession {
       return touched({ lock: "locked", proposedBy: null });
     case "keepEditing":
       if (s.lock !== "proposed") throw new DomainError(`cannot keep-editing while ${s.lock}`);
-      if (a.side === s.proposedBy) throw new DomainError("only the other bearer may keep editing");
+      if (a.side === s.proposedBy) throw new DomainError("only your partner may keep editing");
       return touched({ lock: "editing", proposedBy: null });
     case "selectBearer":
       return touched({ bearerPref: { ...s.bearerPref, [a.side]: a.pref } });

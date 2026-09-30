@@ -151,7 +151,8 @@ function textLabel(n: ProvenanceNode): string {
 function stepLabel(s: ProvenanceStep, index: Map<string, string>, finalRound: number | null): string {
   const how = resolutionLabel(s.resolution);
   const what = `round ${s.round} merge${s.round === finalRound ? " (the final)" : ""}: ${how}`;
-  return s.advancedTextId ? `${what}; ${index.get(s.advancedTextId) ?? "?"} advances unchanged` : what;
+  const goes = s.round === finalRound ? "becomes the final text" : "goes into the next round";
+  return s.advancedTextId ? `${what}; ${index.get(s.advancedTextId) ?? "?"} ${goes} unchanged` : what;
 }
 
 export function provenanceMermaid({ nodes, steps, canonicalTextId, finalRound }: Provenance): string {
@@ -197,7 +198,7 @@ export async function provenanceMarkdown(db: Db, tournamentId: string): Promise<
       (s, i) =>
         `- **M${i}** — round ${s.round} merge of ${index.get(s.inputAId) ?? "?"} + ${index.get(s.inputBId) ?? "?"}: ` +
         (s.advancedTextId
-          ? `${resolutionLabel(s.resolution)}; ${index.get(s.advancedTextId) ?? "?"} advances unchanged`
+          ? `${resolutionLabel(s.resolution)}; ${index.get(s.advancedTextId) ?? "?"} ${s.round === tree.finalRound ? "becomes the final text" : "goes into the next round"} unchanged`
           : resolutionLabel(s.resolution)) +
         (s.round === tree.finalRound ? " — the final" : "") +
         ` — merge id \`${s.mergeId}\``
@@ -206,7 +207,7 @@ export async function provenanceMarkdown(db: Db, tournamentId: string): Promise<
   return [
     `# Provenance — ${t?.name ?? tournamentId}`,
     "",
-    "Every text version with its parentage, and every merge where an input advanced unchanged. The final text traces back through every merge to the original drafts.",
+    "Every text version with its parentage, and every merge that kept an input unchanged. The final text traces back through every merge to the original drafts.",
     "",
     "```mermaid",
     provenanceMermaid(tree),
@@ -216,7 +217,7 @@ export async function provenanceMarkdown(db: Db, tournamentId: string): Promise<
     "",
     listing,
     "",
-    ...(stepListing ? ["## Merges that advanced an input unchanged", "", stepListing, ""] : []),
+    ...(stepListing ? ["## Merges that kept an input unchanged", "", stepListing, ""] : []),
   ].join("\n");
 }
 

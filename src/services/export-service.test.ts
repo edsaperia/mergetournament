@@ -159,8 +159,9 @@ describe("provenance when the final advances an input unchanged", () => {
     expect(mermaid).not.toMatch(/backstop|active_advance|bearer_flip/);
 
     const md = await provenanceMarkdown(db, tid);
-    expect(md).toContain("## Merges that advanced an input unchanged");
-    expect(md).toMatch(/advances unchanged — the final/);
+    expect(md).toContain("## Merges that kept an input unchanged");
+    expect(md).toMatch(/becomes the final text unchanged — the final/);
+    expect(md).not.toMatch(/advanc|next round/i);
     expect(md).toContain("**the final text**");
     expect(md).not.toMatch(/backstop|active_advance|bearer_flip/);
   });

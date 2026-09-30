@@ -39,6 +39,7 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
     // Bearer buttons named for the two bearers, and the two votes.
     await expect(modal.getByRole("button", { name: a.name, exact: true })).toBeVisible();
     await expect(modal.getByRole("button", { name: b.name, exact: true })).toBeVisible();
+    await expect(modal.getByRole("group", { name: "Who goes into the next round?" })).toBeVisible();
     await expect(modal.getByRole("button", { name: "Accept the Merge" })).toBeVisible();
     await expect(modal.getByRole("button", { name: "Reject the Merge" })).toBeVisible();
   }
@@ -46,15 +47,15 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   await expect(pageA.getByText("live · read-only")).toBeVisible();
 
   // Only A typed, so each footer has one short rule line; "what if…" opens the full rules in place.
-  await expect(modalA).toContainText(`If ${b.name} stays silent, your Accept advances this merge.`);
-  await expect(modalB).toContainText(`If you stay silent, ${a.name}'s Accept advances this merge.`);
+  await expect(modalA).toContainText(`If ${b.name} stays silent, your Accept sends this merge into the next round.`);
+  await expect(modalB).toContainText(`If you stay silent, ${a.name}'s Accept sends this merge into the next round.`);
   const whatIfA = modalA.getByRole("button", { name: "what if…" });
   await expect(whatIfA).toHaveAttribute("aria-expanded", "false");
-  await expect(modalA).not.toContainText("anything else advances your own input");
+  await expect(modalA).not.toContainText("anything else sends your own input instead");
   await whatIfA.focus();
   await pageA.keyboard.press("Enter");
   await expect(modalA).toContainText(
-    `While ${b.name} stays silent, your Accept advances this merge and anything else advances your own input`
+    `While ${b.name} stays silent, your Accept sends this merge into the next round and anything else sends your own input instead`
   );
   await expect(modalA.getByRole("button", { name: "less" })).toHaveAttribute("aria-expanded", "true");
   // On a 360×640 phone the full rules fit without scrolling, final words included, and "less" is on screen.
@@ -65,7 +66,7 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   await expect(modalA.getByRole("button", { name: "less" })).toBeInViewport({ ratio: 1 });
   await pageA.setViewportSize({ width: 1280, height: 720 });
 
-  // Both choose who carries the result forward, so the merge locks as agreed rather than by coin flip.
+  // Both choose who goes into the next round, so the merge locks as agreed rather than by coin flip.
   for (const modal of [modalA, modalB]) {
     await modal.getByRole("button", { name: a.name, exact: true }).click();
   }
@@ -81,9 +82,9 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   // Second accept-vote locks the merge; both modals go and the result shows, on A's page without a reload.
   await modalB.getByRole("button", { name: "Accept the Merge" }).click();
   await expect(modalB).toBeHidden();
-  await expect(pageB.getByText(`Agreed: ${a.name} carries the merged text forward.`).first()).toBeVisible();
+  await expect(pageB.getByText(`Agreed: ${a.name} goes into the next round with the merged text.`).first()).toBeVisible();
   await expect(modalA).toBeHidden();
-  await expect(pageA.getByText(`Agreed: ${a.name} carries the merged text forward.`).first()).toBeVisible();
+  await expect(pageA.getByText(`Agreed: ${a.name} goes into the next round with the merged text.`).first()).toBeVisible();
   // The round is still in its decision-window, but this merge's is over: the header stops showing it.
   for (const page of [pageA, pageB]) {
     await expect(page.getByText("decision window")).toBeHidden();
@@ -122,10 +123,10 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
   for (const page of [pageA, pageB]) {
     const flip = page.getByRole("dialog", { name: "Coin flip" });
     await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
-    await expect(flip).toContainText("Time ran out — deciding which input text advances");
+    await expect(flip).toContainText("Time ran out — deciding which input text goes into the next round");
     // Which input advanced isn't shown behind the overlay while the coin is in the air.
     await expect(flip).toContainText("the coin is in the air");
-    await expect(page.getByText(/input advances unchanged/)).toBeHidden();
+    await expect(page.getByText(/text goes into the next round unchanged/)).toBeHidden();
     await expect(page.getByRole("dialog", { name: "Time is up — decide on the merge" })).toBeHidden();
   }
 

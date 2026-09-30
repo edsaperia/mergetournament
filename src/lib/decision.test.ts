@@ -45,7 +45,7 @@ describe("voteLine", () => {
     expect(r.kind).toBe("ACTIVE_ADVANCE");
     expect(r.advancing?.text).toBe("b");
     expect(voteLine({ ...base, partnerVote: "input", iAmActive: false })).toBe(
-      "Cleo rejected the merge. If you stay silent, Cleo's input advances unchanged; if you respond, it's a coin flip unless you both accept."
+      "Cleo rejected the merge. If you stay silent, Cleo's input goes into the next round unchanged; if you respond, it's a coin flip unless you both accept."
     );
   });
 

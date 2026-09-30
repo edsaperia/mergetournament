@@ -64,7 +64,7 @@ export function WorkspaceControls({
           carry the result into. */}
       {!finalRound && (
         <fieldset className="rounded-md border border-edge p-3 text-sm">
-          <legend className="px-1 text-muted">Who carries the result forward?</legend>
+          <legend className="px-1 text-muted">Who goes into the next round?</legend>
           <div className="flex flex-wrap gap-2">
             {(["A", "B"] as const).map((s) => (
               <Button

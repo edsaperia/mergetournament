@@ -78,7 +78,7 @@ export function DecisionModal({
   const [showAll, setShowAll] = useState(false);
   const partner = names[mySide === "A" ? "B" : "A"];
   const iAccepted = proposedBy === mySide;
-  const votes = voteLine({ mySide, partner, proposedBy, myVote, partnerVote, iAmActive, partnerActive });
+  const votes = voteLine({ mySide, partner, proposedBy, myVote, partnerVote, iAmActive, partnerActive, finalRound });
   const blank = workingText.trim() === "";
   const lines = workingText.split("\n");
   // Confirmation strip: the modal confirms which text, it isn't for rereading.
@@ -90,29 +90,34 @@ export function DecisionModal({
   // and the full rules behind "what if…" (short enough for a 360×640 phone).
   const both = `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}.`;
   const orFlip = "it's both accepting or a coin flip between the input texts";
+  // Where a text goes at the window's end: the next round, or in the final
+  // round, the final text.
+  const sendsMerge = finalRound ? "makes this merge the final text" : "sends this merge into the next round";
+  const sendsInput = (whose: string) =>
+    finalRound ? `makes ${whose} own input the final text` : `sends ${whose} own input instead`;
   const variant = iAmActive && partnerActive ? "both" : iAmActive ? "me" : partnerActive ? "partner" : "none";
   const rules = {
     both: {
       short: `${both} Anything else: a coin flip between the input texts.`,
-      full: `${both} Anything else: a coin flip picks one input text to advance unchanged.`,
+      full: `${both} Anything else: a coin flip picks one input text, which ${finalRound ? "becomes the final text" : "goes into the next round"} unchanged.`,
     },
     me: {
-      short: `${both} If ${partner} stays silent, your Accept advances this merge.`,
+      short: `${both} If ${partner} stays silent, your Accept ${sendsMerge}.`,
       full:
-        `${both} While ${partner} stays silent, your Accept advances this merge and anything else advances ` +
-        `your own input; once ${partner} responds, ${orFlip}.`,
+        `${both} While ${partner} stays silent, your Accept ${sendsMerge} and anything else ` +
+        `${sendsInput("your")}; once ${partner} responds, ${orFlip}.`,
     },
     partner: {
-      short: `${both} If you stay silent, ${partner}'s Accept advances this merge.`,
+      short: `${both} If you stay silent, ${partner}'s Accept ${sendsMerge}.`,
       full:
-        `${both} If you stay silent, ${partner}'s Accept advances this merge and anything else advances ` +
-        `their own input; once you respond, ${orFlip}.`,
+        `${both} If you stay silent, ${partner}'s Accept ${sendsMerge} and anything else ` +
+        `${sendsInput("their")}; once you respond, ${orFlip}.`,
     },
     none: {
       short: `${both} If nobody responds, the merge is abandoned.`,
       full:
-        `${both} If just one of you responds, their Accept advances this merge and anything else their own ` +
-        `input; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
+        `${both} If just one of you responds, their Accept ${sendsMerge} and anything else ` +
+        `${sendsInput("their")}; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
     },
   }[variant];
   // Who carries: with one bearer active, whatever advances at the window's
@@ -123,7 +128,7 @@ export function DecisionModal({
   // their Accept advances while you stay silent, and the picks count once you respond.)
   const carrier =
     variant === "me"
-      ? `While ${partner} stays silent, you carry whatever advances; your pick counts only if ${partner} accepts too.`
+      ? `While ${partner} stays silent, you go into the next round; your pick counts only if ${partner} accepts too.`
       : carrierLine(mySide, names, picks);
   // Expanded for one variant only, so a change of who is active collapses it.
   const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
@@ -183,7 +188,7 @@ export function DecisionModal({
       <form action={dispatch} className="flex shrink-0 flex-col gap-2 border-t border-edge bg-panel px-5 py-3 sm:gap-3 sm:py-4">
         {!finalRound && (
           <fieldset className="rounded-md border border-edge p-3 text-sm">
-            <legend className="px-1 text-muted">Who carries the result forward?</legend>
+            <legend className="px-1 text-muted">Who goes into the next round?</legend>
             <div className="flex flex-wrap gap-2">
               {(["A", "B"] as const).map((s) => (
                 <Button
