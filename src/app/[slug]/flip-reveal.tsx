@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "../modal";
 
+const landedEvent = (flipKey: string) => `flip-landed:${flipKey}`;
+
 /**
  * The performed coin flip (SPEC §4): a centered modal saying what is being
  * decided, flashing between the two choices faster and faster for about six
@@ -50,6 +52,7 @@ export function FlipReveal({
         if (elapsed >= TOTAL) {
           // Stays revealed until the viewer taps or clicks outside the modal.
           setPhase("revealed");
+          window.dispatchEvent(new Event(landedEvent(flipKey)));
           return;
         }
         setFace((f) => 1 - f);
@@ -63,7 +66,7 @@ export function FlipReveal({
       cancelled = true;
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [storageKey]);
+  }, [storageKey, flipKey]);
 
   if (phase === "done") return <>{children}</>;
   if (phase === "pending") return null;
@@ -100,4 +103,27 @@ export function FlipReveal({
       {phase === "animating" ? <span className="text-muted">coin flip…</span> : children}
     </>
   );
+}
+
+/**
+ * Withholds a part of the page that would spoil the flip keyed `flipKey` —
+ * e.g. the merge's chat, whose system message names the result — until the
+ * coin lands, or at once if this browser has already seen that flip. With no
+ * `flipKey` it shows its children. Hidden, not removed: the space stays and
+ * nothing inside remounts.
+ */
+export function HiddenWhileFlipping({ flipKey, children }: { flipKey: string | null; children: React.ReactNode }) {
+  const [hidden, setHidden] = useState(flipKey !== null);
+  useEffect(() => {
+    // FlipReveal marks the flip seen only after this runs (in a timeout), so
+    // a mark here means an earlier visit.
+    const seen = flipKey === null || sessionStorage.getItem(`flip:${flipKey}`) !== null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
+    setHidden(!seen);
+    if (seen) return;
+    const show = () => setHidden(false);
+    window.addEventListener(landedEvent(flipKey), show);
+    return () => window.removeEventListener(landedEvent(flipKey), show);
+  }, [flipKey]);
+  return <div className={hidden ? "invisible" : undefined}>{children}</div>;
 }
