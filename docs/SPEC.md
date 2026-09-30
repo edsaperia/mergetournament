@@ -4,7 +4,7 @@
 
 A web application that takes a set of submitted draft documents and reduces them to a single canonical text through a knockout tournament of pairwise merges, run against an automated schedule. Built for constitutional conventions — typically in person with ~20 drafts, but it must accept any number of drafts from 2 upwards.
 
-Once the first round begins, the system runs itself — rounds open and close on schedule (or early, if every merge in a round has locked in), unresolved merges are settled by animated coin flip, and the process counts down to a single final text. The admin's live controls are exactly two: **begin** (ending the convening period) and **pause**. Everything else is automatic.
+Once the first round begins, the system runs itself — rounds open and close on schedule (or early, if every merge in a round has locked in), unresolved merges get a 60-second decision window and are then settled by the resolution rules below (an animated coin flip when both bearers took part), and the process counts down to a single final text. The admin's live controls are exactly two: **begin** (ending the convening period) and **pause**. Everything else is automatic.
 
 The full bracket — every pairing, every bye, every round's start time — is visible to everyone from the moment the tournament is published, and is designed to be projected on a wall throughout the event.
 
