@@ -15,10 +15,19 @@ export function HowItWorks({ open = false }: { open?: boolean }) {
           can rig it.
         </li>
         <li>
-          Each round, you and your partner sit together and merge your two texts into one,
-          against a countdown. If you both agree on the merged text, it advances. If time runs
-          out without agreement, a recorded coin flip decides which of the two input texts
-          advances instead — so it always pays to find the version you can both live with.
+          Each round, you and your partner sit together and merge your two texts into one in a
+          shared editor, against a countdown. Lock it in together and it advances at once. When
+          the countdown runs out, the text freezes and you have 60 seconds to decide:
+          <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5">
+            <li>you both accept: the merged text advances;</li>
+            <li>
+              only one of you took part this round: their Accept advances the merged text (their
+              own input if the merged text is blank), and anything else advances their own input;
+            </li>
+            <li>you both took part but don&apos;t both accept: a recorded coin flip picks one input text to advance unchanged;</li>
+            <li>neither of you took part: the merge is abandoned and its place in the bracket stays empty.</li>
+          </ul>
+          So it pays to find a version you can both live with.
         </li>
         <li>
           Whoever carries the advancing text repeats this in the next round with a new partner,

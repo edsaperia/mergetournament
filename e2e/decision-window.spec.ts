@@ -81,9 +81,9 @@ test("round-countdown expires unfinished: both bearers get the decision-modal, t
   // Second accept-vote locks the merge; both modals go and the result shows, on A's page without a reload.
   await modalB.getByRole("button", { name: "Accept the Merge" }).click();
   await expect(modalB).toBeHidden();
-  await expect(pageB.getByText(/^Resolved \(agreed\)/)).toBeVisible();
+  await expect(pageB.getByText(`Agreed: ${a.name} carries the merged text forward.`).first()).toBeVisible();
   await expect(modalA).toBeHidden();
-  await expect(pageA.getByText(/^Resolved \(agreed\)/)).toBeVisible();
+  await expect(pageA.getByText(`Agreed: ${a.name} carries the merged text forward.`).first()).toBeVisible();
   // The round is still in its decision-window, but this merge's is over: the header stops showing it.
   for (const page of [pageA, pageB]) {
     await expect(page.getByText("decision window")).toBeHidden();
@@ -123,9 +123,9 @@ test("decision-window runs out with both bearers rejecting: both modals clear by
     const flip = page.getByRole("dialog", { name: "Coin flip" });
     await expect(flip).toBeVisible({ timeout: (GRACE_S + 15) * 1000 });
     await expect(flip).toContainText("Time ran out — deciding which input text advances");
-    // Who carries the result isn't shown behind the overlay while the coin is in the air.
+    // Which input advanced isn't shown behind the overlay while the coin is in the air.
     await expect(flip).toContainText("the coin is in the air");
-    await expect(page.getByText(/carried by/)).toBeHidden();
+    await expect(page.getByText(/input advances unchanged/)).toBeHidden();
     await expect(page.getByRole("dialog", { name: "Time is up — decide on the merge" })).toBeHidden();
   }
 

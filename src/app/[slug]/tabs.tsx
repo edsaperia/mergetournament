@@ -16,7 +16,7 @@ export function Tabs({
   defaultIndex = 0,
   children,
 }: {
-  labels: string[];
+  labels: React.ReactNode[];
   ids?: string[];
   defaultIndex?: number;
   children: React.ReactNode[];
@@ -64,7 +64,7 @@ export function Tabs({
             role="tab"
             aria-selected={active === i}
             onClick={() => select(i)}
-            className={`rounded-t-md px-3 py-2 text-sm font-medium sm:px-4 ${
+            className={`whitespace-nowrap rounded-t-md px-3 py-2 text-sm font-medium sm:px-4 ${
               active === i
                 ? "border border-b-0 border-edge bg-background"
                 : "text-muted hover:bg-wash hover:text-foreground"

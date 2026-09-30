@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
+import { advancedFrom, resolutionSentence, whatNow } from "../../../../lib/resolution";
 import { warnThresholds } from "../../../../lib/schedule";
 import { nameMapFor, scheduleContext } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
@@ -51,6 +52,14 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   // the merge resolved drops the listener.
   const deciding = tournament.phase === "running" && round.state === "closing" && m.state === "open";
 
+  const advanced = m.state === "resolved" ? advancedFrom(m) : null;
+  // The candidate didn't advance: an input did instead, or nothing did.
+  const candidateLost = m.state === "resolved" && advanced !== "merged";
+  const advancesTag = (
+    <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
+      {isFinal ? "the final text" : "advances"}
+    </span>
+  );
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
 
@@ -98,7 +107,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         {/* This merge's window only: once it resolves, the resolved banner says what happened. */}
         {ctx.running && round.state === "closing" && m.state === "open" && (
           <span className="text-lg text-warn">
-            decision window <Countdown remainingS={ctx.backstopRemaining(round)} paused={paused} />
+            decision window <Countdown remainingS={ctx.decisionWindowRemaining(round)} paused={paused} />
           </span>
         )}
       </div>
@@ -108,17 +117,18 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           {(() => {
             const summary = (
               <span>
-                Resolved ({m.resolution?.replace("_", " ")})
+                {resolutionSentence(m, bearerName, isFinal)}
                 {m.resultTextId && (
                   <>
                     {" · "}
                     <Link className="underline" href={`/${slug}/text/${m.resultTextId}`}>
-                      see the advancing text
+                      {isFinal ? "read the final text" : "read the advancing text"}
                     </Link>
                   </>
                 )}
-                {/* In the final round nothing is carried onward; abandoned merges have no carrier either. */}
-                {!isFinal && m.advancingBearerId && <>{" · carried by "}{bearerName(m.advancingBearerId)}</>}
+                {me && mySide && (
+                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal, tournament.phase === "complete")}</span>
+                )}
               </span>
             );
             // Only animate flips that just happened; cold visitors see history.
@@ -149,11 +159,16 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
       )}
 
       <Tabs
-        defaultIndex={2}
+        // Remount on resolution, so a tab open during the flip also moves to what advanced.
+        key={advanced ?? "open"}
+        // Once resolved, open on what advanced: after a coin flip that is an
+        // input, and the merge candidate is the text that lost.
+        defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 1 : 2}
+        // Short on a phone, so the three tabs share one row at 360 px.
         labels={[
-          `Input A · ${bearerName(m.bearerAId)}`,
-          `Input B · ${bearerName(m.bearerBId)}`,
-          "Merge candidate",
+          <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} />,
+          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} />,
+          <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} />,
         ]}
       >
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -161,6 +176,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input A · {bearerName(m.bearerAId)}
               {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
+              {advanced === "A" && advancesTag}
             </h2>
             {textA ? <NumberedText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
@@ -171,6 +187,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input B · {bearerName(m.bearerBId)}
               {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
+              {advanced === "B" && advancesTag}
             </h2>
             {textB ? <NumberedText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
@@ -178,7 +195,13 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </section>
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="min-w-0 rounded-lg border-2 border-line p-4">
-            <h2 className="mb-2 font-semibold">Merge candidate</h2>
+            <h2 className="mb-2 font-semibold">
+              Merge candidate
+              {advanced === "merged" && advancesTag}
+              {candidateLost && (
+                <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">did not advance</span>
+              )}
+            </h2>
           {m.state === "resolved" ? (
             m.workingText ? (
               <NumberedText body={m.workingText} />
@@ -202,12 +225,14 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               names={{ A: bearerName(m.bearerAId), B: bearerName(m.bearerBId) }}
               proposedBy={m.proposedBy}
               myVote={mySide === "A" ? m.activeChoiceA : m.activeChoiceB}
+              partnerVote={mySide === "A" ? m.activeChoiceB : m.activeChoiceA}
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
+              partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
               iAmActive={mySide === "A" ? m.activeA : m.activeB}
               partnerActive={mySide === "A" ? m.activeB : m.activeA}
               finalRound={isFinal}
               workingText={m.workingText}
-              remainingS={ctx.backstopRemaining(round)}
+              remainingS={ctx.decisionWindowRemaining(round)}
             />
           )}
           {canAct && mySide && (
@@ -219,6 +244,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               lock={lock === "locked" ? "editing" : (lock as "editing" | "proposed")}
               proposedBy={m.proposedBy}
               myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
+              partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
               finalRound={isFinal}
             />
           )}
@@ -233,5 +259,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </section>
       </Tabs>
     </main>
+  );
+}
+
+function TabLabel({ short, long, mark }: { short: string; long: string; mark: string }) {
+  return (
+    <>
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{long}</span>
+      {mark}
+    </>
   );
 }

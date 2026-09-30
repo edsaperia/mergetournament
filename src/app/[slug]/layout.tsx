@@ -89,7 +89,7 @@ async function PauseGate({
       globalRemainingS={ctx.globalRemaining()}
       roundNo={open?.number}
       roundRemainingS={
-        open ? (open.state === "closing" ? ctx.backstopRemaining(open) : ctx.remainingFor(open.number)) : undefined
+        open ? (open.state === "closing" ? ctx.decisionWindowRemaining(open) : ctx.remainingFor(open.number)) : undefined
       }
     />
   );

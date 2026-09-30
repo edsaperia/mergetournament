@@ -1,6 +1,15 @@
 import type { Round, Tournament } from "../../../db/schema";
 import { numRounds } from "../../../lib/bracket";
-import { projectedStarts, scheduledStarts, wallClockIso, type RoundProgress } from "../../../lib/schedule";
+import {
+  DECISION_WINDOW_S,
+  earliestStarts,
+  fmtDuration,
+  projectedEnd,
+  projectedStarts,
+  scheduledStarts,
+  wallClockIso,
+  type RoundProgress,
+} from "../../../lib/schedule";
 import {
   beginAction,
   closeSubmissionsAction,
@@ -20,10 +29,6 @@ import { DurationEditor, TimeControl } from "./timeline-controls";
  * Round 1 is scheduled are shown relative to the start ("start +30m").
  */
 
-function fmtOffset(s: number): string {
-  const m = Math.round(s / 60);
-  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
-}
 
 type Mark = "done" | "current" | "future";
 
@@ -41,17 +46,26 @@ function Row({
   slim?: boolean;
   children?: React.ReactNode;
 }) {
+  // A table from sm up; on a phone each row stacks (stage, then time, then
+  // actions) so nothing is clipped at 360 px.
   return (
-    <tr className={mark === "current" ? "bg-wash" : mark === "done" ? "text-muted" : ""}>
-      <td className="w-52 py-2.5 pr-3 align-top font-medium">
+    <tr
+      className={`flex flex-col gap-1 py-2.5 sm:table-row sm:py-0 ${
+        mark === "current" ? "bg-wash" : mark === "done" ? "text-muted" : ""
+      }`}
+    >
+      <td className="pr-3 align-top font-medium sm:w-52 sm:py-2.5">
         <span className={`mr-1.5 inline-block w-4 ${mark === "current" ? "text-live-ink" : "text-muted"}`}>
           {mark === "done" ? "✓" : mark === "current" ? "▶" : ""}
         </span>
         {stage}
         {slim && children && <div className="ml-5.5 mt-0.5 font-normal">{children}</div>}
       </td>
-      <td className="w-56 py-2.5 pr-3 align-top text-muted">{time}</td>
-      {!slim && <td className="py-2.5 align-top">{children}</td>}
+      {/* On a phone an unknown time ("—") is noise: shown only in the table. */}
+      <td className={`pl-5.5 pr-3 align-top text-muted sm:w-56 sm:py-2.5 sm:pl-0 ${time === "—" ? "hidden sm:table-cell" : ""}`}>
+        {time}
+      </td>
+      {!slim && <td className="min-w-0 pl-5.5 align-top sm:py-2.5 sm:pl-0">{children}</td>}
     </tr>
   );
 }
@@ -82,30 +96,50 @@ export function Timeline({
   const deadlinePassed = Boolean(t.submissionDeadline && t.submissionDeadline.getTime() <= now);
   const closed = !prePublish || deadlinePassed;
   const introDone = t.intro.trim() !== "";
-  const templateDone = t.defaultSubmission.trim() !== "" || !prePublish;
+  // Ticked only when there is a template: an optional step left alone isn't "done".
+  const templateDone = t.defaultSubmission.trim() !== "";
   const inviteDone = invited >= 2;
 
   const roundCount = prePublish ? numRounds(Math.max(submitted, 2)) : allRounds.length;
-  const config = { numRounds: roundCount, roundDurationS: t.roundDurationS, breakDurationS: t.breakDurationS };
+  // Times are ceilings: each round may run a decision-window past its clock.
+  const config = {
+    numRounds: roundCount,
+    roundDurationS: t.roundDurationS,
+    breakDurationS: t.breakDurationS,
+    decisionWindowS: DECISION_WINDOW_S,
+  };
   const progress: RoundProgress[] = prePublish
     ? []
-    : allRounds.map((r) => ({ actualStart: r.actualStartS ?? undefined, actualClose: r.actualCloseS ?? undefined }));
+    : allRounds.map((r) => ({
+        actualStart: r.actualStartS ?? undefined,
+        actualClose: r.actualCloseS ?? undefined,
+        scheduledStart: r.scheduledStartS,
+      }));
+  // Starts are shown as the earliest a round can open (printed times leave
+  // out decision-windows), with how much later it could be; ends are the latest case.
   const starts = prePublish ? scheduledStarts(config) : projectedStarts(config, progress);
-  const roundEnd = (k: number) => progress[k - 1]?.actualClose ?? starts[k - 1] + t.roundDurationS;
+  const earliest = earliestStarts(config, progress);
+  const roundEnd = (k: number) => projectedEnd(config, progress, starts, k);
+  const slip = (k: number) => (progress[k - 1]?.actualStart !== undefined ? 0 : starts[k - 1] - earliest[k - 1]);
 
   // Pre-begin, the planned startAt anchors the projection instead.
   const wallIso = (s: number): string | null =>
     wallClockIso(t, s) ?? (t.startAt ? new Date(t.startAt.getTime() + s * 1000).toISOString() : null);
 
-  const Span = ({ fromS, toS }: { fromS: number; toS: number }) => {
+  const Span = ({ fromS, toS, slipS = 0 }: { fromS: number; toS: number; slipS?: number }) => {
     const from = wallIso(fromS);
     const to = wallIso(toS);
+    const later = slipS > 0 ? <> (or up to {fmtDuration(slipS)} later)</> : null;
     return from && to ? (
       <>
-        <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly />
+        <LocalTime iso={from} timeOnly />
+        {later} – <LocalTime iso={to} timeOnly />
       </>
     ) : (
-      <>start +{fmtOffset(fromS)} – +{fmtOffset(toS)}</>
+      <>
+        start +{fmtDuration(fromS)}
+        {later} – +{fmtDuration(toS)}
+      </>
     );
   };
 
@@ -152,7 +186,7 @@ export function Timeline({
           k === 1 && prePublish && !readOnly ? (
             <DurationEditor slug={slug} field="round" minutes={Math.round(t.roundDurationS / 60)} />
           ) : (
-            <Span fromS={starts[k - 1]} toS={roundEnd(k)} />
+            <Span fromS={earliest[k - 1]} toS={roundEnd(k)} slipS={slip(k)} />
           )
         }
       >
@@ -211,7 +245,12 @@ export function Timeline({
           n === 1 && prePublish && !readOnly ? (
             <DurationEditor slug={slug} field="break" minutes={Math.round(t.breakDurationS / 60)} />
           ) : (
-            <Span fromS={roundEnd(n)} toS={starts[n] ?? roundEnd(n) + t.breakDurationS} />
+            // Clock times once the round before has closed; until then only its length is certain.
+            progress[n - 1]?.actualClose !== undefined ? (
+              <Span fromS={progress[n - 1].actualClose!} toS={earliest[n]} />
+            ) : (
+              fmtDuration(t.breakDurationS)
+            )
           )
         }
       >
@@ -223,16 +262,16 @@ export function Timeline({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
+    <div className="sm:overflow-x-auto">
+      <table className="block w-full border-collapse text-sm sm:table">
+        <thead className="hidden sm:table-header-group">
           <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-muted">
             <th className="py-2 pr-3 font-medium">Stage</th>
             <th className="py-2 pr-3 font-medium">Time</th>
             {!readOnly && <th className="py-2 font-medium">Actions</th>}
           </tr>
         </thead>
-        <tbody className="divide-y divide-edge-faint">
+        <tbody className="block divide-y divide-edge-faint sm:table-row-group">
           {!readOnly && (
             <>
               <Row mark={mark("intro", introDone)} stage="Write the intro" time="—">
@@ -242,8 +281,14 @@ export function Timeline({
                 </span>
               </Row>
               <Row mark={templateDone ? "done" : "future"} stage="Create template" time="—">
-                <a className="underline" href="#template">Edit template →</a>
-                <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
+                {prePublish ? (
+                  <>
+                    <a className="underline" href="#template">Edit template →</a>
+                    <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted">{templateDone ? "drafts started from it" : "not used"}</span>
+                )}
               </Row>
               <Row mark={mark("invite", inviteDone)} stage="Invite participants" time="—">
                 <a className="underline" href="#roster">Edit the roster →</a>
@@ -311,8 +356,8 @@ export function Timeline({
           </Row>
           {roundRows}
           {prePublish && (
-            <tr>
-              <td colSpan={readOnly ? 2 : 3} className="py-2.5 pl-6 text-sm italic text-muted">
+            <tr className="block sm:table-row">
+              <td colSpan={readOnly ? 2 : 3} className="block py-2.5 pl-6 text-sm italic text-muted sm:table-cell">
                 more rounds will be added as the roster grows
               </td>
             </tr>
@@ -325,12 +370,12 @@ export function Timeline({
               wallIso(roundEnd(roundCount)) ? (
                 <LocalTime iso={wallIso(roundEnd(roundCount))!} />
               ) : (
-                <>start +{fmtOffset(roundEnd(roundCount))}</>
+                <>start +{fmtDuration(roundEnd(roundCount))}</>
               )
             }
           >
             <span className="text-sm">
-              the canonical text will live at{" "}
+              {t.phase === "complete" ? "the canonical text lives at" : "the canonical text will live at"}{" "}
               <a className="underline" href={`/${slug}/text`}>
                 {host}/{slug}/text
               </a>

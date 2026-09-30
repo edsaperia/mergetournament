@@ -84,7 +84,12 @@ export async function setUpTournament(opts: { names: string[]; roundDurationS?: 
         .where(inArray(merges.slotId, round1.map((s) => s.id)));
       merge = { id: m.id, url: `/${slug}/merge/${m.id}`, a: bearer(m.bearerAId), b: bearer(m.bearerBId) };
     }
-    return { slug, people: fx.people.map((p) => ({ name: p.name, link: linkFor(p.email) })), merge };
+    return {
+      slug,
+      admin: { name: fx.admin.name, link: linkFor(fx.admin.email) },
+      people: fx.people.map((p) => ({ name: p.name, link: linkFor(p.email) })),
+      merge,
+    };
   });
 }
 

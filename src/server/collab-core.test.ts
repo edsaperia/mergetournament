@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import * as Y from "yjs";
 import { eq } from "drizzle-orm";
@@ -124,11 +124,52 @@ describe("collab write gates", () => {
     const frozen = handle.liveText(merge.id) ?? "";
     a.text.insert(0, "AFTER-FREEZE ");
     await settle();
-    // The rejected update closed the connection and unloaded the doc; the
-    // persisted row must hold the frozen text, without the late edit.
+    // The refused update never reached the document; the persisted row
+    // must hold the frozen text, without the late edit.
     const [row] = await db.select().from(merges).where(eq(merges.id, merge.id));
     expect(row.workingText).toBe(frozen);
     expect(row.workingText).not.toContain("AFTER-FREEZE");
     a.provider.destroy();
+  });
+
+  it("a frozen merge still refuses document updates, quietly: no stack traces, presence keeps flowing", async () => {
+    await db.update(merges).set({ proposedBy: null }).where(eq(merges.id, merge.id));
+    handle.invalidateGate(merge.id);
+    const a = connect(merge.bearerAId!, merge.id);
+    const b = connect(merge.bearerBId!, merge.id);
+    await until(() => a.provider.synced && b.provider.synced);
+
+    // Freeze, as the round-countdown expiring or a lock-in proposal does.
+    await db.update(merges).set({ proposedBy: "A" }).where(eq(merges.id, merge.id));
+    handle.invalidateGate(merge.id);
+    const frozen = handle.liveText(merge.id) ?? "";
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      a.text.insert(0, "LATE-EDIT ");
+      a.provider.setAwarenessField("cursor", { at: 3 });
+      await settle();
+      // The document update is refused: the server's text and B's copy are unchanged.
+      expect(handle.liveText(merge.id)).toBe(frozen);
+      expect(b.text.toString()).not.toContain("LATE-EDIT");
+      // Awareness (cursors, presence) still reaches the partner, and nothing was logged.
+      await until(() =>
+        [...b.provider.awareness!.getStates().values()].some((st) => (st as { cursor?: { at: number } }).cursor?.at === 3)
+      );
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
+    const [row] = await db.select().from(merges).where(eq(merges.id, merge.id));
+    expect(row.workingText).not.toContain("LATE-EDIT");
+
+    // Unfrozen again (keep editing), the same connection writes again.
+    await db.update(merges).set({ proposedBy: null }).where(eq(merges.id, merge.id));
+    handle.invalidateGate(merge.id);
+    b.text.insert(0, "AFTER-UNFREEZE ");
+    await until(() => (handle.liveText(merge.id) ?? "").includes("AFTER-UNFREEZE"));
+
+    a.provider.destroy();
+    b.provider.destroy();
   });
 });

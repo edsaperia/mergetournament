@@ -252,8 +252,13 @@ export const messages = pgTable(
     kind: messageKind("kind").notNull().default("user"),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Insertion order. Messages posted in one transaction share `now()`, so
+     * createdAt can't order them; chat reads order by this.
+     */
+    seq: bigint("seq", { mode: "number" }).notNull().generatedAlwaysAsIdentity(),
   },
-  (t) => [index("messages_room_created").on(t.roomId, t.createdAt)]
+  (t) => [index("messages_room_created").on(t.roomId, t.createdAt), index("messages_room_seq").on(t.roomId, t.seq)]
 );
 
 export const comments = pgTable(

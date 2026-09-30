@@ -10,10 +10,23 @@
  * shifts every subsequent segment forward.
  */
 
+/**
+ * The decision-window (SPEC §4): after a round's clock expires with merges
+ * unfinished, their bearers get this long to accept or reject before the
+ * round closes. Schedules count it, so printed times are a true ceiling.
+ */
+export const DECISION_WINDOW_S = 60;
+
 export interface ScheduleConfig {
   numRounds: number;
   roundDurationS: number;
   breakDurationS: number;
+  /**
+   * The decision-window a round may run on past its clock (DECISION_WINDOW_S
+   * for display). Projections assume every unclosed round uses it. Default 0:
+   * the round clocks alone, as publish stores them.
+   */
+  decisionWindowS?: number;
 }
 
 /** What has actually happened so far, indexed by round (0-based array for rounds 1..R). */
@@ -22,15 +35,36 @@ export interface RoundProgress {
   actualStart?: number;
   /** Effective time the round closed (early or on the clock), if it has. */
   actualClose?: number;
+  /**
+   * The round's printed start (rounds.scheduledStartS). A round never opens
+   * before it unless every bearer is ready, so projections honour it.
+   */
+  scheduledStart?: number;
 }
 
 function checkConfig(c: ScheduleConfig): void {
   if (!Number.isInteger(c.numRounds) || c.numRounds < 1) {
     throw new Error(`numRounds must be a positive integer, got ${c.numRounds}`);
   }
-  if (c.roundDurationS <= 0 || c.breakDurationS < 0) {
+  if (c.roundDurationS <= 0 || c.breakDurationS < 0 || (c.decisionWindowS ?? 0) < 0) {
     throw new Error(`durations invalid: round=${c.roundDurationS}, break=${c.breakDurationS}`);
   }
+}
+
+/** How long a round can run, clock plus decision-window. */
+function roundSpan(c: ScheduleConfig): number {
+  return c.roundDurationS + (c.decisionWindowS ?? 0);
+}
+
+/** A length of time for people: "2m 30s", "30s", "1h 5m", "3m". */
+export function fmtDuration(totalS: number): string {
+  const s = Math.max(0, Math.round(totalS));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  if (m > 0) return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+  return `${sec}s`;
 }
 
 /**
@@ -59,7 +93,8 @@ export function effectiveNow(
 /**
  * Projected start of each round in effective seconds, honouring actual closes
  * where known: round 1 starts at 0; round r+1 starts one break after round r's
- * close (actual if recorded, else its full-duration expiry).
+ * close (actual if recorded, else its clock plus the decision-window), and
+ * not before its printed start if one is given.
  */
 export function projectedStarts(config: ScheduleConfig, progress: readonly RoundProgress[]): number[] {
   checkConfig(config);
@@ -70,8 +105,38 @@ export function projectedStarts(config: ScheduleConfig, progress: readonly Round
       continue;
     }
     const prev = progress[r - 1];
-    const prevClose = prev?.actualClose ?? starts[r - 1] + config.roundDurationS;
-    starts.push(progress[r]?.actualStart ?? prevClose + config.breakDurationS);
+    const prevClose = prev?.actualClose ?? starts[r - 1] + roundSpan(config);
+    starts.push(
+      progress[r]?.actualStart ?? Math.max(prevClose + config.breakDurationS, progress[r]?.scheduledStart ?? 0)
+    );
+  }
+  return starts;
+}
+
+/**
+ * The earliest each round can open without everyone confirming readiness:
+ * the engine opens a round at max(previous close + break, its printed start),
+ * and a round can close any time after it opens (all merges agreed), so an
+ * unclosed round bounds nothing below its printed start. Printed starts
+ * exclude decision-windows. Display a start as this ("not before"), and
+ * use projectedStarts (the latest case) only for ends and totals.
+ */
+export function earliestStarts(config: ScheduleConfig, progress: readonly RoundProgress[]): number[] {
+  checkConfig(config);
+  const printed = projectedStarts({ ...config, decisionWindowS: 0 }, []);
+  const starts: number[] = [];
+  for (let r = 0; r < config.numRounds; r++) {
+    const actual = progress[r]?.actualStart;
+    if (actual !== undefined) {
+      starts.push(actual);
+      continue;
+    }
+    if (r === 0) {
+      starts.push(0);
+      continue;
+    }
+    const prevBound = progress[r - 1]?.actualClose ?? starts[r - 1];
+    starts.push(Math.max(progress[r]?.scheduledStart ?? printed[r], prevBound + config.breakDurationS));
   }
   return starts;
 }
@@ -81,15 +146,21 @@ export function scheduledStarts(config: ScheduleConfig): number[] {
   return projectedStarts(config, []);
 }
 
-/** Full-duration length of the whole tournament in seconds. */
+/** Full-duration length of the whole tournament in seconds, decision-windows included. */
 export function totalDurationS(config: ScheduleConfig): number {
   checkConfig(config);
-  return config.numRounds * config.roundDurationS + (config.numRounds - 1) * config.breakDurationS;
+  return config.numRounds * roundSpan(config) + (config.numRounds - 1) * config.breakDurationS;
+}
+
+/** When a round ends at the latest: its actual close, else its clock plus the decision-window. */
+export function projectedEnd(config: ScheduleConfig, progress: readonly RoundProgress[], starts: readonly number[], round: number): number {
+  return progress[round - 1]?.actualClose ?? starts[round - 1] + roundSpan(config);
 }
 
 /**
- * The global countdown: effective seconds until the final merge locks,
- * assuming every remaining round and break runs its full duration.
+ * The global countdown: effective seconds until the final round closes,
+ * assuming every remaining round and break runs its full duration, each
+ * round's decision-window included.
  */
 export function globalRemainingS(
   config: ScheduleConfig,
@@ -99,7 +170,7 @@ export function globalRemainingS(
   const finalProgress = progress[config.numRounds - 1];
   if (finalProgress?.actualClose !== undefined) return 0;
   const starts = projectedStarts(config, progress);
-  const finalEnd = starts[config.numRounds - 1] + config.roundDurationS;
+  const finalEnd = starts[config.numRounds - 1] + roundSpan(config);
   return Math.max(0, finalEnd - nowEffectiveS);
 }
 

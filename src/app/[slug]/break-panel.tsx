@@ -1,6 +1,8 @@
 import { type Tournament } from "../../db/schema";
 import { workspaceAction } from "../../server/actions";
+import { projectedStarts, wallClockIso } from "../../lib/schedule";
 import { roundMerges, scheduleContext } from "../../server/queries";
+import { LocalTime } from "../local-time";
 import { ControlButton } from "./admin/admin-controls";
 
 /**
@@ -16,7 +18,7 @@ export async function BreakPanel({
   tournament: Tournament;
   participantId: string | null;
 }) {
-  const { allRounds } = await scheduleContext(tournament);
+  const { allRounds, config, progress } = await scheduleContext(tournament);
   // Only relevant during a break: no round open/closing, a scheduled one next.
   if (allRounds.some((r) => r.state === "open" || r.state === "closing")) return null;
   const next = allRounds.find((r) => r.state === "scheduled");
@@ -25,6 +27,7 @@ export async function BreakPanel({
   const pending = (await roundMerges(tournament.id, next.number)).filter((m) => m.state === "pending");
   if (pending.length === 0) return null;
 
+  const startIso = wallClockIso(tournament, projectedStarts(config, progress)[next.number - 1]);
   const bearersTotal = pending.length * 2;
   const bearersReady = pending.reduce((n, m) => n + (m.readyA ? 1 : 0) + (m.readyB ? 1 : 0), 0);
   const mine = participantId
@@ -41,7 +44,13 @@ export async function BreakPanel({
       <div>
         <p className="font-semibold">Break — round {next.number} is next</p>
         <p className="text-sm text-muted">
-          Scheduled for +{Math.round(next.scheduledStartS / 60)}m; it starts
+          {startIso ? (
+            <>
+              Starts at <LocalTime iso={startIso} timeOnly /> at the latest;
+            </>
+          ) : (
+            "It starts on schedule;"
+          )}{" "}
           sooner only when all its bearers are ready ({bearersReady} of {bearersTotal} so far).
         </p>
       </div>

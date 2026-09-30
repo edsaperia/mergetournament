@@ -126,6 +126,7 @@ async function buildInvite(
     participantName: opts.participantName,
     tournamentName: tournament.name,
     adminName: opts.selfIsAdmin ? undefined : admin?.name,
+    selfIsAdmin: opts.selfIsAdmin,
     intro: tournament.intro,
     schedule: scheduleLine(tournament),
     magicLink: opts.magicLink,

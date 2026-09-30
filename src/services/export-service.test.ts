@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { createTestDb, TestDb } from "../db/test-db";
-import { merges } from "../db/schema";
+import { and, asc, eq } from "drizzle-orm";
+import { merges, slots } from "../db/schema";
 import { ConsoleEmailer } from "../lib/email";
+import { roomForMerge, roomForText } from "./chat-service";
 import { auditJsonl, canonicalText, draftsBundle, provenance, provenanceMermaid, provenanceMarkdown } from "./export-service";
 import { mergeAction, tick } from "./runtime-service";
 import { makeTournament } from "./test-fixture";
@@ -38,7 +40,8 @@ describe("exports", () => {
   });
 
   it("builds a provenance tree whose mermaid has every version and both parent edges", async () => {
-    const nodes = await provenance(db, tournamentId);
+    const tree = await provenance(db, tournamentId);
+    const { nodes } = tree;
     expect(nodes).toHaveLength(3); // 2 drafts + 1 merge result
     const result = nodes.find((n) => n.kind === "merge_result")!;
     expect(result.resolution).toBe("agreed");
@@ -46,7 +49,10 @@ describe("exports", () => {
       nodes.filter((n) => n.kind === "draft").map((n) => n.id).sort()
     );
 
-    const mermaid = provenanceMermaid(nodes);
+    expect(tree.steps).toEqual([]);
+    expect(tree.canonicalTextId).toBe(result.id);
+
+    const mermaid = provenanceMermaid(tree);
     expect(mermaid).toContain("flowchart TD");
     expect(mermaid).toContain("Ada's draft");
     expect(mermaid).toContain("Bo's draft");
@@ -72,5 +78,98 @@ describe("exports", () => {
     expect(typeof published.payload.seed).toBe("number");
     expect(published.payload.seedCommitment).toMatch(/^[0-9a-f]{64}$/);
     expect(entries.every((e) => typeof e.at === "string")).toBe(true);
+  });
+});
+
+describe("provenance when the final advances an input unchanged", () => {
+  // The 30 Sep playtest: round 1 agreed, the final ran out and a coin flip
+  // advanced one of the round-1 texts intact.
+  let tid: string;
+  let round1Results: string[];
+  let finalMergeId: string;
+
+  beforeAll(async () => {
+    const emailer = new ConsoleEmailer();
+    const { t } = await makeTournament(db, {
+      slug: "exp-flip",
+      names: ["Ada", "Ben", "Cleo", "Dev"],
+      participants: 4,
+      emailer,
+      beginAt: T0,
+    });
+    tid = t.id;
+    const at = (s: number) => new Date(T0.getTime() + s * 1000);
+    const mergesOf = async (roundNo: number) => {
+      const rs = await db
+        .select()
+        .from(slots)
+        .where(and(eq(slots.tournamentId, tid), eq(slots.roundNo, roundNo)))
+        .orderBy(asc(slots.position));
+      return (await db.select().from(merges)).filter((m) => rs.some((s) => s.id === m.slotId));
+    };
+    for (const [i, m] of (await mergesOf(1)).entries()) {
+      await mergeAction(db, m.id, m.bearerAId!, { type: "edit", text: `Round-1 text ${i}.` }, at(60));
+      await mergeAction(db, m.id, m.bearerAId!, { type: "selectBearer", pref: "A" }, at(60));
+      await mergeAction(db, m.id, m.bearerAId!, { type: "propose" }, at(60));
+      await mergeAction(db, m.id, m.bearerBId!, { type: "confirm" }, at(60));
+    }
+    await tick(db, emailer, "http://x", tid, at(61)); // round 1 closes early
+    round1Results = (await mergesOf(1)).map((m) => m.resultTextId!);
+    await tick(db, emailer, "http://x", tid, at(660)); // the final opens on schedule
+    const [final] = await mergesOf(2);
+    finalMergeId = final.id;
+    // Both bearers take part, neither proposes: the window ends in a coin flip.
+    await mergeAction(db, final.id, final.bearerAId!, { type: "edit", text: "A merge nobody accepted." }, at(700));
+    await mergeAction(db, final.id, final.bearerBId!, { type: "selectBearer", pref: "B" }, at(701));
+    await tick(db, emailer, "http://x", tid, at(1260)); // round-countdown expires
+    await tick(db, emailer, "http://x", tid, at(1320)); // decision-window ends
+    const [resolved] = await db.select().from(merges).where(eq(merges.id, final.id));
+    expect(resolved.resolution).toBe("backstop_flip");
+  });
+
+  it("keeps each text's own resolution: the round-1 text stays agreed", async () => {
+    const tree = await provenance(db, tid);
+    const created = tree.nodes.filter((n) => n.kind === "merge_result");
+    expect(created).toHaveLength(2);
+    for (const n of created) {
+      expect(n.resolution).toBe("agreed");
+      expect(n.round).toBe(1);
+    }
+    expect(round1Results).toContain(tree.canonicalTextId);
+  });
+
+  it("lists the final as a merge whose result is an unchanged input", async () => {
+    const tree = await provenance(db, tid);
+    expect(tree.finalRound).toBe(2);
+    expect(tree.steps).toEqual([
+      {
+        mergeId: finalMergeId,
+        round: 2,
+        inputAId: expect.any(String),
+        inputBId: expect.any(String),
+        resolution: "backstop_flip",
+        advancedTextId: tree.canonicalTextId,
+      },
+    ]);
+    expect([tree.steps[0].inputAId, tree.steps[0].inputBId].sort()).toEqual([...round1Results].sort());
+
+    const mermaid = provenanceMermaid(tree);
+    expect(mermaid).toContain('M0{{"round 2 merge (the final): no agreement · coin flip between the inputs;');
+    expect((mermaid.match(/--> M0$/gm) ?? []).length).toBe(2);
+    expect(mermaid).not.toMatch(/backstop|active_advance|bearer_flip/);
+
+    const md = await provenanceMarkdown(db, tid);
+    expect(md).toContain("## Merges that advanced an input unchanged");
+    expect(md).toMatch(/advances unchanged — the final/);
+    expect(md).toContain("**the final text**");
+    expect(md).not.toMatch(/backstop|active_advance|bearer_flip/);
+  });
+
+  it("keeps the final text's chat on the merge that wrote it", async () => {
+    const tree = await provenance(db, tid);
+    const creator = (await db.select().from(merges)).find(
+      (m) => m.resultTextId === tree.canonicalTextId && m.id !== finalMergeId
+    )!;
+    expect((await roomForText(db, tree.canonicalTextId!))?.id).toBe((await roomForMerge(db, creator.id))?.id);
   });
 });

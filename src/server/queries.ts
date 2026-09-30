@@ -69,7 +69,7 @@ export interface ScheduleContext {
   /** Seconds left on an open round's clock. */
   remainingFor(roundNo: number): number;
   /** Seconds left in a closing round's decision window. */
-  backstopRemaining(round: Round): number;
+  decisionWindowRemaining(round: Round): number;
   /** Seconds until the whole schedule completes. */
   globalRemaining(): number;
 }
@@ -85,10 +85,12 @@ export async function scheduleContext(tournament: Tournament): Promise<ScheduleC
     numRounds: allRounds.length,
     roundDurationS: tournament.roundDurationS,
     breakDurationS: tournament.breakDurationS,
+    decisionWindowS: GRACE_S,
   };
   const progress: RoundProgress[] = allRounds.map((r) => ({
     actualStart: r.actualStartS ?? undefined,
     actualClose: r.actualCloseS ?? undefined,
+    scheduledStart: r.scheduledStartS,
   }));
   const running = tournament.phase === "running" && Boolean(tournament.begunAt);
   const te = running ? effectiveT(tournament, new Date()) : 0;
@@ -100,7 +102,7 @@ export async function scheduleContext(tournament: Tournament): Promise<ScheduleC
     paused: Boolean(tournament.pausedAt),
     te,
     remainingFor: (roundNo) => roundRemainingS(config, progress, roundNo, te),
-    backstopRemaining: (round) => (round.actualStartS ?? 0) + tournament.roundDurationS + GRACE_S - te,
+    decisionWindowRemaining: (round) => (round.actualStartS ?? 0) + tournament.roundDurationS + GRACE_S - te,
     globalRemaining: () => globalRemainingS(config, progress, te),
   };
 }

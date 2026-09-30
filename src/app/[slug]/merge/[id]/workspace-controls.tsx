@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
+import { carrierLine } from "../../../../lib/carrier";
 import { ActionStatus } from "../../../action-status";
 import { Button } from "../../../ui";
 
@@ -17,6 +18,7 @@ export function WorkspaceControls({
   lock,
   proposedBy,
   myPref,
+  partnerPref,
   finalRound,
 }: {
   slug: string;
@@ -26,6 +28,7 @@ export function WorkspaceControls({
   lock: "editing" | "proposed";
   proposedBy: "A" | "B" | null;
   myPref: "A" | "B" | null;
+  partnerPref: "A" | "B" | null;
   finalRound: boolean;
 }) {
   const [state, dispatch, pending] = useActionState(
@@ -55,12 +58,13 @@ export function WorkspaceControls({
           This is the final round: the text you lock in becomes the canonical text.
         </p>
       )}
-      {/* Bearer choice first: settle it before lock-in, since an unsettled
-          choice is what triggers a coin flip at confirmation. Absent in the
-          final round — there is no next round to carry the result into. */}
+      {/* Bearer choice first: settle it before lock-in, since picks that
+          differ (or no pick at all) are what trigger a coin flip at
+          confirmation. Absent in the final round — there is no next round to
+          carry the result into. */}
       {!finalRound && (
         <fieldset className="rounded-md border border-edge p-3 text-sm">
-          <legend className="px-1 text-muted">Who carries the result forward? (unsettled = coin flip)</legend>
+          <legend className="px-1 text-muted">Who carries the result forward?</legend>
           <div className="flex flex-wrap gap-2">
             {(["A", "B"] as const).map((s) => (
               <Button
@@ -74,6 +78,9 @@ export function WorkspaceControls({
               </Button>
             ))}
           </div>
+          <p className="mt-2 text-xs text-muted">
+            {carrierLine(mySide, names, mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref })}
+          </p>
         </fieldset>
       )}
 

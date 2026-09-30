@@ -7,7 +7,8 @@
  * - Only the merge's bearers may write, and only while the merge is open,
  *   un-proposed, the round open, the tournament running and not paused.
  * - Everyone else (participants, admin, observers) connects read-only.
- * - Late or tampered updates against a frozen merge are rejected outright.
+ * - Late or tampered updates against a frozen merge are refused, quietly:
+ *   the connection stays open for presence, and nothing is logged.
  */
 
 import { Server } from "@hocuspocus/server";
@@ -102,9 +103,16 @@ export function createCollabServer(config: CollabConfig) {
     },
 
     async beforeHandleMessage({ connection, context }) {
-      if (connection.readOnly) return; // hocuspocus already drops its writes
+      // Non-bearers connect read-only and stay so; hocuspocus drops their writes.
+      if (!context.side) return;
+      // A bearer's connection is read-only exactly while the merge is frozen
+      // (locked, proposed, paused, or past the round-countdown). Hocuspocus's
+      // read-only path refuses document updates without applying them, while
+      // cursors and presence (awareness) still flow. Throwing here instead
+      // closed the connection and logged a stack trace for every cursor move
+      // after a freeze.
       const gate = await loadGate(context.mergeId);
-      if (!gate.writable) throw new Error("merge is frozen (locked, proposed, or paused)");
+      connection.readOnly = !gate.writable;
     },
 
     async onLoadDocument({ document, documentName }) {

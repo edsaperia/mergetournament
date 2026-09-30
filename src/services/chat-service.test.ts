@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
-import { merges } from "../db/schema";
+import { merges, messages } from "../db/schema";
 import {
   addComment,
   commentsFor,
@@ -11,7 +11,7 @@ import {
   roomForMerge,
   roomForText,
 } from "./chat-service";
-import { mergeAction } from "./runtime-service";
+import { mergeAction, tick } from "./runtime-service";
 import { makeTournament } from "./test-fixture";
 
 let db: TestDb;
@@ -62,7 +62,7 @@ describe("rooms", () => {
     expect(resultRoom?.id).toBe(mergeRoom?.id);
     // The merge chat received system events (lock-in resolution).
     const msgs = await messagesFor(db, mergeRoom!.id);
-    expect(msgs.some((x) => x.kind === "system" && x.body.includes("resolved"))).toBe(true);
+    expect(msgs.some((x) => x.kind === "system" && x.body.startsWith("Agreed"))).toBe(true);
   });
 });
 
@@ -112,5 +112,40 @@ describe("perpetual after completion", () => {
     const g = await globalRoom(db, tournamentId);
     await postMessage(db, g!.id, p0Id, "post-tournament reflection");
     await addComment(db, { textVersionId: draftId, authorId: p0Id, line: 2, body: "for posterity" });
+  });
+});
+
+describe("system narration order", () => {
+  it("reads back in the order it was posted, even when one tick posts several lines at the same instant", async () => {
+    const T0 = new Date("2026-09-30T10:00:00Z");
+    const { t, emailer } = await makeTournament(db, { slug: "chat-order", names: ["Ada", "Ben"], beginAt: T0 });
+    // Neither bearer takes part: one tick at the window's end resolves the
+    // merge, closes the round and completes the tournament, all at one now().
+    await tick(db, emailer, "http://x", t.id, new Date(T0.getTime() + 600_000));
+    await tick(db, emailer, "http://x", t.id, new Date(T0.getTime() + 660_000));
+
+    const room = await globalRoom(db, t.id);
+    const bodies = (await messagesFor(db, room!.id)).map((x) => x.body);
+    expect(bodies.map((b) => b.split(/[:.]/)[0])).toEqual([
+      "The bracket is published",
+      "Round 1 is open",
+      "Round 1",
+      "Round 1 has closed",
+      "Randomness revealed",
+      "The tournament concluded with no canonical text",
+    ]);
+    // One announcement per event: no "Begin! Round 1 is open." beside "Round 1 is open."
+    expect(bodies.filter((b) => b.includes("Round 1 is open"))).toHaveLength(1);
+  });
+
+  it("orders by insertion even among messages sharing a timestamp", async () => {
+    const room = await globalRoom(db, tournamentId);
+    const stamp = new Date("2026-09-30T12:00:00Z");
+    const bodies = Array.from({ length: 12 }, (_, i) => `same-instant ${i}`);
+    for (const body of bodies) {
+      await db.insert(messages).values({ roomId: room!.id, kind: "system", body, createdAt: stamp });
+    }
+    const read = (await messagesFor(db, room!.id)).map((x) => x.body).filter((b) => b.startsWith("same-instant"));
+    expect(read).toEqual(bodies);
   });
 });

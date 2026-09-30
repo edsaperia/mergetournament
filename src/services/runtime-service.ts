@@ -39,7 +39,8 @@ import {
 } from "../lib/engine";
 import { commitmentOf, deriveSeed, makeMasterSecret } from "../lib/commit";
 import { mulberry32 } from "../lib/rng";
-import { effectiveNow, scheduledStarts } from "../lib/schedule";
+import { DECISION_WINDOW_S, effectiveNow, scheduledStarts } from "../lib/schedule";
+import { resolutionSentence } from "../lib/resolution";
 import { countWords } from "../lib/text";
 import type { Email, Emailer } from "../lib/email";
 import { DomainError } from "../lib/errors";
@@ -49,7 +50,7 @@ import type { Db } from "./tournament-service";
  * The decision window after a round's clock expires (SPEC §4): text frozen,
  * bearers may still accept or reject the merge and choose who carries it.
  */
-export const GRACE_S = 60;
+export const GRACE_S = DECISION_WINDOW_S;
 
 async function audit(db: Db, tournamentId: string, action: string, payload: unknown): Promise<void> {
   await db.insert(auditLog).values({ tournamentId, action, payload });
@@ -192,7 +193,7 @@ export async function beginTournament(db: Db, tournamentId: string, now: Date) {
     await tx.update(tournaments).set({ phase: "running", begunAt: now }).where(eq(tournaments.id, tournamentId));
     await openRound(tx, tournamentId, 1, 0);
     await audit(tx, tournamentId, "begin", { at: now.toISOString() });
-    await postSystem(tx, tournamentId, "Begin! Round 1 is open.");
+    // openRound has just posted "Round 1 is open."; one announcement is enough.
   });
 }
 
@@ -410,12 +411,24 @@ async function finalizeMerge(db: Db, t: Tournament, m: Merge, session: MergeSess
     flipSeed: resolved.flips.length > 0 ? flipSeed : null,
     resultTextId,
   });
+  const bearers = await db
+    .select({ id: participants.id, name: participants.name })
+    .from(participants)
+    .where(inArray(participants.id, [m.bearerAId, m.bearerBId]));
+  const nameOf = (id: string | null) => bearers.find((p) => p.id === id)?.name ?? "?";
   await postSystem(
     db,
     t.id,
-    resolved.kind === "ABANDONED"
-      ? "Neither bearer was present; this merge is abandoned."
-      : `Merge resolved (${resolved.kind.toLowerCase().replace("_", " ")}).`,
+    resolutionSentence(
+      {
+        ...m,
+        resolution: KIND_TO_DB[resolved.kind as keyof typeof KIND_TO_DB],
+        resultTextId,
+        advancingBearerId: resolved.advancing?.bearer ?? null,
+      },
+      nameOf,
+      finalRound
+    ),
     m.id
   );
 }

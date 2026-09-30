@@ -5,8 +5,8 @@ import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
-import { markdown } from "@codemirror/lang-markdown";
 import { yCollab } from "y-codemirror.next";
+import { markdownEditing } from "../../../markdown-editing";
 import { countWords } from "../../../../lib/text";
 
 const COLORS = ["#30bced", "#6eeb83", "#ffbc42", "#ecd444", "#ee6352", "#9ac2c9", "#8acb88", "#1be7ff"];
@@ -54,7 +54,7 @@ export function CollabEditor({
         doc: ytext.toString(),
         extensions: [
           basicSetup,
-          markdown(),
+          markdownEditing(),
           yCollab(ytext, provider.awareness),
           // Both flags: `editable` alone still lets paste/drop through.
           EditorView.editable.of(!readOnly),
