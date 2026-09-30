@@ -92,7 +92,12 @@ export function whatNow(
   roundNo: number,
   finalRound: boolean,
   /** The tournament has completed: nothing left to watch live. */
-  tournamentOver = false
+  tournamentOver = false,
+  /**
+   * Where the text that went on landed, once the next round is drawn up:
+   * with no partner there, it stands over (or, in the final, becomes the final text).
+   */
+  next: "merge" | "standsOver" | "standsOverFinal" | null = null
 ): string {
   const done = tournamentOver
     ? "The tournament is over; read the final text or look back through the bracket."
@@ -112,6 +117,16 @@ export function whatNow(
     return "That was the final, so you're done merging. Read the final text or join the chat.";
   }
   if (m.advancingBearerId === meId) {
+    if (next === "standsOver" || next === "standsOverFinal") {
+      const final = next === "standsOverFinal";
+      const there = final ? "the final" : `round ${roundNo + 1}`;
+      if (tournamentOver) {
+        const then = final ? "became the final text" : `stood over into round ${roundNo + 2}`;
+        return `You went into ${there} with this text, and it had no partner there, so it ${then}. ${done}`;
+      }
+      const then = final ? "becomes the final text" : `stands over into round ${roundNo + 2}`;
+      return `You go into ${there} with this text, but it has no partner there, so it ${then}. Meanwhile, read the texts and join the chat.`;
+    }
     return tournamentOver
       ? `You went into round ${roundNo + 1} with this text. ${done}`
       : `You go into round ${roundNo + 1} with this text. In the break, read the texts and find your next partner.`;

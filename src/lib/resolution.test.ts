@@ -172,3 +172,23 @@ describe("sittingOutLine", () => {
     );
   });
 });
+
+describe("whatNow for a player whose text then stands over", () => {
+  const agreed = { ...base, resolution: "agreed", resultTextId: "new", advancingBearerId: "ada" };
+  it("doesn't send them to find a partner they won't have", () => {
+    expect(whatNow(agreed, "ada", nameOf, 1, false, false, "standsOver")).toBe(
+      "You go into round 2 with this text, but it has no partner there, so it stands over into round 3. Meanwhile, read the texts and join the chat."
+    );
+    expect(whatNow(agreed, "ada", nameOf, 2, false, false, "standsOverFinal")).toBe(
+      "You go into the final with this text, but it has no partner there, so it becomes the final text. Meanwhile, read the texts and join the chat."
+    );
+    expect(whatNow(agreed, "ada", nameOf, 2, false, true, "standsOverFinal")).toBe(
+      "You went into the final with this text, and it had no partner there, so it became the final text. " +
+        "The tournament is over; read the final text or look back through the bracket."
+    );
+    // A partner waiting in the next round: as before.
+    expect(whatNow(agreed, "ada", nameOf, 1, false, false, "merge")).toContain("find your next partner");
+    // The other player's line doesn't change.
+    expect(whatNow(agreed, "ben", nameOf, 1, false, false, "standsOver")).toBe(whatNow(agreed, "ben", nameOf, 1, false, false));
+  });
+});

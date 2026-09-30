@@ -5,7 +5,7 @@ import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
 import { advancedFrom, resolutionSentence, whatNow } from "../../../../lib/resolution";
 import { warnThresholds } from "../../../../lib/schedule";
-import { nameMapFor, scheduleContext } from "../../../../server/queries";
+import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
 import { collabWsUrl } from "../../../../server/collab";
@@ -61,6 +61,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const flipKey = flipFresh ? m.id : null;
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
+  // If I went on and the next round has no partner for my text, it stands over there.
+  let next: "standsOver" | "standsOverFinal" | null = null;
+  if (me && m.state === "resolved" && m.advancingBearerId === me.id) {
+    const withMerge = new Set((await mergesFor(tournament.id)).map((x) => x.slotId));
+    const nextSlot = (await slotsFor(tournament.id)).find(
+      (s) => s.roundNo === slot.roundNo + 1 && !withMerge.has(s.id) && s.outState === "filled" && s.outBearerId === me.id
+    );
+    if (nextSlot) next = nextSlot.roundNo === ctx.allRounds.length ? "standsOverFinal" : "standsOver";
+  }
 
   // Chats: the merge's own room, and each input's room (a draft's chat, or
   // the chat of the merge that produced it — discussion travels with texts).
@@ -96,7 +105,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         <h1 className="text-xl font-bold">
           Round {slot.roundNo}
           {isFinal ? " (final)" : ""}
-          {m.isAdHoc ? " (ad-hoc)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
+          {m.isAdHoc ? " (extra pairing)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
         </h1>
         {ctx.running && round.state === "open" && (
           <Countdown
@@ -129,7 +138,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                   </>
                 )}
                 {me && mySide && (
-                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal, tournament.phase === "complete")}</span>
+                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal, tournament.phase === "complete", next)}</span>
                 )}
               </span>
             );

@@ -167,6 +167,9 @@ export async function BracketView({
                                 {title(slot.outTextId)}
                               </Link>
                             </>
+                          ) : slot.outState === "empty" ? (
+                            // Used up: its text went into an extra pairing instead.
+                            "—"
                           ) : (
                             "bye"
                           )
@@ -201,7 +204,7 @@ export async function BracketView({
                     >
                       <p className="font-medium">
                         {nameOf.get(m.bearerAId ?? "") ?? "?"} + {nameOf.get(m.bearerBId ?? "") ?? "?"}
-                        {m.isAdHoc && <span className="ml-1 text-xs text-muted">(ad-hoc)</span>}
+                        {m.isAdHoc && <span className="ml-1 text-xs text-muted">(extra pairing)</span>}
                         {here && <span className="ml-1 text-xs text-live-ink">you are here</span>}
                         {upNext && <span className="ml-1 text-xs text-live-ink">you, up next</span>}
                       </p>
