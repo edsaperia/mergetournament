@@ -198,7 +198,14 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           <aside className="min-w-0">{await chatFor(roomA, "This text's chat")}</aside>
         </section>
         <section className="grid gap-4">
-          <div className="min-w-0 rounded-lg border-2 border-line p-4">
+          <div
+            className={`min-w-0 rounded-lg border-2 border-line p-4 ${
+              // From lg up, while it is being written, the pane fits the screen with room for the
+              // merge chat's header below: a long text scrolls inside the editor, and the picks
+              // and Propose lock-in under it stay in view.
+              m.state === "open" ? "lg:flex lg:max-h-[calc(100dvh-15rem)] lg:flex-col" : ""
+            }`}
+          >
             <h2 className="mb-2 font-semibold">
               Merge candidate
               {advanced === "merged" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
@@ -217,8 +224,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 <p className="text-faint">(blank)</p>
               )
             ) : (
-              // Capped from lg up, like the input beside it, so both stay in view.
-              <div className="lg:[--editor-max-height:var(--pane-max-height)]">
+              // From lg up the editor takes what the pane has left after the controls.
+              <div className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:[--editor-min-height:10rem]">
                 <CollabEditor
                   wsUrl={collabWsUrl()}
                   docName={docName(m.id)}
