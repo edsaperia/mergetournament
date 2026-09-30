@@ -75,3 +75,38 @@ export function resolutionSentence(m: ResolvedMergeView, nameOf: (id: string | n
       return "Resolved.";
   }
 }
+
+/**
+ * The "what now" line for one bearer of a resolved merge: whether they carry
+ * on, and if not, why (their partner carries, they were away, or the merge
+ * was abandoned) and what they can still do.
+ */
+export function whatNow(
+  m: ResolvedMergeView,
+  meId: string,
+  nameOf: (id: string | null) => string,
+  roundNo: number,
+  finalRound: boolean
+): string {
+  const done = "You're done merging; watch the other merges or join the chat.";
+  if (m.resolution === "abandoned" || !m.resultTextId) {
+    return `Neither of you took part, so neither text goes on. ${done}`;
+  }
+  const carrier = nameOf(m.advancingBearerId);
+  if (finalRound) {
+    // Away in the final: say what their partner's text became.
+    if (m.resolution === "active_advance" && m.advancingBearerId !== meId) {
+      const what = advancedFrom(m) === "merged" ? "the merged text they accepted" : "their own input";
+      return `While you were away, only ${carrier} took part, so ${what} became the final text. Read it or join the chat.`;
+    }
+    return "That was the final, so you're done merging. Read the final text or join the chat.";
+  }
+  if (m.advancingBearerId === meId) {
+    return `You carry this into round ${roundNo + 1}. In the break, read the texts and find your next partner.`;
+  }
+  if (m.resolution === "active_advance") {
+    const what = advancedFrom(m) === "merged" ? "the merged text they accepted" : "their own input";
+    return `While you were away, only ${carrier} took part, so ${what} goes on with ${carrier}. ${done}`;
+  }
+  return `${carrier} carries this forward. ${done}`;
+}

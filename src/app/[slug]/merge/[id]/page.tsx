@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
-import { advancedFrom, resolutionSentence } from "../../../../lib/resolution";
+import { advancedFrom, resolutionSentence, whatNow } from "../../../../lib/resolution";
 import { warnThresholds } from "../../../../lib/schedule";
 import { nameMapFor, scheduleContext } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
@@ -125,6 +125,9 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                       {isFinal ? "read the final text" : "read the advancing text"}
                     </Link>
                   </>
+                )}
+                {me && mySide && (
+                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal)}</span>
                 )}
               </span>
             );

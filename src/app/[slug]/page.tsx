@@ -10,6 +10,7 @@ import { ConveningPanel } from "./convening-panel";
 import { GlobalChat } from "./global-chat";
 import { IntroSection } from "./intro-section";
 import { MyDraft } from "./my-draft";
+import { WhatNow } from "./what-now";
 
 const PHASE_LABEL: Record<string, string> = {
   setup: "Being set up",
@@ -70,6 +71,9 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
       <IntroSection tournament={tournament} viewerRole={me?.role ?? null} />
       {tournament.phase === "convening" && (
         <ConveningPanel slug={slug} tournamentId={tournament.id} me={me} />
+      )}
+      {me && me.role === "participant" && (tournament.phase === "running" || tournament.phase === "complete") && (
+        <WhatNow tournamentId={tournament.id} slug={slug} meId={me.id} />
       )}
       {tournament.phase === "running" && (
         <BreakPanel slug={slug} tournament={tournament} participantId={me?.id ?? null} />
