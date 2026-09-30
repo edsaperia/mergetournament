@@ -10,7 +10,9 @@ import { withParticipant, type ActionState } from "./shared";
 
 /** Autosave a participant's draft (no explicit submit — the deadline snapshots whatever is here). */
 export async function saveDraftAction(slug: string, body: string): Promise<ActionState> {
-  return withParticipant(slug, { revalidate: [`/${slug}/submit`] }, async (db, me) => {
+  // No SSE nudge: pages are live during submission, and every autosave
+  // would otherwise refresh every open tab.
+  return withParticipant(slug, { revalidate: [`/${slug}/submit`], notify: false }, async (db, me) => {
     const draft = await saveDraft(db, me.id, body);
     return { message: `Saved · ${draft.wordCount} words` };
   });

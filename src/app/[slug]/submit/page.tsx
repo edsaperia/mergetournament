@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { textVersions } from "../../../db/schema";
 import { currentParticipant, tournamentBySlug } from "../../../server/session";
+import { AutoRefresh } from "../../live";
 import { LocalTime } from "../../local-time";
 import { DraftEditor } from "./draft-editor";
 
@@ -41,8 +42,14 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
     .from(textVersions)
     .where(and(eq(textVersions.authorId, me.id), eq(textVersions.kind, "draft")));
 
+  const open =
+    tournament.phase === "submission" &&
+    !(tournament.submissionDeadline && new Date() > tournament.submissionDeadline);
+
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-8 sm:px-6">
+      {/* Closing submissions or starting the tournament reaches this tab without a reload. */}
+      {tournament.phase === "submission" && <AutoRefresh slug={slug} />}
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="text-xl font-bold">
           <Link className="hover:underline" href={`/${slug}`}>{tournament.name}</Link>
@@ -54,7 +61,7 @@ export default async function SubmitPage(props: PageProps<"/[slug]/submit">) {
           </span>
         )}
       </div>
-      {tournament.phase === "submission" ? (
+      {open ? (
         <DraftEditor slug={slug} initialBody={draft?.bodyMd ?? tournament.defaultSubmission} />
       ) : (
         <p className="text-soft">Submissions are closed.</p>

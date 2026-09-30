@@ -42,12 +42,20 @@ export default async function TournamentPage(props: PageProps<"/[slug]">) {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
-      {live && <AutoRefresh slug={slug} />}
+      {/* Before the start too: the admin closing submissions or starting the
+          tournament must reach tabs opened during submission. */}
+      {(live || preStart) && <AutoRefresh slug={slug} />}
       {tournament.phase === "submission" && tournament.submissionDeadline && (
         <RefreshAt iso={tournament.submissionDeadline.toISOString()} />
       )}
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-soft">{PHASE_LABEL[tournament.phase] ?? tournament.phase}</p>
+        <p className="text-soft">
+          {tournament.phase === "submission" &&
+          tournament.submissionDeadline &&
+          new Date() > tournament.submissionDeadline
+            ? "Submissions closed"
+            : (PHASE_LABEL[tournament.phase] ?? tournament.phase)}
+        </p>
         <nav className="flex items-center gap-3 text-sm">
           {me && live && <BellWithState tournament={tournament} participantId={me.id} />}
           {me && (
