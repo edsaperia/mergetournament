@@ -45,17 +45,26 @@ function Row({
   slim?: boolean;
   children?: React.ReactNode;
 }) {
+  // A table from sm up; on a phone each row stacks (stage, then time, then
+  // actions) so nothing is clipped at 360 px.
   return (
-    <tr className={mark === "current" ? "bg-wash" : mark === "done" ? "text-muted" : ""}>
-      <td className="w-52 py-2.5 pr-3 align-top font-medium">
+    <tr
+      className={`flex flex-col gap-1 py-2.5 sm:table-row sm:py-0 ${
+        mark === "current" ? "bg-wash" : mark === "done" ? "text-muted" : ""
+      }`}
+    >
+      <td className="pr-3 align-top font-medium sm:w-52 sm:py-2.5">
         <span className={`mr-1.5 inline-block w-4 ${mark === "current" ? "text-live-ink" : "text-muted"}`}>
           {mark === "done" ? "✓" : mark === "current" ? "▶" : ""}
         </span>
         {stage}
         {slim && children && <div className="ml-5.5 mt-0.5 font-normal">{children}</div>}
       </td>
-      <td className="w-56 py-2.5 pr-3 align-top text-muted">{time}</td>
-      {!slim && <td className="py-2.5 align-top">{children}</td>}
+      {/* On a phone an unknown time ("—") is noise: shown only in the table. */}
+      <td className={`pl-5.5 pr-3 align-top text-muted sm:w-56 sm:py-2.5 sm:pl-0 ${time === "—" ? "hidden sm:table-cell" : ""}`}>
+        {time}
+      </td>
+      {!slim && <td className="min-w-0 pl-5.5 align-top sm:py-2.5 sm:pl-0">{children}</td>}
     </tr>
   );
 }
@@ -237,16 +246,16 @@ export function Timeline({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
+    <div className="sm:overflow-x-auto">
+      <table className="block w-full border-collapse text-sm sm:table">
+        <thead className="hidden sm:table-header-group">
           <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-muted">
             <th className="py-2 pr-3 font-medium">Stage</th>
             <th className="py-2 pr-3 font-medium">Time</th>
             {!readOnly && <th className="py-2 font-medium">Actions</th>}
           </tr>
         </thead>
-        <tbody className="divide-y divide-edge-faint">
+        <tbody className="block divide-y divide-edge-faint sm:table-row-group">
           {!readOnly && (
             <>
               <Row mark={mark("intro", introDone)} stage="Write the intro" time="—">
@@ -325,8 +334,8 @@ export function Timeline({
           </Row>
           {roundRows}
           {prePublish && (
-            <tr>
-              <td colSpan={readOnly ? 2 : 3} className="py-2.5 pl-6 text-sm italic text-muted">
+            <tr className="block sm:table-row">
+              <td colSpan={readOnly ? 2 : 3} className="block py-2.5 pl-6 text-sm italic text-muted sm:table-cell">
                 more rounds will be added as the roster grows
               </td>
             </tr>
