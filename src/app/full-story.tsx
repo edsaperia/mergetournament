@@ -31,7 +31,7 @@ export function FullStory() {
         one last minute to accept or reject the text as it stands; if they still don&apos;t both
         accept, a coin flip selects one of the two input texts to advance intact. A bearer who
         takes no part at all forfeits the say: if only one of the two took part, their choice
-        alone decides what advances, and if neither did, the pairing is abandoned.
+        alone decides what goes into the next round, and if neither did, the pairing is abandoned.
       </P>
       <P>
         Rounds halve the field until one text remains. Twenty drafts become one in five rounds;
