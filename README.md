@@ -2,7 +2,7 @@
 
 **A fair method for combining many draft documents into one by knockout tournament of pairwise negotiations.**
 
-A merge tournament takes a set of draft documents — position papers, proposed constitutions, competing specifications — and produces a single canonical text. Drafts are seeded into a knockout bracket at random. In each round, pairs of texts meet: their two bearers negotiate a merged text in a shared editor, against a fixed deadline. Both must consent to the result. If the clock expires first, a coin flip selects one of the two input texts to advance intact. Rounds halve the field until one text remains — with full provenance back to every original draft.
+A merge tournament takes a set of draft documents — position papers, proposed constitutions, competing specifications — and produces a single canonical text. Drafts are seeded into a knockout bracket at random. In each round, pairs of texts meet: their two bearers negotiate a merged text in a shared editor, against a fixed deadline. Both must consent to the result. If the clock runs out first, the pair gets a 60-second decision-window to accept or reject the frozen text; without two accepts, a coin flip selects one of the two input texts to advance intact (if only one bearer took part, their choice advances instead). Rounds halve the field until one text remains — with full provenance back to every original draft.
 
 Built for constitutional conventions — but the structure is general: standards bodies reconciling competing proposals, activist groups synthesising position papers, communities drafting charters or codes of conduct.
 
@@ -12,7 +12,7 @@ The full specification lives in [`docs/SPEC.md`](docs/SPEC.md); the theory and p
 
 - **Submission**: magic-link auth (no accounts), one draft per participant with live word count, admin dashboard with roster management and expected-length readout.
 - **Publication**: bracket construction for any n ≥ 2 with byes, uniformly random seeding (seed recorded), schedule generation, invitation emails.
-- **The tournament runs itself**: rounds open and close on the clock (or early on unanimous lock-in); a 60-second are-you-still-here window at expiry; backstop coin flips; byes, walkovers, and ad-hoc idle-matching; pause/resume as the admin's only live controls besides Begin.
+- **The tournament runs itself**: rounds open and close on the clock (or early on unanimous lock-in); a 60-second decision-window after the round-countdown, where unfinished pairs accept or reject their frozen merge; coin flips between the inputs when both bearers took part without agreeing; byes, walkovers, and ad-hoc idle-matching; pause/resume as the admin's only live controls besides Begin.
 - **Real-time negotiation**: Yjs over Hocuspocus with server-enforced write gates — bearers hold the pen, everyone else watches live; late updates against a frozen merge are rejected server-side.
 - **Chat and comments**: a global room, a room per draft and per merge (discussion travels with texts through the bracket), system events narrating the tournament, line-anchored inline comments on every read-only text.
 - **Live everywhere**: SSE pushes bracket, clock, chat, and flip changes to every screen; coin flips play as a six-second performed reveal.
@@ -34,10 +34,10 @@ persists under `.data/`; the seed scripts must run while the dev server is
 stopped (single-process database).
 
 ```bash
-npm test                       # 138 tests: property-based bracket/schedule/engine,
+npm test                       # 167 tests: property-based bracket/schedule/engine,
                                # PGlite-backed services, real-WebSocket collab gates
 npm run test:e2e               # browser tests (Playwright): magic-link sign-in,
-                               # live co-typing, the decision-modal
+                               # live co-typing, the decision-modal, live phase changes
 ```
 
 The browser tests build and start the app themselves (ports 3100/3101) on a
@@ -45,7 +45,15 @@ Postgres database they wipe first — `mergetournament_e2e` on
 `localhost:5432` (user/password `postgres`), or set `E2E_DATABASE_URL`; the
 name must end in `_e2e`. For example:
 `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`, then
-`npx playwright install chromium` once.
+`npx playwright install chromium` once. Where `playwright install` isn't
+possible (no network, or a pinned browser already on the machine), point
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` at that Chromium; `playwright.config.ts`
+passes it as `launchOptions.executablePath`:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
+E2E_DATABASE_URL=postgres://postgres@localhost:5433/mergetournament_e2e npm run test:e2e
+```
 
 ## Stack
 

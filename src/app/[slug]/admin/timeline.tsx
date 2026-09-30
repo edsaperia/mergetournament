@@ -95,7 +95,8 @@ export function Timeline({
   const deadlinePassed = Boolean(t.submissionDeadline && t.submissionDeadline.getTime() <= now);
   const closed = !prePublish || deadlinePassed;
   const introDone = t.intro.trim() !== "";
-  const templateDone = t.defaultSubmission.trim() !== "" || !prePublish;
+  // Ticked only when there is a template: an optional step left alone isn't "done".
+  const templateDone = t.defaultSubmission.trim() !== "";
   const inviteDone = invited >= 2;
 
   const roundCount = prePublish ? numRounds(Math.max(submitted, 2)) : allRounds.length;
@@ -265,8 +266,14 @@ export function Timeline({
                 </span>
               </Row>
               <Row mark={templateDone ? "done" : "future"} stage="Create template" time="—">
-                <a className="underline" href="#template">Edit template →</a>
-                <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
+                {prePublish ? (
+                  <>
+                    <a className="underline" href="#template">Edit template →</a>
+                    <span className="ml-2 text-xs text-muted">optional — the text every draft starts from</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted">{templateDone ? "drafts started from it" : "not used"}</span>
+                )}
               </Row>
               <Row mark={mark("invite", inviteDone)} stage="Invite participants" time="—">
                 <a className="underline" href="#roster">Edit the roster →</a>
@@ -353,7 +360,7 @@ export function Timeline({
             }
           >
             <span className="text-sm">
-              the canonical text will live at{" "}
+              {t.phase === "complete" ? "the canonical text lives at" : "the canonical text will live at"}{" "}
               <a className="underline" href={`/${slug}/text`}>
                 {host}/{slug}/text
               </a>

@@ -164,10 +164,11 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         // Once resolved, open on what advanced: after a coin flip that is an
         // input, and the merge candidate is the text that lost.
         defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 1 : 2}
+        // Short on a phone, so the three tabs share one row at 360 px.
         labels={[
-          `Input A · ${bearerName(m.bearerAId)}${advanced === "A" ? " ✓" : ""}`,
-          `Input B · ${bearerName(m.bearerBId)}${advanced === "B" ? " ✓" : ""}`,
-          candidateLost ? "Merge candidate ✗" : "Merge candidate",
+          <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} />,
+          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} />,
+          <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} />,
         ]}
       >
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -258,5 +259,15 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </section>
       </Tabs>
     </main>
+  );
+}
+
+function TabLabel({ short, long, mark }: { short: string; long: string; mark: string }) {
+  return (
+    <>
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{long}</span>
+      {mark}
+    </>
   );
 }

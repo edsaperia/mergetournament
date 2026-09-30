@@ -61,6 +61,19 @@ export function fmtEventLocal(date: Date, tzOffsetMin: number): string {
   return `${day}, ${hh}:${mm}`;
 }
 
+/** An exact length in words, for email: "2 minutes 30 seconds", "30 seconds", "1 hour". */
+export function durationWords(totalS: number): string {
+  const s = Math.max(0, Math.round(totalS));
+  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const parts = [
+    [Math.floor(s / 3600), "hour"],
+    [Math.floor((s % 3600) / 60), "minute"],
+    [s % 60, "second"],
+  ] as const;
+  const shown = parts.filter(([n]) => n > 0).map(([n, w]) => unit(n, w));
+  return shown.length > 0 ? shown.join(" ") : "0 seconds";
+}
+
 /**
  * One human sentence (or two) of logistics, derived from whatever the admin
  * has scheduled so far. Times are event-local (see fmtEventLocal) — an email
@@ -82,8 +95,9 @@ export function scheduleLine(t: {
     parts.push("Timing is still being decided — the tournament page always shows the latest schedule.");
   }
   parts.push(
-    `Rounds are ${Math.round(t.roundDurationS / 60)} minutes with ${Math.round(t.breakDurationS / 60)}-minute breaks; ` +
-      `how many rounds depends on how many drafts come in.`
+    `Rounds last ${durationWords(t.roundDurationS)}, and the breaks between them ${durationWords(t.breakDurationS)}; ` +
+      `a pair still deciding when a round's time is up gets 1 more minute. ` +
+      `How many rounds depends on how many drafts come in.`
   );
   return parts.join(" ");
 }
@@ -116,7 +130,9 @@ export function inviteEmail(opts: {
     `Your personal link (keep it private — it signs you in):`,
     opts.magicLink,
     ``,
-    `Use it to read the details and write your draft.`
+    opts.adminName
+      ? `Use it to read the details and write your draft.`
+      : `Use it to open the admin dashboard, invite participants and run the tournament.`
   );
   if (opts.baseUrl) {
     lines.push(

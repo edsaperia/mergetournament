@@ -23,7 +23,19 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Where `playwright install` isn't possible, point this at a Chromium
+        // already on the machine (e.g. /opt/pw-browsers/chromium-1194/chrome-linux/chrome).
+        launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+          ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+          : {},
+      },
+    },
+  ],
   webServer: {
     command: `tsx e2e/reset-db.ts && next build && next start -p ${PORT}`,
     // 200 only once the database answers, the scheduler ticks and the collab server is up.

@@ -163,7 +163,7 @@ export default async function TextPage(props: PageProps<"/[slug]/text/[id]">) {
           )}
           {Boolean(me) && !(text.kind === "draft" && tournament.phase === "submission") && (
             <p className="mt-2 text-xs text-muted">
-              Hover a line and click 💬 to comment on it.
+              Tap or click 💬 beside a line to comment on it.
             </p>
           )}
         </aside>

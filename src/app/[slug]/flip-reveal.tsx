@@ -48,7 +48,7 @@ export function FlipReveal({
         if (cancelled) return;
         const elapsed = Date.now() - started;
         if (elapsed >= TOTAL) {
-          // Stays revealed until the viewer clicks outside the modal.
+          // Stays revealed until the viewer taps or clicks outside the modal.
           setPhase("revealed");
           return;
         }
@@ -83,9 +83,18 @@ export function FlipReveal({
         ) : (
           <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
         )}
-        <p className="text-xs text-faint">
-          {phase === "animating" ? "the coin is in the air…" : "decided — click outside to dismiss"}
-        </p>
+        {phase === "animating" ? (
+          <p className="text-xs text-faint">the coin is in the air…</p>
+        ) : (
+          // A button as well as tapping outside: on a phone the card fills nearly the whole screen.
+          <button
+            type="button"
+            onClick={() => setPhase("done")}
+            className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-wash"
+          >
+            Close
+          </button>
+        )}
       </Modal>
       {/* The result behind the overlay would spoil the flip: withheld until the coin lands. */}
       {phase === "animating" ? <span className="text-muted">coin flip…</span> : children}
