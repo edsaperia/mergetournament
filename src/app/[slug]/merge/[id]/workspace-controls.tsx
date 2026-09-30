@@ -19,6 +19,8 @@ export function WorkspaceControls({
   proposedBy,
   myPref,
   partnerPref,
+  iAmActive,
+  partnerActive,
   finalRound,
 }: {
   slug: string;
@@ -29,6 +31,9 @@ export function WorkspaceControls({
   proposedBy: "A" | "B" | null;
   myPref: "A" | "B" | null;
   partnerPref: "A" | "B" | null;
+  /** Whether each player has taken part yet this round: with one silent, the picks don't decide. */
+  iAmActive: boolean;
+  partnerActive: boolean;
   finalRound: boolean;
 }) {
   const [state, dispatch, pending] = useActionState(
@@ -55,7 +60,7 @@ export function WorkspaceControls({
     <form action={dispatch} className="mt-3 flex flex-col gap-3">
       {finalRound && (
         <p className="text-sm text-muted">
-          This is the final round: the text you lock in becomes the canonical text.
+          This is the final round: the text you lock in becomes the final text.
         </p>
       )}
       {/* Bearer choice first: settle it before lock-in, since picks that
@@ -79,7 +84,11 @@ export function WorkspaceControls({
             ))}
           </div>
           <p className="mt-2 text-xs text-muted">
-            {carrierLine(mySide, names, mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref })}
+            {carrierLine(mySide, names, mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref }, {
+              iAmActive,
+              partnerActive,
+              window: false,
+            })}
           </p>
         </fieldset>
       )}

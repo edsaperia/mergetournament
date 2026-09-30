@@ -41,3 +41,62 @@ test("at phone width one pane shows at a time", async ({ browser }) => {
   await expect(page.getByRole("heading", { name: `Input A · ${a.name}` })).toBeVisible();
   await expect(page.locator(".cm-content")).toBeHidden();
 });
+
+test("on desktop a long merge text scrolls inside the editor: the picks, Propose lock-in and the merge chat stay in reach, and on a short screen the editor keeps 10rem and the page scrolls", async ({
+  browser,
+}) => {
+  // Four drafts, so round 1 isn't the final and the picks show.
+  const { merge } = await setUpTournament({ names: ["Ada", "Brook", "Cyd", "Dee"], roundDurationS: 600 });
+  const { a, url } = merge!;
+  const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+  await page.goto(a.link);
+  await openWorkspace(page, url);
+
+  const propose = page.getByRole("button", { name: "Propose lock-in" });
+  const picks = page.getByRole("group", { name: "Who goes into the next round?" });
+  const chat = page.getByRole("button", { name: /^This merge's chat/ });
+  // Short text: everything on screen, the merge chat included.
+  for (const el of [propose, picks, chat]) await expect(el).toBeInViewport({ ratio: 1 });
+
+  // 80 long lines, as in the playtest: the text scrolls inside the editor instead.
+  await page.locator(".cm-content").click();
+  await page.keyboard.insertText(
+    Array.from({ length: 80 }, (_, i) => `${i + 1}. Clause ${i + 1}: the harbour council shall publish minutes within seven days.`).join("\n")
+  );
+  await expect(page.getByText(/^\d{3,} words$/)).toBeVisible();
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(propose).toBeInViewport({ ratio: 1 });
+    await expect(picks).toBeInViewport({ ratio: 1 });
+    // The chat's header, at least, so its messages are a click or a short scroll away.
+    await expect(chat).toBeInViewport({ ratio: 1 });
+    // The editor is still a usable size.
+    const editor = (await page.locator(".cm-editor").boundingBox())!;
+    expect(editor.height).toBeGreaterThanOrEqual(160);
+  }
+
+  // Too short a screen for all that: the editor keeps its 10rem floor and the page scrolls
+  // instead. Measured on the editor's host, which clips it: what the player can see.
+  // On a phone, one pane at a time and the editor at its full height.
+  const host = page.locator(".cm-editor").locator("..");
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 1024, height: 768 },
+    { width: 1280, height: 600 },
+    { width: 1024, height: 500 },
+    { width: 360, height: 640 },
+  ]) {
+    await page.setViewportSize(size);
+    const box = (await host.boundingBox())!;
+    expect(box.height, `editor host at ${size.width}×${size.height}`).toBeGreaterThanOrEqual(160);
+    // Nothing overlaps it: Propose lock-in sits below, a scroll away at most.
+    const proposeBox = (await propose.boundingBox())!;
+    expect(proposeBox.y).toBeGreaterThanOrEqual(box.y + box.height);
+    await propose.scrollIntoViewIfNeeded();
+    await expect(propose).toBeInViewport({ ratio: 1 });
+  }
+});

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { and, asc, eq } from "drizzle-orm";
 import { createTestDb, TestDb } from "../db/test-db";
-import { auditLog, merges, rounds, slots, textVersions, tournaments } from "../db/schema";
+import { auditLog, chatRooms, merges, messages, participants, rounds, slots, textVersions, tournaments } from "../db/schema";
 import type { Email, Emailer } from "../lib/email";
 import {
   beginTournament,
@@ -38,6 +38,21 @@ async function setup(slug: string, n: number, emailer: Emailer) {
     baseUrl: BASE,
   });
   return { t, people };
+}
+
+/** The system lines posted in a tournament's global chat, oldest first. */
+async function globalSystemLines(tournamentId: string): Promise<string[]> {
+  const [room] = await db
+    .select()
+    .from(chatRooms)
+    .where(and(eq(chatRooms.tournamentId, tournamentId), eq(chatRooms.kind, "global")));
+  const rows = await db.select().from(messages).where(eq(messages.roomId, room.id)).orderBy(asc(messages.seq));
+  return rows.filter((m) => m.kind === "system").map((m) => m.body);
+}
+
+async function nameOfParticipant(id: string | null): Promise<string> {
+  const [p] = await db.select().from(participants).where(eq(participants.id, id ?? ""));
+  return p.name;
 }
 
 async function mergesOfRound(tournamentId: string, roundNo: number) {
@@ -142,6 +157,9 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
     expect(r2).toHaveLength(1);
     expect(r2[0].merge.isAdHoc).toBe(true);
     expect(r2[0].merge.state).toBe("pending");
+    // The chat names the two players, in plain words.
+    const [pa, pb] = [await nameOfParticipant(r2[0].merge.bearerAId), await nameOfParticipant(r2[0].merge.bearerBId)];
+    expect(await globalSystemLines(t.id)).toContain(`${pa} and ${pb} have no partner in round 2, so they merge with each other.`);
 
     // Break passes; round 2 opens at close (660) + break (300) = 960.
     await tick(db, emailer, BASE, t.id, at(959));
@@ -177,6 +195,10 @@ describe("full tournament: 5 drafts, agreement, abandonment, ad-hoc idle-matchin
     expect(finalSlot.outState).toBe("filled");
     const [canonical] = await db.select().from(textVersions).where(eq(textVersions.id, finalSlot.outTextId!));
     expect(canonical.bodyMd).toBe("The final canonical text.");
+    // The final had no partner for it: the chat says so.
+    const standsOver = `${await nameOfParticipant(finalSlot.outBearerId)}'s text has no partner in the final, so it becomes the final text.`;
+    expect(await globalSystemLines(t.id)).toContain(standsOver);
+    expect((await globalSystemLines(t.id)).join("\n")).not.toMatch(/idle|ad-hoc/);
 
     expect(emailer.sent).toHaveLength(6);
     expect(emailer.sent[0].text).toContain("The final canonical text.");
@@ -447,6 +469,28 @@ describe("pause and the no-canonical-text ending", () => {
     const [finalSlot] = await db.select().from(slots).where(eq(slots.tournamentId, t.id));
     expect(finalSlot.outState).toBe("empty");
     const last = emailer.sent.at(-1)!;
-    expect(last.text).toContain("no canonical text");
+    expect(last.text).toContain("no final text");
+  });
+});
+
+describe("a lone player's Reject", () => {
+  it("is named in the merge chat's result line", async () => {
+    const emailer = new CaptureEmailer();
+    const { t } = await makeTournament(db, { slug: "lone-reject", names: ["Cleo", "Ben"], beginAt: T0, emailer });
+    const [m] = await mergesOfRound(t.id, 1).then((rows) => rows.map((r) => r.merge));
+    const cleo = (await nameOfParticipant(m.bearerAId)) === "Cleo" ? m.bearerAId! : m.bearerBId!;
+    await mergeAction(db, m.id, cleo, { type: "edit", text: "Cleo's attempt." }, at(60));
+    await tick(db, emailer, BASE, t.id, at(600));
+    await mergeAction(db, m.id, cleo, { type: "reject" }, at(610));
+    await tick(db, emailer, BASE, t.id, at(660));
+    const [row] = await db.select().from(merges).where(eq(merges.id, m.id));
+    expect(row.resolution).toBe("active_advance");
+    const [room] = await db
+      .select()
+      .from(chatRooms)
+      .where(and(eq(chatRooms.kind, "merge"), eq(chatRooms.subjectId, m.id)));
+    const lines = (await db.select().from(messages).where(eq(messages.roomId, room.id))).map((x) => x.body);
+    // Two players, so this is the final.
+    expect(lines).toContain("Cleo rejected the merge, so Cleo's input becomes the final text unchanged.");
   });
 });

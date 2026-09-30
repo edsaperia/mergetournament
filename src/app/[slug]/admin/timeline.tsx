@@ -375,7 +375,7 @@ export function Timeline({
             }
           >
             <span className="text-sm">
-              {t.phase === "complete" ? "the canonical text lives at" : "the canonical text will live at"}{" "}
+              {t.phase === "complete" ? "the final text lives at" : "the final text will live at"}{" "}
               <a className="underline" href={`/${slug}/text`}>
                 {host}/{slug}/text
               </a>

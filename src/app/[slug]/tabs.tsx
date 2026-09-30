@@ -21,6 +21,8 @@ const UNSELECTED = "text-muted hover:bg-wash hover:text-foreground";
  * it is a plain one-panel tab strip. Panels are never duplicated — the same
  * element is only shown or hidden — so nothing inside mounts twice.
  *
+ * Changing `defaultIndex` later moves to that tab without remounting.
+ *
  * Pass `fill` to stretch the tabs across the strip in equal widths, when
  * there is room (a tab never shrinks below its label; they wrap as before).
  */
@@ -45,6 +47,15 @@ export function Tabs({
     const start = Math.min(defaultIndex, labels.length - 1);
     return start !== pinned ? start : labels.findIndex((_, i) => i !== pinned);
   });
+  // A new defaultIndex (a coin flip landing) moves to that tab in place:
+  // nothing remounts, so chat drafts and the like survive.
+  const [openedOn, setOpenedOn] = useState(defaultIndex);
+  if (defaultIndex !== openedOn) {
+    setOpenedOn(defaultIndex);
+    const i = Math.min(defaultIndex, labels.length - 1);
+    setActive(i);
+    if (pinned !== undefined && i !== pinned) setCompanion(i);
+  }
 
   useEffect(() => {
     if (!ids) return;

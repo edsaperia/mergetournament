@@ -4,8 +4,9 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { merges, slots, textVersions } from "../../../../db/schema";
 import { advancedFrom, resolutionSentence, whatNow } from "../../../../lib/resolution";
+import { isFreshFlip } from "../../../../lib/flip";
 import { warnThresholds } from "../../../../lib/schedule";
-import { nameMapFor, scheduleContext } from "../../../../server/queries";
+import { mergesFor, nameMapFor, scheduleContext, slotsFor } from "../../../../server/queries";
 import { signCollabToken } from "../../../../lib/collab-token";
 import { docName } from "../../../../server/collab-core";
 import { collabWsUrl } from "../../../../server/collab";
@@ -14,9 +15,8 @@ import { messagesFor, roomForMerge, roomForText } from "../../../../services/cha
 import { currentParticipant, tournamentBySlug } from "../../../../server/session";
 import { AutoRefresh, Countdown } from "../../../live";
 import { ChatPanel } from "../../chat-panel";
-import { FlipReveal, HiddenWhileFlipping } from "../../flip-reveal";
+import { FlipAwareTabs, FlipReveal, HiddenWhileFlipping, ShownOnceLanded } from "../../flip-reveal";
 import { NumberedText } from "../../../numbered-text";
-import { Tabs } from "../../tabs";
 import { CollabEditor } from "./collab-editor";
 import { DecisionModal } from "./decision-modal";
 import { WorkspaceControls } from "./workspace-controls";
@@ -55,16 +55,21 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
   const advanced = m.state === "resolved" ? advancedFrom(m) : null;
   // The candidate didn't advance: an input did instead, or nothing did.
   const candidateLost = m.state === "resolved" && advanced !== "merged";
-  const advancesTag = (
-    <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
-      {isFinal ? "the final text" : "goes into the next round"}
-    </span>
-  );
   // Only animate flips that just happened; cold visitors see history.
-  const flipAgeMs = m.resolvedAt ? new Date().getTime() - m.resolvedAt.getTime() : Infinity;
-  const flipFresh = m.state === "resolved" && m.flipSeed !== null && flipAgeMs < 120_000;
+  const flipFresh = isFreshFlip(m, new Date().getTime());
+  // While that coin is in the air, nothing may name its result: marks, tags and the opening tab wait for it.
+  const flipKey = flipFresh ? m.id : null;
   const lock = m.state === "open" ? (m.proposedBy ? "proposed" : "editing") : "locked";
   const bearerName = (sideId: string | null) => nameOf.get(sideId ?? "") ?? "?";
+  // If I went on and the next round has no partner for my text, it stands over there.
+  let next: "standsOver" | "standsOverFinal" | null = null;
+  if (me && m.state === "resolved" && m.advancingBearerId === me.id) {
+    const withMerge = new Set((await mergesFor(tournament.id)).map((x) => x.slotId));
+    const nextSlot = (await slotsFor(tournament.id)).find(
+      (s) => s.roundNo === slot.roundNo + 1 && !withMerge.has(s.id) && s.outState === "filled" && s.outBearerId === me.id
+    );
+    if (nextSlot) next = nextSlot.roundNo === ctx.allRounds.length ? "standsOverFinal" : "standsOver";
+  }
 
   // Chats: the merge's own room, and each input's room (a draft's chat, or
   // the chat of the merge that produced it — discussion travels with texts).
@@ -100,15 +105,22 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         <h1 className="text-xl font-bold">
           Round {slot.roundNo}
           {isFinal ? " (final)" : ""}
-          {m.isAdHoc ? " (ad-hoc)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
+          {m.isAdHoc ? " (extra pairing)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
         </h1>
-        {ctx.running && round.state === "open" && (
+        {ctx.running && round.state === "open" && m.state === "open" && (
           <Countdown
             remainingS={ctx.remainingFor(slot.roundNo)}
             paused={paused}
             className="text-lg"
             {...warnThresholds(tournament.roundDurationS)}
           />
+        )}
+        {/* Decided: the clock no longer applies to this merge, only to the round around it. Greyed, never urgent. */}
+        {ctx.running && round.state === "open" && m.state !== "open" && (
+          <span className="text-sm text-faint">
+            decided · round {slot.roundNo} closes within{" "}
+            <Countdown remainingS={ctx.remainingFor(slot.roundNo)} paused={paused} />
+          </span>
         )}
         {/* This merge's window only: once it resolves, the resolved banner says what happened. */}
         {ctx.running && round.state === "closing" && m.state === "open" && (
@@ -133,7 +145,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                   </>
                 )}
                 {me && mySide && (
-                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal, tournament.phase === "complete")}</span>
+                  <span className="mt-1 block font-medium">{whatNow(m, me.id, bearerName, slot.roundNo, isFinal, tournament.phase === "complete", next)}</span>
                 )}
               </span>
             );
@@ -162,20 +174,23 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
         </div>
       )}
 
-      <Tabs
+      <FlipAwareTabs
         // Remount on resolution, so a tab open during the flip also moves to what advanced.
         key={advanced ?? "open"}
         // Once resolved, open on what advanced: after a coin flip that is an
-        // input, and the merge candidate is the text that lost.
+        // input, and the merge candidate is the text that lost. While the
+        // coin is in the air, on the merge candidate, which gives nothing away.
+        flipKey={flipKey}
+        whileFlipping={1}
         defaultIndex={advanced === "A" ? 0 : advanced === "B" ? 2 : 1}
         // From lg up the merge sits beside an input: A | Merge or Merge | B.
         pinned={1}
         fill
         // Short on a phone, so the three tabs share one row at 360 px.
         labels={[
-          <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} />,
-          <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} />,
-          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} />,
+          <TabLabel key="a" short={`${bearerName(m.bearerAId)}'s input`} long={`Input A · ${bearerName(m.bearerAId)}`} mark={advanced === "A" ? " ✓" : ""} flipKey={flipKey} />,
+          <TabLabel key="m" short="Merge" long="Merge candidate" mark={candidateLost ? " ✗" : ""} flipKey={flipKey} />,
+          <TabLabel key="b" short={`${bearerName(m.bearerBId)}'s input`} long={`Input B · ${bearerName(m.bearerBId)}`} mark={advanced === "B" ? " ✓" : ""} flipKey={flipKey} />,
         ]}
       >
         <section className="grid gap-4">
@@ -183,32 +198,44 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input A · {bearerName(m.bearerAId)}
               {textA && <span className="ml-1 text-xs text-muted">({textA.wordCount}w)</span>}
-              {advanced === "A" && advancesTag}
+              {advanced === "A" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
             </h2>
             {textA ? <InputText body={textA.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
           <aside className="min-w-0">{await chatFor(roomA, "This text's chat")}</aside>
         </section>
         <section className="grid gap-4">
-          <div className="min-w-0 rounded-lg border-2 border-line p-4">
+          <div
+            className={`min-w-0 rounded-lg border-2 border-line p-4 ${
+              // From lg up, while it is being written, the pane fits the screen with room for the
+              // merge chat's header below: a long text scrolls inside the editor, and the picks
+              // and Propose lock-in under it stay in view. On a screen too short for that, the
+              // pane grows to fit its controls and a usable editor (min-content), and the page scrolls.
+              m.state === "open" ? "lg:flex lg:h-[calc(100dvh-15rem)] lg:min-h-min lg:flex-col" : ""
+            }`}
+          >
             <h2 className="mb-2 font-semibold">
               Merge candidate
-              {advanced === "merged" && advancesTag}
+              {advanced === "merged" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
               {candidateLost && (
-                <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">
-                  {isFinal ? "not the final text" : "doesn't go into the next round"}
-                </span>
+                <ShownOnceLanded flipKey={flipKey}>
+                  <span className="ml-2 rounded bg-wash px-1.5 py-0.5 text-xs font-medium text-muted">
+                    {isFinal ? "not the final text" : "doesn't go into the next round"}
+                  </span>
+                </ShownOnceLanded>
               )}
             </h2>
             {m.state === "resolved" ? (
               m.workingText ? (
                 <InputText body={m.workingText} />
               ) : (
-                <p className="text-faint">(blank)</p>
+                <p className="text-faint">(empty)</p>
               )
             ) : (
-              // Capped from lg up, like the input beside it, so both stay in view.
-              <div className="lg:[--editor-max-height:var(--pane-max-height)]">
+              // From lg up the editor takes what the pane has left after the controls, but never
+              // less than 10rem (plus its word-count line). Size containment keeps a long text
+              // from counting towards the pane's min-content: only this floor does.
+              <div className="lg:flex lg:min-h-[calc(var(--editor-min-height)+1.5rem)] lg:flex-1 lg:flex-col lg:[contain:size] lg:[--editor-min-height:10rem]">
                 <CollabEditor
                   wsUrl={collabWsUrl()}
                   docName={docName(m.id)}
@@ -228,6 +255,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 proposedBy={m.proposedBy}
                 myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
                 partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
+                iAmActive={mySide === "A" ? m.activeA : m.activeB}
+                partnerActive={mySide === "A" ? m.activeB : m.activeA}
                 finalRound={isFinal}
               />
             )}
@@ -240,7 +269,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           </div>
           <aside className="min-w-0">
             {/* Its system message names the flip's result; side by side this chat stays in view. */}
-            <HiddenWhileFlipping flipKey={flipFresh ? m.id : null}>
+            <HiddenWhileFlipping flipKey={flipKey}>
               {await chatFor(mergeRoom, "This merge's chat")}
             </HiddenWhileFlipping>
           </aside>
@@ -250,13 +279,13 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
             <h2 className="mb-2 font-semibold">
               Input B · {bearerName(m.bearerBId)}
               {textB && <span className="ml-1 text-xs text-muted">({textB.wordCount}w)</span>}
-              {advanced === "B" && advancesTag}
+              {advanced === "B" && <AdvancesTag isFinal={isFinal} flipKey={flipKey} />}
             </h2>
             {textB ? <InputText body={textB.bodyMd} /> : <p className="text-faint">—</p>}
           </div>
           <aside className="min-w-0">{await chatFor(roomB, "This text's chat")}</aside>
         </section>
-      </Tabs>
+      </FlipAwareTabs>
       {/* Outside the tabs, so no tab choice can hide it: it covers the whole page. */}
       {round.state === "closing" && m.state === "open" && mySide && !paused && (
         <DecisionModal
@@ -289,12 +318,23 @@ function InputText({ body }: { body: string }) {
   );
 }
 
-function TabLabel({ short, long, mark }: { short: string; long: string; mark: string }) {
+function TabLabel({ short, long, mark, flipKey }: { short: string; long: string; mark: string; flipKey: string | null }) {
   return (
     <>
       <span className="sm:hidden">{short}</span>
       <span className="hidden sm:inline">{long}</span>
-      {mark}
+      {mark && <ShownOnceLanded flipKey={flipKey}>{mark}</ShownOnceLanded>}
     </>
+  );
+}
+
+/** The tag on the text that goes on; held back while a coin that decided it is in the air. */
+function AdvancesTag({ isFinal, flipKey }: { isFinal: boolean; flipKey: string | null }) {
+  return (
+    <ShownOnceLanded flipKey={flipKey}>
+      <span className="ml-2 rounded bg-ok-surface px-1.5 py-0.5 text-xs font-medium text-ok">
+        {isFinal ? "the final text" : "goes into the next round"}
+      </span>
+    </ShownOnceLanded>
   );
 }

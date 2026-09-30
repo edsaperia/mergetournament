@@ -612,6 +612,13 @@ async function populateRound(db: Db, t: Tournament, bracket: Bracket, roundNo: n
     .orderBy(asc(slots.position));
   const byPosition = new Map(thisRoundSlots.map((s) => [s.position, s]));
 
+  const roster = await db
+    .select({ id: participants.id, name: participants.name })
+    .from(participants)
+    .where(eq(participants.tournamentId, t.id));
+  const nameOf = (id: string) => roster.find((p) => p.id === id)?.name ?? "?";
+  const finalRound = roundNo === bracket.rounds.length;
+
   const plannedSlots = new Set<number>();
   for (const [slotIndex, pair] of plan.merges) {
     plannedSlots.add(slotIndex);
@@ -639,7 +646,11 @@ async function populateRound(db: Db, t: Tournament, bracket: Bracket, roundNo: n
       .returning();
     await db.insert(chatRooms).values({ tournamentId: t.id, kind: "merge", subjectId: m.id });
     await db.update(slots).set({ outState: "empty" }).where(eq(slots.id, byPosition.get(adhoc.vacatedSlot)!.id));
-    await postSystem(db, t.id, `Two idle texts have been paired into an ad-hoc merge in round ${roundNo}.`);
+    await postSystem(
+      db,
+      t.id,
+      `${nameOf(adhoc.a.bearer)} and ${nameOf(adhoc.b.bearer)} have no partner in ${finalRound ? "the final" : `round ${roundNo}`}, so they merge with each other.`
+    );
   }
   for (const [slotIndex, entry] of plan.standOver) {
     plannedSlots.add(slotIndex);
@@ -647,6 +658,13 @@ async function populateRound(db: Db, t: Tournament, bracket: Bracket, roundNo: n
       .update(slots)
       .set({ outState: "filled", outTextId: entry.text, outBearerId: entry.bearer })
       .where(eq(slots.id, byPosition.get(slotIndex)!.id));
+    await postSystem(
+      db,
+      t.id,
+      finalRound
+        ? `${nameOf(entry.bearer)}'s text has no partner in the final, so it becomes the final text.`
+        : `${nameOf(entry.bearer)}'s text has no partner in round ${roundNo}, so it stands over into round ${roundNo + 1}.`
+    );
   }
   for (const slot of thisRoundSlots) {
     if (!plannedSlots.has(slot.position)) {
@@ -689,7 +707,7 @@ async function completeTournament(db: Db, baseUrl: string, t: Tournament, outbox
   await postSystem(
     db,
     t.id,
-    canonical ? "The tournament is complete: a canonical text has emerged." : "The tournament concluded with no canonical text."
+    canonical ? "The tournament is complete: the final text has emerged." : "The tournament concluded with no final text."
   );
   const roster = await db.select().from(participants).where(eq(participants.tournamentId, t.id));
   for (const p of roster) {
@@ -697,8 +715,8 @@ async function completeTournament(db: Db, baseUrl: string, t: Tournament, outbox
       to: p.email,
       subject: `${t.name}: the tournament is complete`,
       text: canonical
-        ? `The canonical text:\n\n${baseUrl}/${t.slug}\n\n---\n\n${canonical.bodyMd}`
-        : `The tournament concluded with no canonical text.\n\n${baseUrl}/${t.slug}`,
+        ? `The final text:\n\n${baseUrl}/${t.slug}\n\n---\n\n${canonical.bodyMd}`
+        : `The tournament concluded with no final text.\n\n${baseUrl}/${t.slug}`,
     });
   }
 }

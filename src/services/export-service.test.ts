@@ -174,3 +174,71 @@ describe("provenance when the final advances an input unchanged", () => {
     expect((await roomForText(db, tree.canonicalTextId!))?.id).toBe((await roomForMerge(db, creator.id))?.id);
   });
 });
+
+describe("provenance of a 5-draft run: a bye, an abandoned merge, an extra pairing and a final that stands over", () => {
+  it("lists the abandoned merge apart from unchanged inputs, and records the bye and the stand-over", async () => {
+    const T = new Date("2026-07-19T10:00:00Z");
+    const at = (s: number) => new Date(T.getTime() + s * 1000);
+    const emailer = new ConsoleEmailer();
+    const { t } = await makeTournament(db, {
+      slug: "exp5",
+      names: ["Ada", "Bo", "Cleo", "Dev", "Eve"],
+      participants: 5,
+      breakDurationS: 300,
+      emailer,
+      beginAt: T,
+    });
+    const roundMerges = async (roundNo: number) => {
+      const rs = await db
+        .select()
+        .from(slots)
+        .where(and(eq(slots.tournamentId, t.id), eq(slots.roundNo, roundNo)))
+        .orderBy(asc(slots.position));
+      const out = [];
+      for (const s of rs) out.push(...(await db.select().from(merges).where(eq(merges.slotId, s.id))));
+      return out;
+    };
+    const agree = async (m: { id: string; bearerAId: string | null; bearerBId: string | null }, text: string, now: Date) => {
+      await mergeAction(db, m.id, m.bearerAId!, { type: "edit", text }, now);
+      await mergeAction(db, m.id, m.bearerAId!, { type: "selectBearer", pref: "A" }, now);
+      await mergeAction(db, m.id, m.bearerBId!, { type: "selectBearer", pref: "A" }, now);
+      await mergeAction(db, m.id, m.bearerAId!, { type: "propose" }, now);
+      await mergeAction(db, m.id, m.bearerBId!, { type: "confirm" }, now);
+    };
+    // Round 1: one pair agrees, the other never shows up; the bye's draft waits.
+    const [first] = await roundMerges(1);
+    await agree(first, "Round one's merge.", at(60));
+    await tick(db, emailer, "http://x", t.id, at(600));
+    await tick(db, emailer, "http://x", t.id, at(660));
+    // Round 2: the merge result and the bye's draft have no partners, so they pair up and agree.
+    await tick(db, emailer, "http://x", t.id, at(960));
+    const [extra] = await roundMerges(2);
+    expect(extra.isAdHoc).toBe(true);
+    await agree(extra, "The final text.", at(1000));
+    // The final has one text and no partner for it: it stands over and the tournament completes.
+    await tick(db, emailer, "http://x", t.id, at(1010));
+    await tick(db, emailer, "http://x", t.id, at(1310));
+    expect(await canonicalText(db, t.id)).toBe("The final text.");
+
+    const tree = await provenance(db, t.id);
+    expect(tree.steps).toHaveLength(1);
+    expect(tree.steps[0]).toMatchObject({ round: 1, resolution: "abandoned", advancedTextId: null });
+    const drafts = new Map(tree.nodes.filter((n) => n.kind === "draft").map((n) => [n.id, n.author]));
+    expect(tree.passes.map((p) => ({ ...p, textId: drafts.get(p.textId) ?? p.textId === tree.canonicalTextId }))).toEqual([
+      { round: 1, kind: "bye", textId: expect.any(String) },
+      { round: 3, kind: "standOver", textId: true },
+    ]);
+
+    const md = await provenanceMarkdown(db, t.id);
+    expect(md).not.toContain("## Merges that kept an input unchanged");
+    const abandonedSection = md.slice(md.indexOf("## Abandoned merges"));
+    expect(abandonedSection).toMatch(/^## Abandoned merges\n\n- \*\*M0\*\* — round 1 merge of T\d \+ T\d: abandoned · neither player took part; nothing from it goes into the next round/);
+    const passedSection = md.slice(md.indexOf("## Texts that went on without a merge"));
+    expect(passedSection).toMatch(/- \*\*S0\*\* — round 1: bye; T\d goes into round 2 unchanged/);
+    expect(passedSection).toMatch(/- \*\*S1\*\* — the final: T\d+ has no partner, so it becomes the final text/);
+    // In the diagram too, each linked from its text.
+    const mermaid = provenanceMermaid(tree);
+    expect(mermaid).toMatch(/S0\(\["round 1: bye; T\d goes into round 2 unchanged"\]\)/);
+    expect(mermaid).toMatch(/T\d+ --> S1/);
+  });
+});

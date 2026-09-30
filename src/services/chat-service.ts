@@ -81,6 +81,8 @@ export interface MessageView {
   author: string | null;
   body: string;
   at: Date;
+  /** Coin flips this message gives away the result of: it waits for them to land. */
+  flipKeys?: string[];
 }
 
 export async function messagesFor(db: Db, roomId: string): Promise<MessageView[]> {

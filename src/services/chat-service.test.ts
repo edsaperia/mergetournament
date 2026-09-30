@@ -132,7 +132,7 @@ describe("system narration order", () => {
       "Round 1",
       "Round 1 has closed",
       "Randomness revealed",
-      "The tournament concluded with no canonical text",
+      "The tournament concluded with no final text",
     ]);
     // One announcement per event: no "Begin! Round 1 is open." beside "Round 1 is open."
     expect(bodies.filter((b) => b.includes("Round 1 is open"))).toHaveLength(1);

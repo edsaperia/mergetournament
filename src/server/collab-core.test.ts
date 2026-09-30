@@ -35,6 +35,8 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
   }
 }
 
+/** Merges whose pages were told a bearer first wrote in them. */
+const activeCalls: string[] = [];
 const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 
 beforeAll(async () => {
@@ -50,7 +52,15 @@ beforeAll(async () => {
   [merge] = await db.select().from(merges);
   expect(merge.state).toBe("open");
 
-  handle = createCollabServer({ port: 0, secret: SECRET, getDb: async () => db as unknown as Db, debounce: 50 });
+  handle = createCollabServer({
+    port: 0,
+    secret: SECRET,
+    getDb: async () => db as unknown as Db,
+    debounce: 50,
+    onActive: (mergeId) => {
+      activeCalls.push(mergeId);
+    },
+  });
   await handle.server.listen();
   wsUrl = `ws://localhost:${handle.server.address.port}`;
 }, 30000);
@@ -78,9 +88,54 @@ describe("collab write gates", () => {
     // Activity marked for the backstop.
     expect(row.activeA).toBe(true);
     expect(row.activeB).toBe(true);
+    // Each bearer's first edit tells open pages, once: the pick line depends on who has taken part.
+    expect(activeCalls).toEqual([merge.id, merge.id]);
+    // Later edits from the same bearers don't tell them again.
+    a.text.insert(a.text.length, " A again.");
+    b.text.insert(b.text.length, " B again.");
+    await until(() => (handle.liveText(merge.id) ?? "").includes("B again."));
+    await settle(300);
+    expect(activeCalls).toEqual([merge.id, merge.id]);
 
     a.provider.destroy();
     b.provider.destroy();
+  });
+
+  it("a frozen merge's refused edit neither marks the bearer active nor refreshes pages", async () => {
+    // A fresh merge, so neither bearer has been marked yet.
+    const emailer = new ConsoleEmailer();
+    const t = await createTournament(db, { slug: "collab-frozen", name: "F", roundDurationS: 3600, breakDurationS: 60 });
+    for (let i = 0; i < 2; i++) {
+      const p = await addParticipant(db, emailer, "http://x", t.id, { name: `F${i}`, email: `f${i}@f.org` });
+      await saveDraft(db, p.id, `Draft ${i}`);
+    }
+    await publishBracket(db, emailer, "http://x", t.id);
+    await beginTournament(db, t.id, new Date());
+    const [fresh] = await db.select().from(merges).where(eq(merges.state, "open")).then((rows) => rows.filter((m) => m.id !== merge.id));
+    await db.update(merges).set({ proposedBy: "B" }).where(eq(merges.id, fresh.id));
+
+    const a = connect(fresh.bearerAId!, fresh.id);
+    await until(() => a.provider.synced);
+    a.text.insert(0, "REFUSED ");
+    await settle();
+    expect(handle.liveText(fresh.id) ?? "").not.toContain("REFUSED");
+    expect(activeCalls).not.toContain(fresh.id);
+    const [row] = await db.select().from(merges).where(eq(merges.id, fresh.id));
+    expect(row.activeA).toBe(false);
+
+    a.provider.destroy();
+
+    // Unfrozen, the same bearer's next edit counts, once. (A fresh client: the
+    // refused update stays in the old one's document, and later edits build on it.)
+    await db.update(merges).set({ proposedBy: null }).where(eq(merges.id, fresh.id));
+    handle.invalidateGate(fresh.id);
+    const again = connect(fresh.bearerAId!, fresh.id);
+    await until(() => again.provider.synced);
+    again.text.insert(0, "ACCEPTED ");
+    await until(() => (handle.liveText(fresh.id) ?? "").includes("ACCEPTED"));
+    await settle(300);
+    expect(activeCalls.filter((id) => id === fresh.id)).toHaveLength(1);
+    again.provider.destroy();
   });
 
   it("rejects invalid tokens", async () => {

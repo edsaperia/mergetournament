@@ -16,13 +16,44 @@ export function carrierOutcome(prefs: CarrierPrefs): Side | "flip" {
   return "flip";
 }
 
-/** One line for `mySide`'s view of the carrier choice: both picks and what they add up to. */
-export function carrierLine(mySide: Side, names: { A: string; B: string }, prefs: CarrierPrefs): string {
+/**
+ * Who has taken part so far this round, and where: in the round itself the
+ * picks count once the pair locks in; in the decision-window, once both accept.
+ */
+export interface CarrierContext {
+  iAmActive: boolean;
+  partnerActive: boolean;
+  window: boolean;
+}
+
+/**
+ * One line for `mySide`'s view of the carrier choice: both picks and what
+ * they add up to. With `ctx` and exactly one player active, the picks don't
+ * decide: if the silent one stays silent, resolveMerge sends the active one
+ * on (with the merge they accepted, or their own input), so the line says that.
+ */
+export function carrierLine(
+  mySide: Side,
+  names: { A: string; B: string },
+  prefs: CarrierPrefs,
+  ctx?: CarrierContext
+): string {
   const theirSide: Side = mySide === "A" ? "B" : "A";
   const partner = names[theirSide];
   const mine = prefs[mySide];
   const theirs = prefs[theirSide];
   const outcome = carrierOutcome(prefs);
+
+  if (ctx && ctx.iAmActive !== ctx.partnerActive) {
+    const bothAgree = ctx.window ? "you both accept" : "you both lock in";
+    const when = ctx.window ? "" : " when time runs out";
+    if (ctx.iAmActive) {
+      const myPick = mine === null ? "" : mine === mySide ? "You picked yourself. " : `You picked ${partner}. `;
+      return `${myPick}If ${partner} stays silent, you go into the next round${when}; the picks count only if ${bothAgree}.`;
+    }
+    const theirPick = theirs === null ? "" : theirs === mySide ? `${partner} picked you, but i` : `${partner} picked themselves. I`;
+    return `${theirPick || "I"}f you stay silent, ${partner} goes into the next round${when}; the picks count only if ${bothAgree}.`;
+  }
 
   if (mine === null && theirs === null) {
     return "No picks yet. One pick settles it; if neither of you picks, a coin flip decides who goes into the next round.";

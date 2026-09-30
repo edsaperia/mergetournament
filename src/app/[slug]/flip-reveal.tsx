@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal } from "../modal";
+import { Tabs } from "./tabs";
 
 const landedEvent = (flipKey: string) => `flip-landed:${flipKey}`;
 
@@ -72,37 +74,78 @@ export function FlipReveal({
   if (phase === "pending") return null;
   return (
     <>
-      <Modal
-        label="Coin flip"
-        onDismiss={phase === "revealed" ? () => setPhase("done") : undefined}
-        className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
-      >
-        <span className="text-4xl" aria-hidden>
-          🪙
-        </span>
-        <p className="text-sm text-muted">{title}</p>
-        {phase === "animating" ? (
-          <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
-        ) : (
-          <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
-        )}
-        {phase === "animating" ? (
-          <p className="text-xs text-faint">the coin is in the air…</p>
-        ) : (
-          // A button as well as tapping outside: on a phone the card fills nearly the whole screen.
-          <button
-            type="button"
-            onClick={() => setPhase("done")}
-            className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-wash"
+      {/* On the event page the flip sits inside its bracket card, a link: in a portal, and
+          with clicks kept from bubbling to it, closing the flip doesn't open the merge. */}
+      {createPortal(
+        <div onClick={(e) => e.stopPropagation()}>
+          <Modal
+            label="Coin flip"
+            onDismiss={phase === "revealed" ? () => setPhase("done") : undefined}
+            className="flex max-w-md flex-col items-center gap-4 p-8 text-center"
           >
-            Close
-          </button>
-        )}
-      </Modal>
+            <span className="text-4xl" aria-hidden>
+              🎲
+            </span>
+            <p className="text-sm text-muted">{title}</p>
+            {phase === "animating" ? (
+              <p className="min-h-[2.5rem] text-2xl font-bold">{face === 0 ? a : b}</p>
+            ) : (
+              <p className="min-h-[2.5rem] text-2xl font-bold text-live-ink">{winner}</p>
+            )}
+            {phase === "animating" ? (
+              <p className="text-xs text-faint">the coin is in the air…</p>
+            ) : (
+              // A button as well as tapping outside: on a phone the card fills nearly the whole screen.
+              <button
+                type="button"
+                onClick={() => setPhase("done")}
+                className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-wash"
+              >
+                Close
+              </button>
+            )}
+          </Modal>
+        </div>,
+        document.body
+      )}
       {/* The result behind the overlay would spoil the flip: withheld until the coin lands. */}
       {phase === "animating" ? <span className="text-muted">coin flip…</span> : children}
     </>
   );
+}
+
+/** One flip's key, several (the result names each of them), or none. */
+type FlipKeys = string | readonly string[] | null;
+
+/**
+ * True while a flip keyed by `flipKey` is still to land in this browser: from
+ * the first render (so the server-rendered page never shows the result) until
+ * FlipReveal lands it, or at once if this browser has already seen that flip.
+ * With several keys, until the last of them lands. False for no key.
+ */
+function useFlipping(flipKey: FlipKeys): boolean {
+  // One string, so the effect reruns only when the keys change.
+  const joined = flipKey === null ? "" : typeof flipKey === "string" ? flipKey : flipKey.join(" ");
+  const [flipping, setFlipping] = useState(joined !== "");
+  useEffect(() => {
+    // FlipReveal marks the flip seen only after this runs (in a timeout), so
+    // a mark here means an earlier visit.
+    const inAir = new Set(
+      (joined === "" ? [] : joined.split(" ")).filter((k) => sessionStorage.getItem(`flip:${k}`) === null)
+    );
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
+    setFlipping(inAir.size > 0);
+    const listeners = [...inAir].map((k) => {
+      const land = () => {
+        inAir.delete(k);
+        if (inAir.size === 0) setFlipping(false);
+      };
+      window.addEventListener(landedEvent(k), land);
+      return () => window.removeEventListener(landedEvent(k), land);
+    });
+    return () => listeners.forEach((remove) => remove());
+  }, [joined]);
+  return flipping;
 }
 
 /**
@@ -112,18 +155,31 @@ export function FlipReveal({
  * `flipKey` it shows its children. Hidden, not removed: the space stays and
  * nothing inside remounts.
  */
-export function HiddenWhileFlipping({ flipKey, children }: { flipKey: string | null; children: React.ReactNode }) {
-  const [hidden, setHidden] = useState(flipKey !== null);
-  useEffect(() => {
-    // FlipReveal marks the flip seen only after this runs (in a timeout), so
-    // a mark here means an earlier visit.
-    const seen = flipKey === null || sessionStorage.getItem(`flip:${flipKey}`) !== null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage exists only on the client
-    setHidden(!seen);
-    if (seen) return;
-    const show = () => setHidden(false);
-    window.addEventListener(landedEvent(flipKey), show);
-    return () => window.removeEventListener(landedEvent(flipKey), show);
-  }, [flipKey]);
+export function HiddenWhileFlipping({ flipKey, children }: { flipKey: FlipKeys; children: React.ReactNode }) {
+  const hidden = useFlipping(flipKey);
   return <div className={hidden ? "invisible" : undefined}>{children}</div>;
+}
+
+/**
+ * Leaves out a small mark that names the flip's result — a ✓ on a tab, a
+ * "goes into the next round" tag — until the coin lands. Inline, and nothing
+ * takes its place.
+ */
+export function ShownOnceLanded({ flipKey, children }: { flipKey: FlipKeys; children: React.ReactNode }) {
+  return useFlipping(flipKey) ? null : <>{children}</>;
+}
+
+/**
+ * Tabs whose opening tab would give away a flip's result (the input that won
+ * it): while the coin is in the air they open on `whileFlipping`, and once it
+ * lands they move to `defaultIndex`, in place, so nothing typed meanwhile is lost.
+ */
+export function FlipAwareTabs({
+  flipKey,
+  whileFlipping,
+  defaultIndex,
+  ...rest
+}: { flipKey: string | null; whileFlipping: number } & React.ComponentProps<typeof Tabs>) {
+  const flipping = useFlipping(flipKey);
+  return <Tabs defaultIndex={flipping ? whileFlipping : defaultIndex} {...rest} />;
 }

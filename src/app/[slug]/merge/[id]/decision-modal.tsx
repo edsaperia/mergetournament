@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { carrierLine } from "../../../../lib/carrier";
 import { voteLine } from "../../../../lib/decision";
-import { countWords } from "../../../../lib/text";
+import { textSize } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
 import { ActionStatus } from "../../../action-status";
@@ -17,8 +17,6 @@ const initial: ActionState = { ok: true, message: "" };
 /** Lines of the frozen text the confirmation strip shows from each end. */
 const STRIP_HEAD = 3;
 const STRIP_TAIL = 3;
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * The decision modal (SPEC §4, the decision window): once the clock expires
@@ -88,7 +86,7 @@ export function DecisionModal({
   // one, their accept-vote advances the merge, anything else their input;
   // with none, abandoned. Worded for who is active now: one short sentence,
   // and the full rules behind "what if…" (short enough for a 360×640 phone).
-  const both = `Both accept: ${finalRound ? "it becomes the canonical text" : "it locks in"}.`;
+  const both = `Both accept: ${finalRound ? "it becomes the final text" : "it locks in"}.`;
   const orFlip = "it's both accepting or a coin flip between the input texts";
   // Where a text goes at the window's end: the next round, or in the final
   // round, the final text.
@@ -120,16 +118,11 @@ export function DecisionModal({
         `${sendsInput("their")}; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
     },
   }[variant];
-  // Who carries: with one bearer active, whatever advances at the window's
-  // end is theirs to carry (resolveMerge ignores the picks); the picks count
-  // only if both accept and the merge locks.
+  // Who goes on: with one player active, whatever goes on at the window's end
+  // is theirs (resolveMerge ignores the picks); the picks count only if both
+  // accept and the merge locks.
   const picks = mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref };
-  // (The partner-only case needs no extra line: the rules line already says
-  // their Accept advances while you stay silent, and the picks count once you respond.)
-  const carrier =
-    variant === "me"
-      ? `While ${partner} stays silent, you go into the next round; your pick counts only if ${partner} accepts too.`
-      : carrierLine(mySide, names, picks);
+  const carrier = carrierLine(mySide, names, picks, { iAmActive, partnerActive, window: true });
   // Expanded for one variant only, so a change of who is active collapses it.
   const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
   const whatIf = whatIfFor === variant;
@@ -161,11 +154,11 @@ export function DecisionModal({
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-3 sm:gap-3 sm:py-4">
         {!iAmActive && <p className="text-sm font-semibold text-warn sm:text-base">Are you still here? Any button below counts.</p>}
         <p className="text-xs text-muted sm:text-sm">
-          The merge you would accept · {plural(countWords(workingText), "word")} · {plural(lines.length, "line")}
+          The merge you would accept · {textSize(workingText)}
         </p>
         <div className="rounded-md border border-edge p-3">
           {blank ? (
-            <p className="text-faint">(blank)</p>
+            <p className="text-faint">(empty)</p>
           ) : excerpt ? (
             <>
               <NumberedText body={lines.slice(0, STRIP_HEAD).join("\n")} />

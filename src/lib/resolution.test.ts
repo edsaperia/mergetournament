@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { newSession, resolveMerge } from "./engine";
 import { mulberry32 } from "./rng";
-import { resolutionLabel, resolutionSentence, whatNow, type ResolvedMergeView } from "./resolution";
+import { resolutionLabel, resolutionSentence, sittingOutLine, whatNow, type ResolvedMergeView } from "./resolution";
 
 const names: Record<string, string> = { ada: "Ada", ben: "Ben" };
 const nameOf = (id: string | null) => names[id ?? ""] ?? "?";
@@ -84,12 +84,44 @@ describe("whatNow", () => {
 });
 
 describe("whatNow once the tournament is over", () => {
+  const flip = { ...base, resolution: "backstop_flip", resultTextId: "tA", advancingBearerId: "ada" };
   it("stops telling an eliminated bearer to watch the other merges", () => {
-    const flip = { ...base, resolution: "backstop_flip", resultTextId: "tA", advancingBearerId: "ada" };
     expect(whatNow(flip, "ben", nameOf, 1, false, false)).toContain("watch the other merges");
     const over = whatNow(flip, "ben", nameOf, 1, false, true);
-    expect(over).toBe("Ada goes into the next round with this text. The tournament is over; read the final text or look back through the bracket.");
+    expect(over).toBe("Ada went into the next round with this text. The tournament is over; read the final text or look back through the bracket.");
     expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 1, false, true)).not.toContain("watch the other merges");
+  });
+
+  it("looks back in the past tense, and sends nobody to find a partner", () => {
+    expect(whatNow(flip, "ada", nameOf, 1, false, true)).toBe(
+      "You went into round 2 with this text. The tournament is over; read the final text or look back through the bracket."
+    );
+    const solo = { ...base, resolution: "active_advance", resultTextId: "new", advancingBearerId: "ada" };
+    expect(whatNow(solo, "ben", nameOf, 1, false, true)).toBe(
+      "While you were away, only Ada took part, so Ada went into the next round with the merged text they accepted. " +
+        "The tournament is over; read the final text or look back through the bracket."
+    );
+    expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 1, false, true)).toMatch(
+      /^Neither of you took part, so neither text went into the next round\./
+    );
+    expect(whatNow({ ...base, resolution: "abandoned" }, "ben", nameOf, 2, true, true)).toMatch(
+      /^Neither of you took part, so neither text became the final text\./
+    );
+    const merges = [
+      flip,
+      solo,
+      { ...base, resolution: "agreed", resultTextId: "new", advancingBearerId: "ben" },
+      { ...base, resolution: "abandoned" },
+    ];
+    for (const m of merges) {
+      for (const me of ["ada", "ben"]) {
+        for (const finalRound of [false, true]) {
+          const line = whatNow(m, me, nameOf, 1, finalRound, true);
+          expect(line).not.toMatch(/find your next partner|in the break|watch the other merges|\bgoes\b|\byou go\b/i);
+          expect(line).not.toMatch(OLD_WORDS);
+        }
+      }
+    }
   });
 });
 
@@ -103,5 +135,110 @@ describe("a lone bearer who accepts a blank merged text", () => {
     expect(resolutionSentence(m, nameOf, false)).toBe(
       "Only Ada took part, and there was no accepted merged text, so Ada's input goes into the next round unchanged."
     );
+  });
+});
+
+describe("sittingOutLine", () => {
+  const line = (o: Partial<Parameters<typeof sittingOutLine>[0]>) =>
+    sittingOutLine({ kind: "bye", roundNo: 1, finalRound: false, isDraft: true, tournamentOver: false, ...o });
+  it("tells a player with a bye that their draft goes on unchanged, and what to do meanwhile", () => {
+    expect(line({})).toBe("You have a bye in round 1: your draft goes into round 2 unchanged. Meanwhile, read the texts and join the chat.");
+    expect(line({ roundNo: 2 })).toBe("You have a bye in round 2: your draft goes into round 3 unchanged. Meanwhile, read the texts and join the chat.");
+  });
+  it("tells a player whose text stands over, and never sends them to find a partner", () => {
+    expect(line({ kind: "standOver", roundNo: 2, isDraft: false })).toBe(
+      "Your text has no partner in round 2, so it stands over into round 3 unchanged. Meanwhile, read the texts and join the chat."
+    );
+    expect(line({ kind: "standOver", roundNo: 3, finalRound: true, isDraft: false })).toBe(
+      "Your text has no partner in the final, so it becomes the final text."
+    );
+    for (const kind of ["bye", "standOver"] as const) {
+      for (const finalRound of [false, true]) {
+        for (const tournamentOver of [false, true]) {
+          const l = line({ kind, finalRound, tournamentOver });
+          expect(l).not.toMatch(/partner\b.*find|find your|next partner/i);
+          expect(l).not.toMatch(OLD_WORDS);
+          if (finalRound) expect(l).not.toMatch(/next round|round \d/);
+        }
+      }
+    }
+  });
+  it("looks back once the tournament is over", () => {
+    expect(line({ tournamentOver: true })).toBe(
+      "You had a bye in round 1: your draft went into round 2 unchanged. The tournament is over; read the final text or look back through the bracket."
+    );
+    expect(line({ kind: "standOver", roundNo: 3, finalRound: true, isDraft: false, tournamentOver: true })).toBe(
+      "Your text had no partner in the final, so it became the final text. Read it or look back through the bracket."
+    );
+  });
+});
+
+describe("whatNow for a player whose text then stands over", () => {
+  const agreed = { ...base, resolution: "agreed", resultTextId: "new", advancingBearerId: "ada" };
+  it("doesn't send them to find a partner they won't have", () => {
+    expect(whatNow(agreed, "ada", nameOf, 1, false, false, "standsOver")).toBe(
+      "You go into round 2 with this text, but it has no partner there, so it stands over into round 3. Meanwhile, read the texts and join the chat."
+    );
+    expect(whatNow(agreed, "ada", nameOf, 2, false, false, "standsOverFinal")).toBe(
+      "You go into the final with this text, but it has no partner there, so it becomes the final text. Meanwhile, read the texts and join the chat."
+    );
+    expect(whatNow(agreed, "ada", nameOf, 2, false, true, "standsOverFinal")).toBe(
+      "You went into the final with this text, and it had no partner there, so it became the final text. " +
+        "The tournament is over; read the final text or look back through the bracket."
+    );
+    // A partner waiting in the next round: as before.
+    expect(whatNow(agreed, "ada", nameOf, 1, false, false, "merge")).toContain("find your next partner");
+    // The other player's line doesn't change.
+    expect(whatNow(agreed, "ben", nameOf, 1, false, false, "standsOver")).toBe(whatNow(agreed, "ben", nameOf, 1, false, false));
+  });
+});
+
+describe("a coin flip on who goes into the next round says why it was needed", () => {
+  const flipped = (bearerPrefA: "A" | "B" | null, bearerPrefB: "A" | "B" | null) => {
+    const session = { ...newSession(), lock: "locked" as const, workingText: "x", bearerPref: { A: bearerPrefA, B: bearerPrefB } };
+    const r = resolveMerge({ text: "tA", bearer: "ada" }, { text: "tB", bearer: "ben" }, session, null, mulberry32(1));
+    expect(r.kind).toBe("BEARER_FLIP");
+    return { ...base, resolution: "bearer_flip", resultTextId: "new", advancingBearerId: r.advancing!.bearer, bearerPrefA, bearerPrefB };
+  };
+  it("neither picked", () => {
+    const m = flipped(null, null);
+    expect(resolutionSentence(m, nameOf, false)).toBe(
+      `Agreed. Neither Ada nor Ben picked who goes into the next round, so a coin flip chose ${nameOf(m.advancingBearerId)}.`
+    );
+  });
+  it("the picks differed, either way round", () => {
+    for (const [a, b] of [["A", "B"], ["B", "A"]] as const) {
+      const m = flipped(a, b);
+      expect(resolutionSentence(m, nameOf, false)).toBe(
+        `Agreed. The picks for who goes into the next round differed, so a coin flip chose ${nameOf(m.advancingBearerId)}.`
+      );
+    }
+  });
+});
+
+describe("a lone player who rejects", () => {
+  it("is said to have rejected the merge", () => {
+    // Only Ada took part; in the decision-window she pressed Reject, so no accept-vote stands.
+    const session = { ...newSession(), workingText: "Ada's merge", active: { A: true, B: false } };
+    const r = resolveMerge({ text: "tA", bearer: "ada" }, { text: "tB", bearer: "ben" }, session, null, mulberry32(1));
+    expect(r.kind).toBe("ACTIVE_ADVANCE");
+    expect(r.advancing).toEqual({ source: "input", text: "tA", bearer: "ada" });
+    const m = { ...base, resolution: "active_advance", resultTextId: "tA", advancingBearerId: "ada", activeChoiceA: "input" as const };
+    expect(resolutionSentence(m, nameOf, false)).toBe("Ada rejected the merge, so Ada's input goes into the next round unchanged.");
+    expect(resolutionSentence(m, nameOf, true)).toBe("Ada rejected the merge, so Ada's input becomes the final text unchanged.");
+    // Ben's side: the same when Ben is the one who took part.
+    const mB = { ...base, resolution: "active_advance", resultTextId: "tB", advancingBearerId: "ben", activeChoiceB: "input" as const };
+    expect(resolutionSentence(mB, nameOf, false)).toBe("Ben rejected the merge, so Ben's input goes into the next round unchanged.");
+  });
+  it("tells an accepted but empty merge from a rejection, and silence from both", () => {
+    const m = { ...base, resolution: "active_advance", resultTextId: "tA", advancingBearerId: "ada" };
+    expect(resolutionSentence({ ...m, activeChoiceA: "working" }, nameOf, false)).toBe(
+      "Only Ada took part, and the merge Ada accepted was empty, so Ada's input goes into the next round unchanged."
+    );
+    expect(resolutionSentence({ ...m, activeChoiceA: null }, nameOf, false)).toBe(
+      "Only Ada took part, and there was no accepted merged text, so Ada's input goes into the next round unchanged."
+    );
+    // The partner's press can't be what decided it.
+    expect(resolutionSentence({ ...m, activeChoiceB: "input" }, nameOf, false)).not.toMatch(/rejected/);
   });
 });

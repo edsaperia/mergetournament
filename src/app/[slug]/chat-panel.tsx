@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { postMessageAction, type ActionState } from "../../server/actions";
 import type { MessageView } from "../../services/chat-service";
 import { Button } from "../ui";
+import { ShownOnceLanded } from "./flip-reveal";
 
 const initial: ActionState = { ok: true, message: "" };
 
@@ -85,12 +86,14 @@ export function ChatPanel({
             {messages.length === 0 && <p className="text-xs text-faint">No messages yet.</p>}
             {messages.map((m) =>
               m.kind === "system" ? (
-                <p key={m.id} className="text-xs italic text-muted [overflow-wrap:anywhere]">
-                  <span className="not-italic text-faint">
-                    <MessageTime at={m.at} />
-                  </span>{" "}
-                  ⚙ {m.body}
-                </p>
+                <ShownOnceLanded key={m.id} flipKey={m.flipKeys ?? null}>
+                  <p className="text-xs italic text-muted [overflow-wrap:anywhere]">
+                    <span className="not-italic text-faint">
+                      <MessageTime at={m.at} />
+                    </span>{" "}
+                    ⚙ {m.body}
+                  </p>
+                </ShownOnceLanded>
               ) : (
                 <p key={m.id} className="text-sm [overflow-wrap:anywhere]">
                   <span className="font-semibold">{m.author}</span>{" "}

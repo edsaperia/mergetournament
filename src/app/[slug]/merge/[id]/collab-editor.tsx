@@ -61,8 +61,14 @@ export function CollabEditor({
           EditorState.readOnly.of(readOnly),
           EditorView.lineWrapping,
           EditorView.theme({
-            // --editor-max-height is set only where the editor sits beside an input (lg up).
-            "&": { fontSize: "var(--editor-font-size)", minHeight: "20rem", maxHeight: "var(--editor-max-height, none)" },
+            // In a flex column (the workspace from lg up) the editor shrinks to what its pane has
+            // left, down to --editor-min-height, and scrolls inside.
+            "&": {
+              fontSize: "var(--editor-font-size)",
+              minHeight: "var(--editor-min-height, 20rem)",
+              maxHeight: "var(--editor-max-height, none)",
+              flex: "1 1 auto",
+            },
             ".cm-scroller": { overflow: "auto" },
             ".cm-content": { fontFamily: "var(--font-geist-mono), monospace" },
           }),
@@ -84,10 +90,10 @@ export function CollabEditor({
   }, [wsUrl, docName, token, readOnly, userName]);
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div
         ref={host}
-        className={`overflow-hidden rounded-md border ${
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border ${
           readOnly ? "border-warn" : "border-line"
         }`}
       />
