@@ -113,6 +113,34 @@ export function projectedStarts(config: ScheduleConfig, progress: readonly Round
   return starts;
 }
 
+/**
+ * The earliest each round can open without everyone confirming readiness:
+ * the engine opens a round at max(previous close + break, its printed start),
+ * and a round can close any time after it opens (all merges agreed), so an
+ * unclosed round bounds nothing below its printed start. Printed starts
+ * exclude decision-windows. Display a start as this ("not before"), and
+ * use projectedStarts (the latest case) only for ends and totals.
+ */
+export function earliestStarts(config: ScheduleConfig, progress: readonly RoundProgress[]): number[] {
+  checkConfig(config);
+  const printed = projectedStarts({ ...config, decisionWindowS: 0 }, []);
+  const starts: number[] = [];
+  for (let r = 0; r < config.numRounds; r++) {
+    const actual = progress[r]?.actualStart;
+    if (actual !== undefined) {
+      starts.push(actual);
+      continue;
+    }
+    if (r === 0) {
+      starts.push(0);
+      continue;
+    }
+    const prevBound = progress[r - 1]?.actualClose ?? starts[r - 1];
+    starts.push(Math.max(progress[r]?.scheduledStart ?? printed[r], prevBound + config.breakDurationS));
+  }
+  return starts;
+}
+
 /** The scheduled (pre-tournament) start offsets: no early closes yet. */
 export function scheduledStarts(config: ScheduleConfig): number[] {
   return projectedStarts(config, []);

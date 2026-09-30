@@ -2,6 +2,7 @@ import type { Round, Tournament } from "../../../db/schema";
 import { numRounds } from "../../../lib/bracket";
 import {
   DECISION_WINDOW_S,
+  earliestStarts,
   fmtDuration,
   projectedEnd,
   projectedStarts,
@@ -114,22 +115,31 @@ export function Timeline({
         actualClose: r.actualCloseS ?? undefined,
         scheduledStart: r.scheduledStartS,
       }));
+  // Starts are shown as the earliest a round can open (printed times leave
+  // out decision-windows), with how much later it could be; ends are the latest case.
   const starts = prePublish ? scheduledStarts(config) : projectedStarts(config, progress);
+  const earliest = earliestStarts(config, progress);
   const roundEnd = (k: number) => projectedEnd(config, progress, starts, k);
+  const slip = (k: number) => (progress[k - 1]?.actualStart !== undefined ? 0 : starts[k - 1] - earliest[k - 1]);
 
   // Pre-begin, the planned startAt anchors the projection instead.
   const wallIso = (s: number): string | null =>
     wallClockIso(t, s) ?? (t.startAt ? new Date(t.startAt.getTime() + s * 1000).toISOString() : null);
 
-  const Span = ({ fromS, toS }: { fromS: number; toS: number }) => {
+  const Span = ({ fromS, toS, slipS = 0 }: { fromS: number; toS: number; slipS?: number }) => {
     const from = wallIso(fromS);
     const to = wallIso(toS);
+    const later = slipS > 0 ? <> (or up to {fmtDuration(slipS)} later)</> : null;
     return from && to ? (
       <>
-        <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly />
+        <LocalTime iso={from} timeOnly />
+        {later} – <LocalTime iso={to} timeOnly />
       </>
     ) : (
-      <>start +{fmtDuration(fromS)} – +{fmtDuration(toS)}</>
+      <>
+        start +{fmtDuration(fromS)}
+        {later} – +{fmtDuration(toS)}
+      </>
     );
   };
 
@@ -176,7 +186,7 @@ export function Timeline({
           k === 1 && prePublish && !readOnly ? (
             <DurationEditor slug={slug} field="round" minutes={Math.round(t.roundDurationS / 60)} />
           ) : (
-            <Span fromS={starts[k - 1]} toS={roundEnd(k)} />
+            <Span fromS={earliest[k - 1]} toS={roundEnd(k)} slipS={slip(k)} />
           )
         }
       >
@@ -235,7 +245,12 @@ export function Timeline({
           n === 1 && prePublish && !readOnly ? (
             <DurationEditor slug={slug} field="break" minutes={Math.round(t.breakDurationS / 60)} />
           ) : (
-            <Span fromS={roundEnd(n)} toS={starts[n] ?? roundEnd(n) + t.breakDurationS} />
+            // Clock times once the round before has closed; until then only its length is certain.
+            progress[n - 1]?.actualClose !== undefined ? (
+              <Span fromS={progress[n - 1].actualClose!} toS={earliest[n]} />
+            ) : (
+              fmtDuration(t.breakDurationS)
+            )
           )
         }
       >

@@ -5,6 +5,7 @@ import { textVersions, type Tournament } from "../../db/schema";
 import { resolutionLabel } from "../../lib/resolution";
 import {
   DECISION_WINDOW_S,
+  earliestStarts,
   fmtDuration,
   projectedEnd,
   projectedStarts,
@@ -45,7 +46,11 @@ export async function BracketView({
     return t.kind === "draft" ? `${nameOf.get(t.authorId ?? "") ?? "?"}'s draft` : `merged text (${t.wordCount}w)`;
   };
 
+  // A round is shown starting at the earliest it can open (its printed time,
+  // which leaves out decision-windows), noting how much later it could be
+  // if earlier rounds use theirs; ends and totals are the latest case.
   const starts = allRounds.length > 0 ? projectedStarts(config, progress) : [];
+  const earliest = allRounds.length > 0 ? earliestStarts(config, progress) : [];
 
   // Clock times once Round 1 has a start (begun, or scheduled while
   // convening); before that, only lengths are known.
@@ -53,12 +58,13 @@ export async function BracketView({
     wallClockIso(tournament, s) ??
     (tournament.startAt ? new Date(tournament.startAt.getTime() + s * 1000).toISOString() : null);
 
-  const TimeSpan = ({ fromS, toS, length }: { fromS: number; toS: number; length: string }) => {
+  const TimeSpan = ({ fromS, toS, length, slipS = 0 }: { fromS: number; toS: number; length: string; slipS?: number }) => {
     const from = wallIso(fromS);
     const to = wallIso(toS);
     return from && to ? (
       <>
-        <LocalTime iso={from} timeOnly /> – <LocalTime iso={to} timeOnly />
+        <LocalTime iso={from} timeOnly />
+        {slipS > 0 && <> (or up to {fmtDuration(slipS)} later)</>} – <LocalTime iso={to} timeOnly />
       </>
     ) : (
       <>{length}</>
@@ -80,10 +86,10 @@ export async function BracketView({
           const prev = allRounds[round.number - 2];
           const inThisBreak =
             running && !paused && round.state === "scheduled" && prev?.state === "closed";
-          const roundStart = round.actualStartS ?? starts[round.number - 1] ?? round.scheduledStartS;
+          const roundStart = round.actualStartS ?? earliest[round.number - 1] ?? round.scheduledStartS;
+          const slipS = round.actualStartS == null ? (starts[round.number - 1] ?? roundStart) - roundStart : 0;
           // At the latest: unfinished pairs get the decision-window after the clock.
           const roundEnd = projectedEnd(config, progress, starts, round.number);
-          const breakStart = round.number > 1 ? projectedEnd(config, progress, starts, round.number - 1) : roundStart;
           return (
             <section key={round.number}>
               {round.number > 1 && (
@@ -91,7 +97,12 @@ export async function BracketView({
                   <header className="mb-1 flex items-baseline justify-between">
                     <h3 className="font-semibold text-muted">Break</h3>
                     <span className="text-xs text-muted">
-                      <TimeSpan fromS={breakStart} toS={roundStart} length={fmtDuration(tournament.breakDurationS)} />
+                      {/* Clock times once the round before has closed; until then only its length is certain. */}
+                      {prev?.actualCloseS != null ? (
+                        <TimeSpan fromS={prev.actualCloseS} toS={roundStart} length={fmtDuration(tournament.breakDurationS)} />
+                      ) : (
+                        fmtDuration(tournament.breakDurationS)
+                      )}
                     </span>
                   </header>
                   <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-line px-3 py-1.5 text-sm text-muted">
@@ -113,7 +124,7 @@ export async function BracketView({
                 <h3 className="font-semibold">
                   Round {round.number}
                   <span className="ml-2 text-xs font-normal text-muted">
-                    <TimeSpan fromS={roundStart} toS={roundEnd} length={roundLength} />
+                    <TimeSpan fromS={roundStart} toS={roundEnd} length={roundLength} slipS={slipS} />
                   </span>
                 </h3>
                 <span className="text-xs text-muted">
