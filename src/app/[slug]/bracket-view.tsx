@@ -120,14 +120,15 @@ export async function BracketView({
                   </div>
                 </div>
               )}
-              <header className="mb-2 flex items-baseline justify-between">
-                <h3 className="font-semibold">
+              <header className="mb-2 flex items-baseline justify-between gap-2">
+                <h3 className="min-w-0 font-semibold">
                   Round {round.number}
-                  <span className="ml-2 text-xs font-normal text-muted">
+                  {/* Wraps as a unit under the heading on a phone, never splitting "PM" off. */}
+                  <span className="ml-2 inline-block text-xs font-normal text-muted">
                     <TimeSpan fromS={roundStart} toS={roundEnd} length={roundLength} slipS={slipS} />
                   </span>
                 </h3>
-                <span className="text-xs text-muted">
+                <span className="shrink-0 text-xs text-muted">
                   {round.state === "open" && running && (
                     <Countdown
                       remainingS={ctx.remainingFor(round.number)}
