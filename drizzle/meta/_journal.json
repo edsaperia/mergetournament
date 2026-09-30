@@ -71,6 +71,13 @@
       "when": 1784676617527,
       "tag": "0009_intro-and-tz",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790787113123,
+      "tag": "0010_message-seq",
+      "breakpoints": true
     }
   ]
 }

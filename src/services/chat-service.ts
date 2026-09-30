@@ -95,7 +95,8 @@ export async function messagesFor(db: Db, roomId: string): Promise<MessageView[]
     .from(messages)
     .leftJoin(participants, eq(messages.authorId, participants.id))
     .where(eq(messages.roomId, roomId))
-    .orderBy(asc(messages.createdAt), asc(messages.id));
+    // Insertion order: messages posted in one tick share a timestamp.
+    .orderBy(asc(messages.seq));
   return rows.map((r) => ({ ...r, author: r.author ?? null }));
 }
 

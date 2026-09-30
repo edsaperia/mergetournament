@@ -193,7 +193,7 @@ export async function beginTournament(db: Db, tournamentId: string, now: Date) {
     await tx.update(tournaments).set({ phase: "running", begunAt: now }).where(eq(tournaments.id, tournamentId));
     await openRound(tx, tournamentId, 1, 0);
     await audit(tx, tournamentId, "begin", { at: now.toISOString() });
-    await postSystem(tx, tournamentId, "Begin! Round 1 is open.");
+    // openRound has just posted "Round 1 is open."; one announcement is enough.
   });
 }
 
