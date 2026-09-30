@@ -192,3 +192,26 @@ describe("whatNow for a player whose text then stands over", () => {
     expect(whatNow(agreed, "ben", nameOf, 1, false, false, "standsOver")).toBe(whatNow(agreed, "ben", nameOf, 1, false, false));
   });
 });
+
+describe("a coin flip on who goes into the next round says why it was needed", () => {
+  const flipped = (bearerPrefA: "A" | "B" | null, bearerPrefB: "A" | "B" | null) => {
+    const session = { ...newSession(), lock: "locked" as const, workingText: "x", bearerPref: { A: bearerPrefA, B: bearerPrefB } };
+    const r = resolveMerge({ text: "tA", bearer: "ada" }, { text: "tB", bearer: "ben" }, session, null, mulberry32(1));
+    expect(r.kind).toBe("BEARER_FLIP");
+    return { ...base, resolution: "bearer_flip", resultTextId: "new", advancingBearerId: r.advancing!.bearer, bearerPrefA, bearerPrefB };
+  };
+  it("neither picked", () => {
+    const m = flipped(null, null);
+    expect(resolutionSentence(m, nameOf, false)).toBe(
+      `Agreed. Neither Ada nor Ben picked who goes into the next round, so a coin flip chose ${nameOf(m.advancingBearerId)}.`
+    );
+  });
+  it("the picks differed, either way round", () => {
+    for (const [a, b] of [["A", "B"], ["B", "A"]] as const) {
+      const m = flipped(a, b);
+      expect(resolutionSentence(m, nameOf, false)).toBe(
+        `Agreed. The picks for who goes into the next round differed, so a coin flip chose ${nameOf(m.advancingBearerId)}.`
+      );
+    }
+  });
+});

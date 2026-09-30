@@ -34,6 +34,9 @@ export interface ResolvedMergeView {
   textBId: string | null;
   resultTextId: string | null;
   advancingBearerId: string | null;
+  /** Each player's pick for who goes into the next round, when known: says why a coin flip chose. */
+  bearerPrefA?: "A" | "B" | null;
+  bearerPrefB?: "A" | "B" | null;
 }
 
 /** What advanced from a resolved merge: the merged text, one input unchanged, or nothing. */
@@ -59,8 +62,16 @@ export function resolutionSentence(m: ResolvedMergeView, nameOf: (id: string | n
       return finalRound
         ? "Agreed: the merged text is the tournament's final text."
         : `Agreed: ${carrier} goes into the next round with the merged text.`;
-    case "bearer_flip":
+    case "bearer_flip": {
+      const [pA, pB] = [m.bearerPrefA, m.bearerPrefB];
+      if (pA === null && pB === null) {
+        return `Agreed. Neither ${nameOf(m.bearerAId)} nor ${nameOf(m.bearerBId)} picked who goes into the next round, so a coin flip chose ${carrier}.`;
+      }
+      if (pA && pB && pA !== pB) {
+        return `Agreed. The picks for who goes into the next round differed, so a coin flip chose ${carrier}.`;
+      }
       return `Agreed. The picks for who goes into the next round differed or were missing, so a coin flip chose ${carrier}.`;
+    }
     case "backstop_flip":
       return `No agreement, so a coin flip between the inputs: ${inputOwner}'s ${finalRound ? "input" : "text"} ${goes} unchanged.`;
     case "active_advance":
