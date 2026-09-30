@@ -27,8 +27,11 @@ export function FullStory() {
         are seeded into a knockout bracket at random. In each round, pairs of texts meet: their
         two bearers negotiate a merged text in a shared editor, against a fixed deadline. Both
         must consent to the result. If they agree, the merged text advances, carried forward by
-        one of the two, chosen by agreement or by lot. If the clock expires first, a coin flip
-        selects one of the two input texts to advance intact.
+        one of the two, chosen by agreement or by lot. If the clock expires first, the pair gets
+        one last minute to accept or reject the text as it stands; if they still don&apos;t both
+        accept, a coin flip selects one of the two input texts to advance intact. A bearer who
+        takes no part at all forfeits the say: if only one of the two took part, their choice
+        alone decides what advances, and if neither did, the pairing is abandoned.
       </P>
       <P>
         Rounds halve the field until one text remains. Twenty drafts become one in five rounds;
@@ -70,8 +73,8 @@ export function FullStory() {
         Participants each submit a draft document before a deadline. The system builds the
         bracket, seeds it uniformly at random, publishes the schedule, and from that point runs
         itself. Rounds open and close on the clock; breaks between rounds let everyone read the
-        surviving texts and lobby the bearers of the next round; unresolved merges are settled
-        by an animated coin flip. The administrator has exactly two live controls: begin, and
+        surviving texts and lobby the bearers of the next round; unresolved merges get a final
+        minute to decide, and are then settled by an animated coin flip. The administrator has exactly two live controls: begin, and
         pause. There is deliberately no discretion beyond that: no extending a round, no
         reassigning a pairing, no overriding a flip.
       </P>
