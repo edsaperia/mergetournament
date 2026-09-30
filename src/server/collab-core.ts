@@ -27,6 +27,11 @@ export interface CollabConfig {
   port: number;
   secret: string;
   getDb: () => Promise<Db>;
+  /**
+   * Called once a bearer first writes in a merge: open pages can then
+   * refresh, since who has taken part changes what the pick line says.
+   */
+  onActive?: (mergeId: string) => void | Promise<void>;
   /** onStoreDocument debounce in ms. */
   debounce?: number;
 }
@@ -135,6 +140,7 @@ export function createCollabServer(config: CollabConfig) {
         .update(merges)
         .set(context.side === "A" ? { activeA: true } : { activeB: true })
         .where(eq(merges.id, mergeIdOf(documentName)));
+      await config.onActive?.(mergeIdOf(documentName));
     },
 
     async onStoreDocument({ document, documentName }) {

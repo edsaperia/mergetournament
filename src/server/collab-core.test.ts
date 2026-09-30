@@ -35,6 +35,8 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
   }
 }
 
+/** Merges whose pages were told a bearer first wrote in them. */
+const activeCalls: string[] = [];
 const settle = (ms = 400) => new Promise((r) => setTimeout(r, ms));
 
 beforeAll(async () => {
@@ -50,7 +52,15 @@ beforeAll(async () => {
   [merge] = await db.select().from(merges);
   expect(merge.state).toBe("open");
 
-  handle = createCollabServer({ port: 0, secret: SECRET, getDb: async () => db as unknown as Db, debounce: 50 });
+  handle = createCollabServer({
+    port: 0,
+    secret: SECRET,
+    getDb: async () => db as unknown as Db,
+    debounce: 50,
+    onActive: (mergeId) => {
+      activeCalls.push(mergeId);
+    },
+  });
   await handle.server.listen();
   wsUrl = `ws://localhost:${handle.server.address.port}`;
 }, 30000);
@@ -78,6 +88,8 @@ describe("collab write gates", () => {
     // Activity marked for the backstop.
     expect(row.activeA).toBe(true);
     expect(row.activeB).toBe(true);
+    // Each bearer's first edit tells open pages, once: the pick line depends on who has taken part.
+    expect(activeCalls).toEqual([merge.id, merge.id]);
 
     a.provider.destroy();
     b.provider.destroy();

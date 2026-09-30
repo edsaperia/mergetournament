@@ -120,16 +120,11 @@ export function DecisionModal({
         `${sendsInput("their")}; if you both respond, ${orFlip}; if neither does, the merge is abandoned.`,
     },
   }[variant];
-  // Who carries: with one bearer active, whatever advances at the window's
-  // end is theirs to carry (resolveMerge ignores the picks); the picks count
-  // only if both accept and the merge locks.
+  // Who goes on: with one player active, whatever goes on at the window's end
+  // is theirs (resolveMerge ignores the picks); the picks count only if both
+  // accept and the merge locks.
   const picks = mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref };
-  // (The partner-only case needs no extra line: the rules line already says
-  // their Accept advances while you stay silent, and the picks count once you respond.)
-  const carrier =
-    variant === "me"
-      ? `While ${partner} stays silent, you go into the next round; your pick counts only if ${partner} accepts too.`
-      : carrierLine(mySide, names, picks);
+  const carrier = carrierLine(mySide, names, picks, { iAmActive, partnerActive, window: true });
   // Expanded for one variant only, so a change of who is active collapses it.
   const [whatIfFor, setWhatIfFor] = useState<string | null>(null);
   const whatIf = whatIfFor === variant;

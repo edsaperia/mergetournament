@@ -19,6 +19,8 @@ export function WorkspaceControls({
   proposedBy,
   myPref,
   partnerPref,
+  iAmActive,
+  partnerActive,
   finalRound,
 }: {
   slug: string;
@@ -29,6 +31,9 @@ export function WorkspaceControls({
   proposedBy: "A" | "B" | null;
   myPref: "A" | "B" | null;
   partnerPref: "A" | "B" | null;
+  /** Whether each player has taken part yet this round: with one silent, the picks don't decide. */
+  iAmActive: boolean;
+  partnerActive: boolean;
   finalRound: boolean;
 }) {
   const [state, dispatch, pending] = useActionState(
@@ -79,7 +84,11 @@ export function WorkspaceControls({
             ))}
           </div>
           <p className="mt-2 text-xs text-muted">
-            {carrierLine(mySide, names, mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref })}
+            {carrierLine(mySide, names, mySide === "A" ? { A: myPref, B: partnerPref } : { A: partnerPref, B: myPref }, {
+              iAmActive,
+              partnerActive,
+              window: false,
+            })}
           </p>
         </fieldset>
       )}

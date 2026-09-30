@@ -228,6 +228,8 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
                 proposedBy={m.proposedBy}
                 myPref={mySide === "A" ? m.bearerPrefA : m.bearerPrefB}
                 partnerPref={mySide === "A" ? m.bearerPrefB : m.bearerPrefA}
+                iAmActive={mySide === "A" ? m.activeA : m.activeB}
+                partnerActive={mySide === "A" ? m.activeB : m.activeA}
                 finalRound={isFinal}
               />
             )}

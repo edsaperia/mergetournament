@@ -1,9 +1,10 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
-import { merges } from "../db/schema";
+import { merges, slots } from "../db/schema";
 import { authSecret } from "./config";
 import { createCollabServer, type CollabHandle } from "./collab-core";
+import { bump } from "./events";
 
 /** Port the sync server listens on; the client connects via COLLAB_WS_URL. */
 export function collabPort(): number {
@@ -18,7 +19,21 @@ const globalCache = globalThis as unknown as { __mtCollab?: CollabHandle };
 
 export async function startCollab(): Promise<void> {
   if (globalCache.__mtCollab) return;
-  const handle = createCollabServer({ port: collabPort(), secret: authSecret(), getDb });
+  const handle = createCollabServer({
+    port: collabPort(),
+    secret: authSecret(),
+    getDb,
+    // A bearer's first edit makes them active: refresh open pages so the pick line says so.
+    onActive: async (mergeId) => {
+      const db = await getDb();
+      const [row] = await db
+        .select({ tournamentId: slots.tournamentId })
+        .from(merges)
+        .innerJoin(slots, eq(merges.slotId, slots.id))
+        .where(eq(merges.id, mergeId));
+      if (row) bump(row.tournamentId);
+    },
+  });
   globalCache.__mtCollab = handle;
   await handle.server.listen();
   console.log(`[collab] sync server listening on :${collabPort()}`);
