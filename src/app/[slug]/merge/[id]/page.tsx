@@ -107,13 +107,20 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
           {isFinal ? " (final)" : ""}
           {m.isAdHoc ? " (extra pairing)" : ""}: {bearerName(m.bearerAId)} + {bearerName(m.bearerBId)}
         </h1>
-        {ctx.running && round.state === "open" && (
+        {ctx.running && round.state === "open" && m.state === "open" && (
           <Countdown
             remainingS={ctx.remainingFor(slot.roundNo)}
             paused={paused}
             className="text-lg"
             {...warnThresholds(tournament.roundDurationS)}
           />
+        )}
+        {/* Decided: the clock no longer applies to this merge, only to the round around it. Greyed, never urgent. */}
+        {ctx.running && round.state === "open" && m.state !== "open" && (
+          <span className="text-sm text-faint">
+            decided · round {slot.roundNo} closes within{" "}
+            <Countdown remainingS={ctx.remainingFor(slot.roundNo)} paused={paused} />
+          </span>
         )}
         {/* This merge's window only: once it resolves, the resolved banner says what happened. */}
         {ctx.running && round.state === "closing" && m.state === "open" && (
