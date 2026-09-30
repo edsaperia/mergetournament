@@ -228,7 +228,7 @@ export default async function MergePage(props: PageProps<"/[slug]/merge/[id]">) 
               m.workingText ? (
                 <InputText body={m.workingText} />
               ) : (
-                <p className="text-faint">(blank)</p>
+                <p className="text-faint">(empty)</p>
               )
             ) : (
               // From lg up the editor takes what the pane has left after the controls.

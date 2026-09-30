@@ -49,9 +49,20 @@ export interface ProvenanceStep {
   advancedTextId: string | null;
 }
 
+/**
+ * A text that went on from a round without a merge: a bye, or a text standing
+ * over because its partner's side came up empty. The final text may be one.
+ */
+export interface ProvenancePass {
+  round: number;
+  kind: "bye" | "standOver";
+  textId: string;
+}
+
 export interface Provenance {
   nodes: ProvenanceNode[];
   steps: ProvenanceStep[];
+  passes: ProvenancePass[];
   /** The tournament's final text, once it has one. */
   canonicalTextId: string | null;
   /** The number of the final round, once the bracket exists. */
@@ -107,6 +118,24 @@ export async function provenance(db: Db, tournamentId: string): Promise<Provenan
       created.set(m.resultTextId!, { resolution: m.resolution, round: m.round });
     }
   }
+  // Slots with a text but no merge: byes and stand-overs. A bye slot whose
+  // text went into an extra pairing instead is empty, and not listed.
+  const withMerge = await db
+    .select({ slotId: merges.slotId })
+    .from(merges)
+    .innerJoin(slots, eq(merges.slotId, slots.id))
+    .where(eq(slots.tournamentId, tournamentId));
+  const mergeSlots = new Set(withMerge.map((r) => r.slotId));
+  const passes: ProvenancePass[] = (
+    await db
+      .select()
+      .from(slots)
+      .where(and(eq(slots.tournamentId, tournamentId), eq(slots.outState, "filled")))
+      .orderBy(asc(slots.roundNo), asc(slots.position))
+  )
+    .filter((sl) => !mergeSlots.has(sl.id) && sl.outTextId)
+    .map((sl) => ({ round: sl.roundNo, kind: sl.kind === "bye" ? "bye" : "standOver", textId: sl.outTextId! }));
+
   const { canonicalTextId, finalRound } = await finalOf(db, tournamentId);
   return {
     nodes: texts.map((t) => ({
@@ -116,6 +145,7 @@ export async function provenance(db: Db, tournamentId: string): Promise<Provenan
       round: created.get(t.id)?.round ?? null,
     })),
     steps,
+    passes,
     canonicalTextId,
     finalRound,
   };
@@ -155,7 +185,15 @@ function stepLabel(s: ProvenanceStep, index: Map<string, string>, finalRound: nu
   return s.advancedTextId ? `${what}; ${index.get(s.advancedTextId) ?? "?"} ${goes} unchanged` : what;
 }
 
-export function provenanceMermaid({ nodes, steps, canonicalTextId, finalRound }: Provenance): string {
+function passLabel(p: ProvenancePass, index: Map<string, string>, finalRound: number | null): string {
+  const ref = index.get(p.textId) ?? "?";
+  if (p.round === finalRound) return `the final: ${ref} has no partner, so it becomes the final text`;
+  return p.kind === "bye"
+    ? `round ${p.round}: bye; ${ref} goes into round ${p.round + 1} unchanged`
+    : `round ${p.round}: ${ref} has no partner, so it stands over into round ${p.round + 1}`;
+}
+
+export function provenanceMermaid({ nodes, steps, passes, canonicalTextId, finalRound }: Provenance): string {
   const index = new Map<string, string>();
   const lines = ["flowchart TD"];
   for (const n of nodes) {
@@ -163,6 +201,7 @@ export function provenanceMermaid({ nodes, steps, canonicalTextId, finalRound }:
     lines.push(`  ${ref}["${textLabel(n)}${n.id === canonicalTextId ? " · final text" : ""}"]`);
   }
   steps.forEach((s, i) => lines.push(`  M${i}{{"${stepLabel(s, index, finalRound)}"}}`));
+  passes.forEach((p, i) => lines.push(`  S${i}(["${passLabel(p, index, finalRound)}"])`));
   for (const n of nodes) {
     const ref = index.get(n.id)!;
     if (n.parentAId && index.has(n.parentAId)) lines.push(`  ${index.get(n.parentAId)} --> ${ref}`);
@@ -171,6 +210,9 @@ export function provenanceMermaid({ nodes, steps, canonicalTextId, finalRound }:
   steps.forEach((s, i) => {
     if (index.has(s.inputAId)) lines.push(`  ${index.get(s.inputAId)} --> M${i}`);
     if (index.has(s.inputBId)) lines.push(`  ${index.get(s.inputBId)} --> M${i}`);
+  });
+  passes.forEach((p, i) => {
+    if (index.has(p.textId)) lines.push(`  ${index.get(p.textId)} --> S${i}`);
   });
   return lines.join("\n");
 }
@@ -193,21 +235,22 @@ export async function provenanceMarkdown(db: Db, tournamentId: string): Promise<
       return `- **${ref}** — ${what}, ${n.wordCount} words${parents}${how}${final} — id \`${n.id}\``;
     })
     .join("\n");
-  const stepListing = tree.steps
-    .map(
-      (s, i) =>
-        `- **M${i}** — round ${s.round} merge of ${index.get(s.inputAId) ?? "?"} + ${index.get(s.inputBId) ?? "?"}: ` +
-        (s.advancedTextId
-          ? `${resolutionLabel(s.resolution)}; ${index.get(s.advancedTextId) ?? "?"} ${s.round === tree.finalRound ? "becomes the final text" : "goes into the next round"} unchanged`
-          : resolutionLabel(s.resolution)) +
-        (s.round === tree.finalRound ? " — the final" : "") +
-        ` — merge id \`${s.mergeId}\``
-    )
-    .join("\n");
+  const stepLine = (s: ProvenanceStep) =>
+    `- **M${tree.steps.indexOf(s)}** — round ${s.round} merge of ${index.get(s.inputAId) ?? "?"} + ${index.get(s.inputBId) ?? "?"}: ` +
+    resolutionLabel(s.resolution) +
+    (s.advancedTextId
+      ? `; ${index.get(s.advancedTextId) ?? "?"} ${s.round === tree.finalRound ? "becomes the final text" : "goes into the next round"} unchanged`
+      : `; nothing from it ${s.round === tree.finalRound ? "becomes the final text" : "goes into the next round"}`) +
+    (s.round === tree.finalRound ? " — the final" : "") +
+    ` — merge id \`${s.mergeId}\``;
+  const kept = tree.steps.filter((s) => s.advancedTextId !== null).map(stepLine);
+  const abandoned = tree.steps.filter((s) => s.advancedTextId === null).map(stepLine);
+  const passed = tree.passes.map((p, i) => `- **S${i}** — ${passLabel(p, index, tree.finalRound)} — text id \`${p.textId}\``);
+  const section = (title: string, items: string[]) => (items.length > 0 ? [`## ${title}`, "", items.join("\n"), ""] : []);
   return [
     `# Provenance — ${t?.name ?? tournamentId}`,
     "",
-    "Every text version with its parentage, and every merge that kept an input unchanged. The final text traces back through every merge to the original drafts.",
+    "Every text version with its parentage; every merge that kept an input unchanged or was abandoned; and every text that went on without a merge (a bye, or standing over with no partner). The final text traces back through all of them to the original drafts.",
     "",
     "```mermaid",
     provenanceMermaid(tree),
@@ -217,7 +260,9 @@ export async function provenanceMarkdown(db: Db, tournamentId: string): Promise<
     "",
     listing,
     "",
-    ...(stepListing ? ["## Merges that kept an input unchanged", "", stepListing, ""] : []),
+    ...section("Merges that kept an input unchanged", kept),
+    ...section("Abandoned merges", abandoned),
+    ...section("Texts that went on without a merge", passed),
   ].join("\n");
 }
 

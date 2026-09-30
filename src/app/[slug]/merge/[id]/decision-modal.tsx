@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { carrierLine } from "../../../../lib/carrier";
 import { voteLine } from "../../../../lib/decision";
-import { countWords } from "../../../../lib/text";
+import { textSize } from "../../../../lib/text";
 import { workspaceAction, type ActionState } from "../../../../server/actions";
 import type { WorkspaceAction } from "../../../../services/runtime-service";
 import { ActionStatus } from "../../../action-status";
@@ -17,8 +17,6 @@ const initial: ActionState = { ok: true, message: "" };
 /** Lines of the frozen text the confirmation strip shows from each end. */
 const STRIP_HEAD = 3;
 const STRIP_TAIL = 3;
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * The decision modal (SPEC §4, the decision window): once the clock expires
@@ -156,11 +154,11 @@ export function DecisionModal({
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-3 sm:gap-3 sm:py-4">
         {!iAmActive && <p className="text-sm font-semibold text-warn sm:text-base">Are you still here? Any button below counts.</p>}
         <p className="text-xs text-muted sm:text-sm">
-          The merge you would accept · {plural(countWords(workingText), "word")} · {plural(lines.length, "line")}
+          The merge you would accept · {textSize(workingText)}
         </p>
         <div className="rounded-md border border-edge p-3">
           {blank ? (
-            <p className="text-faint">(blank)</p>
+            <p className="text-faint">(empty)</p>
           ) : excerpt ? (
             <>
               <NumberedText body={lines.slice(0, STRIP_HEAD).join("\n")} />
